@@ -1,0 +1,11 @@
+# 個人の開発ツール
+.serena/
+.claude/settings.local.json
+
+# Firebase の設定（各自のプロジェクトから取得する）
+google-services.json
+
+# 署名鍵
+*.jks
+*.keystore
+keystore.properties
