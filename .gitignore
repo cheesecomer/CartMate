@@ -2,6 +2,17 @@
 .serena/
 .claude/settings.local.json
 
+# ビルド
+.gradle/
+.kotlin/
+build/
+local.properties
+captures/
+
+# IDE
+.idea/
+*.iml
+
 # Firebase の設定（各自のプロジェクトから取得する）
 google-services.json
 

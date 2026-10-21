@@ -39,4 +39,16 @@ docs/       仕様と設計資料
 
 ## 開発
 
-セットアップ手順は実装を始めてから追記します。
+### 必要なもの
+
+- JDK 17 以上
+- Android SDK（compileSdk 37）
+
+### ビルドとテスト
+
+```sh
+./gradlew assembleDebug   # デバッグ APK をビルド
+./gradlew :domain:test    # domain モジュールの単体テスト
+```
+
+Android Studio で開く場合は、リポジトリのルートを開いてください。

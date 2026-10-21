@@ -1,0 +1,4 @@
+# Linux 用の起動スクリプトは LF、Windows 用は CRLF に固定する
+/gradlew        text eol=lf
+*.bat           text eol=crlf
+*.jar           binary
