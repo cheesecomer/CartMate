@@ -5,6 +5,7 @@ MVP は5つのフェーズに分けて実装します。各フェーズの終わ
 ## フェーズ1: 基盤とローカル状態の UI
 
 - Gradle 構成（`app`, `domain`）、Version Catalog、Hilt、テーマ、Navigation。
+- テスト基盤と CI: `domain` と `app` の単体テスト（JUnit、Truth、coroutines-test、Turbine）、Compose UI テスト、GitHub Actions（単体テストと lint）。rules-test と Firestore エミュレータを使う結合テストの基盤はフェーズ2で用意する。
 - `domain` のモデルと Repository インターフェースを **最終形で** 定義する（フェーズ2で実装を差し替えるだけで済むように）。
 - インメモリ Repository（チェック・Undo は [sync.md](design/sync.md) と同じ意味論。購入履歴の記録も含める）。
 - 画面: リスト一覧（作成、未購入件数、空リストの削除）、リスト詳細（追加、数量・単位、チェック、Undo Snackbar、チェック済みセクション、スワイプ操作と項目の削除）。

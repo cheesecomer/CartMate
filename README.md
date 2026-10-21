@@ -47,8 +47,13 @@ docs/       仕様と設計資料
 ### ビルドとテスト
 
 ```sh
-./gradlew assembleDebug   # デバッグ APK をビルド
-./gradlew :domain:test    # domain モジュールの単体テスト
+./gradlew assembleDebug                 # デバッグ APK をビルド
+./gradlew :domain:test                  # domain モジュールの単体テスト
+./gradlew :app:testDebugUnitTest        # app モジュールの単体テスト（ViewModel など）
+./gradlew :app:lintDebug                # lint
+./gradlew :app:connectedDebugAndroidTest  # Compose UI テスト（エミュレータか実機が必要）
 ```
+
+CI（GitHub Actions）では、単体テストと lint を実行します。Compose UI テストは CI では実行しないので、手元で実行してください。
 
 Android Studio で開く場合は、リポジトリのルートを開いてください。
