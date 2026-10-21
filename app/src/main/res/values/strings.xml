@@ -1,5 +1,46 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">CartMate</string>
+
+    <!-- 共通 -->
+    <string name="action_cancel">キャンセル</string>
+    <string name="action_delete">削除</string>
+    <string name="action_undo">元に戻す</string>
+    <string name="action_back">戻る</string>
+
+    <!-- リスト一覧 -->
     <string name="lists_title">買い物リスト</string>
+    <string name="lists_empty">リストがありません。右下のボタンから作成してください。</string>
+    <string name="lists_create">リストを作成</string>
+    <string name="lists_open_count">未購入 %1$d</string>
+    <string name="lists_create_dialog_title">新しいリスト</string>
+    <string name="lists_create_dialog_label">リスト名（例: スーパー、薬局）</string>
+    <string name="lists_create_dialog_confirm">作成</string>
+    <string name="lists_delete">%1$s を削除</string>
+    <string name="lists_delete_dialog_title">リストを削除しますか？</string>
+    <string name="lists_delete_dialog_message">「%1$s」を削除します。購入の記録は残ります。</string>
+
+    <!-- リスト詳細 -->
+    <string name="detail_empty">購入予定の商品はありません</string>
+    <string name="detail_check">チェック</string>
+    <string name="detail_uncheck">チェックを外す</string>
+    <string name="detail_checked_message">%1$s をチェックしました</string>
+    <string name="detail_deleted_message">%1$s を削除しました</string>
+    <string name="detail_already_completed">%1$s はすでにチェック済みです</string>
+    <string name="detail_already_open">すでにチェックが外されています</string>
+    <string name="detail_cannot_delete_completed">%1$s はチェック済みのため削除できません</string>
+    <string name="detail_cannot_edit_completed">%1$s はチェック済みのため変更できません</string>
+    <string name="detail_edited_item_not_found">編集していた商品は削除されています</string>
+    <string name="detail_operation_failed">操作を反映できませんでした</string>
+
+    <!-- 商品追加 -->
+    <string name="add_item_name_label">商品を追加</string>
+    <string name="add_item_quantity_label">数量</string>
+    <string name="add_item_unit_label">単位</string>
+    <string name="add_item_confirm">追加</string>
+    <string name="add_item_update">更新</string>
+    <string name="add_item_edit_name_label">商品名</string>
+    <string name="add_item_cancel_edit">編集をやめる</string>
+    <string name="detail_edit">編集</string>
+    <string name="add_item_cancel">商品名の入力に戻る</string>
 </resources>

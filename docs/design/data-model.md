@@ -62,11 +62,11 @@ households/{hid}/purchases/{purchaseId}      # purchaseId = itemId
 | メンバー | `households/{hid}/members` | listener（数件） |
 | リスト | `households/{hid}/lists`（全件。表示するかどうかはクライアントで判定） | listener（数十件） |
 | 未購入項目 | `items where status == "open"` | listener |
-| チェック済み（詳細画面） | `items where listId == X and status == "completed" and completedAt >= now-24h order by completedAt desc limit 50` | 画面を表示している間だけ listener |
+| リスト詳細の項目 | `items where listId == X and (status == "open" or completedAt >= now-24h)`（OR クエリ。並び順は createdAt でクライアント側） | 画面を表示している間だけ listener |
 | 商品 | `households/{hid}/products`（全件） | listener |
 | 購入履歴 | `purchases where purchasedAt >= now-365d` | listener。`active` の絞り込みはクライアント側 |
 
-複合インデックスは `items (listId ASC, status ASC, completedAt DESC)` の1つだけです。
+複合インデックスは、リスト詳細のクエリ（`listId` と、`status` / `completedAt` の OR）に必要なものだけを作ります。具体的な定義は、フェーズ2でクエリを実装するときに `firestore.indexes.json` で確定させます。
 
 ### 購入履歴の取得範囲（365日）
 

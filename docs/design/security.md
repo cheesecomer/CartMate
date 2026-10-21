@@ -6,6 +6,7 @@
 - **状態遷移をルールで強制する**。項目の open→completed は、同じ書き込みの中で `purchases/{itemId}` が `active == true` になる場合に限って許可する（`getAfter`）。逆方向（Undo）も同じ扱いにする。クライアントにバグがあっても、「チェック済みなのに購入履歴がない」「Undo したのに履歴が有効なまま」という状態は作れない。
 - サーバー時刻を強制する（`createdAt/completedAt/purchasedAt == request.time`）。購入日時の改ざんや、端末の時計のずれを防ぐ。端末時刻の `checkedAt` だけは、許容範囲（未来5分〜過去7日）を検証して受け付ける（[sync.md](sync.md#保留チェック)）。
 - フィールドを `keys().hasOnly(...)` で制限し、型と長さを検証する。
+- 編集: 未購入の項目の商品名・数量・単位だけを変更できる。チェック済みの項目は、購入の記録と食い違わないよう変更できない。
 - 削除: 家族・購入履歴・商品は削除できない。リストは論理削除のみ。物理削除できるのは未購入の項目だけ（誤って追加したものの取り消し。[ui.md](ui.md#スワイプ操作)）。
 - 招待コードは `get`（IDを指定した読み取り）だけを許可し、一覧の取得は同じ家族のメンバーに限る。参加処理は、「members の作成」と「invite の usedCount +1」が同じバッチに含まれる場合だけ成立させる。
 
@@ -130,7 +131,7 @@ service cloud.firestore {
           && request.resource.data.createdAt == request.time
           && exists(/databases/$(db)/documents/households/$(hid)/lists/$(request.resource.data.listId))
           && existsAfter(/databases/$(db)/documents/households/$(hid)/products/$(request.resource.data.productId));
-        allow update: if isMember(hid) && (isCompleting() || isReopening());
+        allow update: if isMember(hid) && (isCompleting() || isReopening() || isEditing());
         allow delete: if isMember(hid) && resource.data.status == 'open';   // 誤って追加した項目の削除
 
         function isCompleting() {
@@ -141,6 +142,16 @@ service cloud.firestore {
             && request.resource.data.completedBy == me()
             && request.resource.data.completedAt == request.time
             && p.active == true && p.purchasedAt == request.time;
+        }
+        // 未購入の項目の商品名・数量・単位の変更。チェック済みの項目は変更できない
+        function isEditing() {
+          return resource.data.status == 'open'
+            && changed().hasOnly(['inputName','quantity','unit'])
+            && str(request.resource.data.inputName, 60)
+            && (request.resource.data.quantity == null
+                || (request.resource.data.quantity is number
+                    && request.resource.data.quantity > 0 && request.resource.data.quantity <= 9999))
+            && optStr(request.resource.data.unit, 10);
         }
         function isReopening() {
           return resource.data.status == 'completed'

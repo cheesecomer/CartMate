@@ -1,0 +1,196 @@
+package com.cheesecomer.cartmate.data.memory
+
+import com.cheesecomer.cartmate.domain.model.Item
+import com.cheesecomer.cartmate.domain.model.ItemId
+import com.cheesecomer.cartmate.domain.model.ItemStatus
+import com.cheesecomer.cartmate.domain.model.ListId
+import com.cheesecomer.cartmate.domain.model.ListStatus
+import com.cheesecomer.cartmate.domain.model.NewItem
+import com.cheesecomer.cartmate.domain.model.Purchase
+import com.cheesecomer.cartmate.domain.model.ShoppingList
+import com.cheesecomer.cartmate.domain.repository.CompleteResult
+import com.cheesecomer.cartmate.domain.repository.CurrentUserProvider
+import com.cheesecomer.cartmate.domain.repository.DeleteItemResult
+import com.cheesecomer.cartmate.domain.repository.DeleteListResult
+import com.cheesecomer.cartmate.domain.repository.ItemRepository
+import com.cheesecomer.cartmate.domain.repository.ItemUpdate
+import com.cheesecomer.cartmate.domain.repository.PurchaseRepository
+import com.cheesecomer.cartmate.domain.repository.ReopenResult
+import com.cheesecomer.cartmate.domain.repository.ShoppingListRepository
+import com.cheesecomer.cartmate.domain.repository.UpdateItemResult
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
+import java.time.Clock
+import java.time.Instant
+import java.util.UUID
+import javax.inject.Inject
+import javax.inject.Singleton
+
+/**
+ * フェーズ1用のインメモリ実装。プロセスが終了するとデータは消える。
+ * チェックと Undo の意味論は Firestore 実装と同じにする（docs/design/sync.md）。
+ */
+@Singleton
+class InMemoryStore @Inject constructor(
+    private val clock: Clock,
+    private val currentUser: CurrentUserProvider,
+) : ShoppingListRepository, ItemRepository, PurchaseRepository {
+
+    private data class Data(
+        val lists: Map<ListId, ShoppingList> = emptyMap(),
+        val items: Map<ItemId, Item> = emptyMap(),
+        val purchases: Map<ItemId, Purchase> = emptyMap(),
+    )
+
+    private val data = MutableStateFlow(Data())
+
+    /** 状態を読んで書き換え、結果を返す。Firestore のトランザクションに相当する */
+    private inline fun <R> transact(block: (Data) -> Pair<Data, R>): R {
+        while (true) {
+            val current = data.value
+            val (next, result) = block(current)
+            if (data.compareAndSet(current, next)) return result
+        }
+    }
+
+    // ShoppingListRepository
+
+    override fun observeLists(): Flow<List<ShoppingList>> =
+        data.map { it.lists.values.sortedBy(ShoppingList::createdAt) }.distinctUntilChanged()
+
+    override suspend fun createList(name: String): ListId {
+        val list = ShoppingList(
+            id = ListId(newId()),
+            name = name,
+            createdAt = clock.instant(),
+            createdBy = currentUser.currentUserId(),
+            status = ListStatus.ACTIVE,
+        )
+        data.update { it.copy(lists = it.lists + (list.id to list)) }
+        return list.id
+    }
+
+    override suspend fun deleteList(id: ListId): DeleteListResult = transact { d ->
+        val list = d.lists[id]
+        when {
+            list == null || list.status == ListStatus.DELETED -> d to DeleteListResult.NotFound
+            d.items.values.any { it.listId == id && it.status == ItemStatus.OPEN } -> d to DeleteListResult.NotEmpty
+            else -> d.copy(lists = d.lists + (id to list.copy(status = ListStatus.DELETED))) to DeleteListResult.Deleted
+        }
+    }
+
+    // ItemRepository
+
+    override fun observeOpenItems(): Flow<List<Item>> =
+        data.map { d -> d.items.values.filter { it.status == ItemStatus.OPEN }.sortedBy(Item::createdAt) }
+            .distinctUntilChanged()
+
+    override fun observeListItems(listId: ListId, completedSince: Instant): Flow<List<Item>> =
+        data.map { d ->
+            d.items.values
+                .filter { it.listId == listId }
+                .filter { it.status == ItemStatus.OPEN || it.completedAt!! >= completedSince }
+                .sortedBy(Item::createdAt)
+        }.distinctUntilChanged()
+
+    override suspend fun addItem(newItem: NewItem): ItemId {
+        val item = Item(
+            id = ItemId(newId()),
+            listId = newItem.listId,
+            inputName = newItem.inputName,
+            quantity = newItem.quantity,
+            unit = newItem.unit,
+            status = ItemStatus.OPEN,
+            createdAt = clock.instant(),
+            createdBy = currentUser.currentUserId(),
+            completedAt = null,
+            completedBy = null,
+        )
+        data.update { it.copy(items = it.items + (item.id to item)) }
+        return item.id
+    }
+
+    override suspend fun updateItem(id: ItemId, update: ItemUpdate): UpdateItemResult = transact { d ->
+        val item = d.items[id]
+        when {
+            item == null -> d to UpdateItemResult.NotFound
+            item.status == ItemStatus.COMPLETED -> d to UpdateItemResult.AlreadyCompleted
+            else -> {
+                val updated = item.copy(inputName = update.inputName, quantity = update.quantity, unit = update.unit)
+                d.copy(items = d.items + (id to updated)) to UpdateItemResult.Updated
+            }
+        }
+    }
+
+    override suspend fun deleteItem(id: ItemId): DeleteItemResult = transact { d ->
+        val item = d.items[id]
+        when {
+            item == null -> d to DeleteItemResult.NotFound
+            item.status == ItemStatus.COMPLETED -> d to DeleteItemResult.AlreadyCompleted
+            else -> d.copy(items = d.items - id) to DeleteItemResult.Deleted
+        }
+    }
+
+    override suspend fun restoreItem(item: Item) {
+        val restored = item.copy(
+            status = ItemStatus.OPEN,
+            createdAt = clock.instant(),
+            completedAt = null,
+            completedBy = null,
+        )
+        data.update { d -> if (item.id in d.items) d else d.copy(items = d.items + (item.id to restored)) }
+    }
+
+    override suspend fun completeItem(id: ItemId, checkedAt: Instant): CompleteResult {
+        val now = clock.instant()
+        val me = currentUser.currentUserId()
+        return transact { d ->
+            val item = d.items[id] ?: return@transact d to CompleteResult.Rejected(null)
+            if (item.status == ItemStatus.COMPLETED) {
+                return@transact d to CompleteResult.AlreadyCompleted(item.completedBy!!, item.completedAt!!)
+            }
+            val completed = item.copy(status = ItemStatus.COMPLETED, completedAt = now, completedBy = me)
+            val purchase = Purchase(
+                itemId = item.id,
+                listId = item.listId,
+                listNameSnapshot = d.lists[item.listId]?.name.orEmpty(),
+                inputName = item.inputName,
+                quantity = item.quantity,
+                unit = item.unit,
+                checkedAt = checkedAt,
+                purchasedAt = now,
+                purchasedBy = me,
+                active = true,
+                revokedAt = null,
+                revokedBy = null,
+            )
+            d.copy(items = d.items + (id to completed), purchases = d.purchases + (id to purchase)) to
+                CompleteResult.Completed
+        }
+    }
+
+    override suspend fun reopenItem(id: ItemId): ReopenResult {
+        val now = clock.instant()
+        val me = currentUser.currentUserId()
+        return transact { d ->
+            val item = d.items[id] ?: return@transact d to ReopenResult.Rejected(null)
+            if (item.status == ItemStatus.OPEN) return@transact d to ReopenResult.AlreadyOpen
+            val reopened = item.copy(status = ItemStatus.OPEN, completedAt = null, completedBy = null)
+            val purchases = d.purchases[id]
+                ?.let { d.purchases + (id to it.copy(active = false, revokedAt = now, revokedBy = me)) }
+                ?: d.purchases
+            d.copy(items = d.items + (id to reopened), purchases = purchases) to ReopenResult.Reopened
+        }
+    }
+
+    // PurchaseRepository
+
+    override fun observePurchases(since: Instant): Flow<List<Purchase>> =
+        data.map { d -> d.purchases.values.filter { it.purchasedAt >= since }.sortedBy(Purchase::purchasedAt) }
+            .distinctUntilChanged()
+
+    private fun newId(): String = UUID.randomUUID().toString()
+}
