@@ -119,6 +119,7 @@ class AddItemReducerTest {
             id = ItemId("i1"),
             listId = ListId("l1"),
             inputName = "牛乳",
+            sortKey = 1.0,
             quantity = 2.0,
             unit = "本",
             status = ItemStatus.OPEN,

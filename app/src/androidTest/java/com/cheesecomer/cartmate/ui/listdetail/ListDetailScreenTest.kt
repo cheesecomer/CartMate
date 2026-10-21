@@ -1,5 +1,7 @@
 package com.cheesecomer.cartmate.ui.listdetail
 
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsOff
@@ -17,6 +19,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performCustomAccessibilityActionWithLabel
 import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
@@ -361,5 +364,57 @@ class ListDetailScreenTest {
         editButton.performClick()
         editButton.assertIsOff()
         composeRule.onNodeWithTag(AddItemBarTags.EDIT_NAME).assertDoesNotExist()
+    }
+
+    private fun listItemNames() =
+        runBlocking { store.observeListItems(listId, Instant.EPOCH).first().map { it.inputName } }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun TalkBackのカスタムアクションで項目を上下に移動できる() {
+        runBlocking {
+            store.addItem(NewItem(listId, "牛乳", null, null))
+            store.addItem(NewItem(listId, "卵", null, null))
+            store.addItem(NewItem(listId, "パン", null, null))
+        }
+        setContent()
+
+        composeRule.onNodeWithText("パン").performCustomAccessibilityActionWithLabel("上へ移動")
+        composeRule.waitUntil { listItemNames() == listOf("牛乳", "パン", "卵") }
+
+        composeRule.onNodeWithText("牛乳").performCustomAccessibilityActionWithLabel("下へ移動")
+        composeRule.waitUntil { listItemNames() == listOf("パン", "牛乳", "卵") }
+    }
+
+    @Test
+    fun ロングタップしてドラッグすると項目を並び替えられる() {
+        runBlocking {
+            store.addItem(NewItem(listId, "牛乳", null, null))
+            store.addItem(NewItem(listId, "卵", null, null))
+            store.addItem(NewItem(listId, "パン", null, null))
+        }
+        setContent()
+        val rowHeight = composeRule.onNodeWithText("卵").getUnclippedBoundsInRoot().let { it.bottom - it.top }
+
+        val bread = composeRule.onNodeWithText("パン")
+        bread.performTouchInput { down(center) }
+        // 長押しとして認識させる（イベントの時刻ではなく、画面側の時計を進める）
+        composeRule.mainClock.advanceTimeBy(1_000)
+        // 2行ぶん上へ、少しずつ動かして先頭に置く
+        repeat(STEPS) {
+            bread.performTouchInput { moveBy(Offset(0f, -(rowHeight.toPx() * 2.5f) / STEPS)) }
+            composeRule.mainClock.advanceTimeBy(50)
+        }
+        bread.performTouchInput { up() }
+
+        composeRule.waitUntil(timeoutMillis = 3_000) { listItemNames().first() == "パン" }
+        // 指を離したあとに、ほかの操作（チェック・削除）が起きていないこと
+        composeRule.waitForIdle()
+        assertThat(listItemNames()).containsExactly("パン", "牛乳", "卵").inOrder()
+        assertThat(activePurchaseCount()).isEqualTo(0)
+    }
+
+    private companion object {
+        const val STEPS = 10
     }
 }

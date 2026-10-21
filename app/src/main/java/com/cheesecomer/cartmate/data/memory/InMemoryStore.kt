@@ -8,6 +8,7 @@ import com.cheesecomer.cartmate.domain.model.ListStatus
 import com.cheesecomer.cartmate.domain.model.NewItem
 import com.cheesecomer.cartmate.domain.model.Purchase
 import com.cheesecomer.cartmate.domain.model.ShoppingList
+import com.cheesecomer.cartmate.domain.order.SortKeys
 import com.cheesecomer.cartmate.domain.repository.CompleteResult
 import com.cheesecomer.cartmate.domain.repository.CurrentUserProvider
 import com.cheesecomer.cartmate.domain.repository.DeleteItemResult
@@ -60,18 +61,37 @@ class InMemoryStore @Inject constructor(
     // ShoppingListRepository
 
     override fun observeLists(): Flow<List<ShoppingList>> =
-        data.map { it.lists.values.sortedBy(ShoppingList::createdAt) }.distinctUntilChanged()
+        data.map { it.lists.values.sortedBy(ShoppingList::sortKey) }.distinctUntilChanged()
 
     override suspend fun createList(name: String): ListId {
-        val list = ShoppingList(
-            id = ListId(newId()),
-            name = name,
-            createdAt = clock.instant(),
-            createdBy = currentUser.currentUserId(),
-            status = ListStatus.ACTIVE,
-        )
-        data.update { it.copy(lists = it.lists + (list.id to list)) }
-        return list.id
+        val id = ListId(newId())
+        val now = clock.instant()
+        val me = currentUser.currentUserId()
+        data.update { d ->
+            val list = ShoppingList(
+                id = id,
+                name = name,
+                // 末尾に追加する
+                sortKey = SortKeys.after(d.lists.values.maxOfOrNull(ShoppingList::sortKey)),
+                createdAt = now,
+                createdBy = me,
+                status = ListStatus.ACTIVE,
+            )
+            d.copy(lists = d.lists + (id to list))
+        }
+        return id
+    }
+
+    override suspend fun moveList(id: ListId, previous: ListId?, next: ListId?) {
+        data.update { d ->
+            if (id !in d.lists) return@update d
+            val ordered = d.lists.values.sortedBy(ShoppingList::sortKey).map { it.id }
+            val keys = when (val move = SortKeys.move(ordered, { d.lists.getValue(it).sortKey }, id, previous, next)) {
+                is SortKeys.Move.Single -> mapOf(id to move.key)
+                is SortKeys.Move.Rebalance -> move.keys
+            }
+            d.copy(lists = d.lists + keys.mapValues { (listId, key) -> d.lists.getValue(listId).copy(sortKey = key) })
+        }
     }
 
     override suspend fun renameList(id: ListId, name: String): RenameListResult = transact { d ->
@@ -103,24 +123,43 @@ class InMemoryStore @Inject constructor(
             d.items.values
                 .filter { it.listId == listId }
                 .filter { it.status == ItemStatus.OPEN || it.completedAt!! >= completedSince }
-                .sortedBy(Item::createdAt)
+                .sortedBy(Item::sortKey)
         }.distinctUntilChanged()
 
     override suspend fun addItem(newItem: NewItem): ItemId {
-        val item = Item(
-            id = ItemId(newId()),
-            listId = newItem.listId,
-            inputName = newItem.inputName,
-            quantity = newItem.quantity,
-            unit = newItem.unit,
-            status = ItemStatus.OPEN,
-            createdAt = clock.instant(),
-            createdBy = currentUser.currentUserId(),
-            completedAt = null,
-            completedBy = null,
-        )
-        data.update { it.copy(items = it.items + (item.id to item)) }
-        return item.id
+        val id = ItemId(newId())
+        val now = clock.instant()
+        val me = currentUser.currentUserId()
+        data.update { d ->
+            val item = Item(
+                id = id,
+                listId = newItem.listId,
+                inputName = newItem.inputName,
+                // 末尾に追加する
+                sortKey = SortKeys.after(d.items.values.filter { it.listId == newItem.listId }.maxOfOrNull(Item::sortKey)),
+                quantity = newItem.quantity,
+                unit = newItem.unit,
+                status = ItemStatus.OPEN,
+                createdAt = now,
+                createdBy = me,
+                completedAt = null,
+                completedBy = null,
+            )
+            d.copy(items = d.items + (id to item))
+        }
+        return id
+    }
+
+    override suspend fun moveItem(id: ItemId, previous: ItemId?, next: ItemId?) {
+        data.update { d ->
+            val listId = d.items[id]?.listId ?: return@update d
+            val ordered = d.items.values.filter { it.listId == listId }.sortedBy(Item::sortKey).map { it.id }
+            val keys = when (val move = SortKeys.move(ordered, { d.items.getValue(it).sortKey }, id, previous, next)) {
+                is SortKeys.Move.Single -> mapOf(id to move.key)
+                is SortKeys.Move.Rebalance -> move.keys
+            }
+            d.copy(items = d.items + keys.mapValues { (itemId, key) -> d.items.getValue(itemId).copy(sortKey = key) })
+        }
     }
 
     override suspend fun updateItem(id: ItemId, update: ItemUpdate): UpdateItemResult = transact { d ->
@@ -145,9 +184,9 @@ class InMemoryStore @Inject constructor(
     }
 
     override suspend fun restoreItem(item: Item) {
+        // 並び順の値はそのまま残し、削除する前の位置に戻す
         val restored = item.copy(
             status = ItemStatus.OPEN,
-            createdAt = clock.instant(),
             completedAt = null,
             completedBy = null,
         )

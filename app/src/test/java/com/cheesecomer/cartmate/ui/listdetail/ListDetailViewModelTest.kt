@@ -158,4 +158,17 @@ class ListDetailViewModelTest {
             assertThat(awaitItem()).isEqualTo(DetailMessage.CannotEditCompleted("低脂肪乳"))
         }
     }
+
+    @Test
+    fun `項目を動かすと並び順が変わる`() = runTest {
+        val milk = store.addItem(NewItem(listId, "牛乳", null, null))
+        val egg = store.addItem(NewItem(listId, "卵", null, null))
+        viewModel.uiState.test {
+            awaitUntil { it.items.size == 2 }
+
+            viewModel.move(egg, previous = null, next = milk)
+
+            awaitUntil { state -> state.items.map { it.inputName } == listOf("卵", "牛乳") }
+        }
+    }
 }

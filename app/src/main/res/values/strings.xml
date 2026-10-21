@@ -7,6 +7,8 @@
     <string name="action_delete">削除</string>
     <string name="action_undo">元に戻す</string>
     <string name="action_back">戻る</string>
+    <string name="action_move_up">上へ移動</string>
+    <string name="action_move_down">下へ移動</string>
 
     <!-- リスト一覧 -->
     <string name="lists_title">買い物リスト</string>

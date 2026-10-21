@@ -1,11 +1,13 @@
 package com.cheesecomer.cartmate.ui.lists
 
+import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performCustomAccessibilityActionWithLabel
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -75,5 +77,19 @@ class ListsScreenTest {
 
         composeRule.onNodeWithText("イオン").assertIsDisplayed()
         composeRule.onNodeWithText("スーパー").assertDoesNotExist()
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun TalkBackのカスタムアクションでリストを上下に移動できる() {
+        runBlocking {
+            store.createList("スーパー")
+            store.createList("薬局")
+        }
+        setContent()
+
+        composeRule.onNodeWithText("薬局").performCustomAccessibilityActionWithLabel("上へ移動")
+
+        composeRule.waitUntil { runBlocking { store.observeLists().first().map { it.name } } == listOf("薬局", "スーパー") }
     }
 }

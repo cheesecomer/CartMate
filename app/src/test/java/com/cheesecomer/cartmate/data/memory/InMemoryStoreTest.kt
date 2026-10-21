@@ -123,9 +123,70 @@ class InMemoryStoreTest {
         val restored = store.observeOpenItems().first().single()
         assertThat(restored.id).isEqualTo(itemId)
         assertThat(restored.inputName).isEqualTo("牛乳")
-        // 並び順は末尾になる
-        assertThat(restored.createdAt).isEqualTo(clock.now)
     }
+
+    @Test
+    fun `削除した項目を元に戻すと、削除する前の位置に戻る`() = runTest {
+        val listId = store.createList("スーパー")
+        store.addItem(NewItem(listId, "牛乳", null, null))
+        val egg = store.addItem(NewItem(listId, "卵", null, null))
+        store.addItem(NewItem(listId, "パン", null, null))
+        val eggItem = store.observeOpenItems().first().single { it.id == egg }
+
+        store.deleteItem(egg)
+        store.restoreItem(eggItem)
+
+        assertThat(listItemNames(listId)).containsExactly("牛乳", "卵", "パン").inOrder()
+    }
+
+    @Test
+    fun `リストは作成した順に並び、動かすと前後の間に入る`() = runTest {
+        val a = store.createList("A")
+        val b = store.createList("B")
+        val c = store.createList("C")
+        assertThat(listNames()).containsExactly("A", "B", "C").inOrder()
+
+        store.moveList(c, previous = a, next = b)
+        assertThat(listNames()).containsExactly("A", "C", "B").inOrder()
+
+        store.moveList(a, previous = b, next = null)
+        assertThat(listNames()).containsExactly("C", "B", "A").inOrder()
+
+        store.moveList(a, previous = null, next = c)
+        assertThat(listNames()).containsExactly("A", "C", "B").inOrder()
+    }
+
+    @Test
+    fun `項目は追加した順に並び、動かすと前後の間に入る。チェック済みの項目も動かせる`() = runTest {
+        val listId = store.createList("スーパー")
+        val milk = store.addItem(NewItem(listId, "牛乳", null, null))
+        val egg = store.addItem(NewItem(listId, "卵", null, null))
+        val bread = store.addItem(NewItem(listId, "パン", null, null))
+        store.completeItem(egg, clock.now)
+
+        store.moveItem(bread, previous = null, next = milk)
+        assertThat(listItemNames(listId)).containsExactly("パン", "牛乳", "卵").inOrder()
+
+        store.moveItem(egg, previous = null, next = bread)
+        assertThat(listItemNames(listId)).containsExactly("卵", "パン", "牛乳").inOrder()
+    }
+
+    @Test
+    fun `新しい項目は、並び替えたあとでも末尾に追加する`() = runTest {
+        val listId = store.createList("スーパー")
+        val milk = store.addItem(NewItem(listId, "牛乳", null, null))
+        val egg = store.addItem(NewItem(listId, "卵", null, null))
+        store.moveItem(milk, previous = egg, next = null)
+
+        store.addItem(NewItem(listId, "パン", null, null))
+
+        assertThat(listItemNames(listId)).containsExactly("卵", "牛乳", "パン").inOrder()
+    }
+
+    private suspend fun listNames() = store.observeLists().first().map { it.name }
+
+    private suspend fun listItemNames(listId: ListId) =
+        store.observeListItems(listId, Instant.EPOCH).first().map { it.inputName }
 
     @Test
     fun `チェック済みの項目は削除できない`() = runTest {

@@ -97,7 +97,8 @@ service cloud.firestore {
       match /lists/{listId} {
         allow read: if isMember(hid);
         allow create: if isMember(hid)
-          && request.resource.data.keys().hasOnly(['name','createdBy','createdAt','status'])
+          && request.resource.data.keys().hasOnly(['name','sortKey','createdBy','createdAt','status'])
+          && request.resource.data.sortKey is number
           && str(request.resource.data.name, 40)
           && request.resource.data.createdBy == me()
           && request.resource.data.createdAt == request.time
@@ -110,6 +111,8 @@ service cloud.firestore {
             && request.resource.data.deletedAt == request.time)
           // リスト名の変更。購入の記録の listNameSnapshot は書き換えない
           || (changed().hasOnly(['name']) && str(request.resource.data.name, 40))
+          // 並び替え
+          || (changed().hasOnly(['sortKey']) && request.resource.data.sortKey is number)
         );
         allow delete: if false;
       }
@@ -120,9 +123,10 @@ service cloud.firestore {
       match /items/{itemId} {
         allow read: if isMember(hid);
         allow create: if isMember(hid)
-          && request.resource.data.keys().hasOnly(['listId','productId','inputName','quantity','unit',
+          && request.resource.data.keys().hasOnly(['listId','productId','inputName','sortKey','quantity','unit',
                 'status','createdBy','createdAt','completedAt','completedBy'])
           && str(request.resource.data.inputName, 60)
+          && request.resource.data.sortKey is number
           && (request.resource.data.quantity == null
               || (request.resource.data.quantity is number
                   && request.resource.data.quantity > 0 && request.resource.data.quantity <= 9999))
@@ -134,7 +138,7 @@ service cloud.firestore {
           && request.resource.data.createdAt == request.time
           && exists(/databases/$(db)/documents/households/$(hid)/lists/$(request.resource.data.listId))
           && existsAfter(/databases/$(db)/documents/households/$(hid)/products/$(request.resource.data.productId));
-        allow update: if isMember(hid) && (isCompleting() || isReopening() || isEditing());
+        allow update: if isMember(hid) && (isCompleting() || isReopening() || isEditing() || isReordering());
         allow delete: if isMember(hid) && resource.data.status == 'open';   // 誤って追加した項目の削除
 
         function isCompleting() {
@@ -155,6 +159,10 @@ service cloud.firestore {
                 || (request.resource.data.quantity is number
                     && request.resource.data.quantity > 0 && request.resource.data.quantity <= 9999))
             && optStr(request.resource.data.unit, 10);
+        }
+        // 並び替え。未購入・チェック済みのどちらも動かせる
+        function isReordering() {
+          return changed().hasOnly(['sortKey']) && request.resource.data.sortKey is number;
         }
         function isReopening() {
           return resource.data.status == 'completed'

@@ -13,7 +13,7 @@ interface ItemRepository {
     fun observeOpenItems(): Flow<List<Item>>
 
     /**
-     * [listId] の未購入の項目と、[completedSince] 以降にチェックされた項目（追加した順）。
+     * [listId] の未購入の項目と、[completedSince] 以降にチェックされた項目（並び順）。
      * チェック済みの項目も元の位置に表示するため、両方を1つの一覧として返す
      */
     fun observeListItems(listId: ListId, completedSince: Instant): Flow<List<Item>>
@@ -26,7 +26,10 @@ interface ItemRepository {
     /** 未購入の項目だけを削除できる */
     suspend fun deleteItem(id: ItemId): DeleteItemResult
 
-    /** 削除の取り消し。同じ ID・同じ内容で作り直す */
+    /** [id] を [previous] と [next] の間に動かす。null は先頭・末尾を表す */
+    suspend fun moveItem(id: ItemId, previous: ItemId?, next: ItemId?)
+
+    /** 削除の取り消し。同じ ID・同じ内容・同じ並び順で作り直す */
     suspend fun restoreItem(item: Item)
 
     /** チェックと購入の記録を1つの操作として行う（docs/design/sync.md） */

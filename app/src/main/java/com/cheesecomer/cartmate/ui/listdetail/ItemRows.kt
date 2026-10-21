@@ -3,7 +3,6 @@ package com.cheesecomer.cartmate.ui.listdetail
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.material3.ListItemDefaults
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
@@ -12,7 +11,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.IconToggleButton
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxState
@@ -28,10 +26,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import com.cheesecomer.cartmate.R
 import com.cheesecomer.cartmate.ui.components.AccentCard
+import com.cheesecomer.cartmate.ui.components.CardContent
+import com.cheesecomer.cartmate.ui.components.DraggingElevation
 import com.cheesecomer.cartmate.ui.components.cardSlot
 import com.cheesecomer.cartmate.domain.input.formatQuantity
 import com.cheesecomer.cartmate.domain.model.Item
@@ -43,6 +44,16 @@ private const val SWIPE_THRESHOLD = 0.4f
 /** チェック済みの項目の文字の透明度 */
 private const val COMPLETED_CONTENT_ALPHA = 0.38f
 
+/**
+ * 並び替えのための行の設定。[handle] はロングタップでドラッグを始める部分に付ける Modifier、
+ * [actions] は TalkBack 用の「上へ移動」「下へ移動」
+ */
+data class RowDrag(
+    val dragging: Boolean = false,
+    val handle: Modifier = Modifier,
+    val actions: List<CustomAccessibilityAction> = emptyList(),
+)
+
 /** 未購入の項目。タップか → でチェック、編集ボタンで編集、← か削除ボタンで削除 */
 @Composable
 fun OpenItemRow(
@@ -53,6 +64,7 @@ fun OpenItemRow(
     onCheck: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
+    drag: RowDrag = RowDrag(),
 ) {
     SwipeableRow(
         enableStartToEnd = true,
@@ -61,16 +73,19 @@ fun OpenItemRow(
         endToStartIcon = R.drawable.ic_delete,
         endToStartColors = deleteSwipeColors(),
         modifier = modifier,
+        dragging = drag.dragging,
     ) {
         AccentCard(
             accent = MaterialTheme.colorScheme.primary,
             onClickLabel = stringResource(R.string.detail_check),
             onClick = onCheck,
+            modifier = drag.handle,
+            customActions = drag.actions,
         ) {
-            ListItem(
-                headlineContent = { Text(item.inputName) },
-                supportingContent = item.quantityText()?.let { { Text(it) } },
-                trailingContent = {
+            CardContent(
+                headline = { Text(item.inputName) },
+                supporting = item.quantityText()?.let { { Text(it) } },
+                trailing = {
                     Row {
                         // 編集中はボタンを選択状態にして示す。もう一度押すと編集をやめる
                         IconToggleButton(
@@ -94,7 +109,6 @@ fun OpenItemRow(
                         )
                     }
                 },
-                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
             )
         }
     }
@@ -102,7 +116,12 @@ fun OpenItemRow(
 
 /** チェック済みの項目。打ち消し線とグレーアウトで示す。タップか ← かボタンでチェックを外す */
 @Composable
-fun CompletedItemRow(item: Item, onUncheck: () -> Unit, modifier: Modifier = Modifier) {
+fun CompletedItemRow(
+    item: Item,
+    onUncheck: () -> Unit,
+    modifier: Modifier = Modifier,
+    drag: RowDrag = RowDrag(),
+) {
     // Material 3 で「使えない状態」を表すときと同じ透明度
     val grayedOut = MaterialTheme.colorScheme.onSurface.copy(alpha = COMPLETED_CONTENT_ALPHA)
     SwipeableRow(
@@ -112,25 +131,27 @@ fun CompletedItemRow(item: Item, onUncheck: () -> Unit, modifier: Modifier = Mod
         endToStartIcon = R.drawable.ic_undo,
         endToStartColors = uncheckSwipeColors(),
         modifier = modifier,
+        dragging = drag.dragging,
     ) {
         AccentCard(
             accent = MaterialTheme.colorScheme.outlineVariant,
             onClickLabel = stringResource(R.string.detail_uncheck),
             onClick = onUncheck,
+            modifier = drag.handle,
+            customActions = drag.actions,
         ) {
-            ListItem(
-                headlineContent = {
+            CardContent(
+                headline = {
                     Text(item.inputName, textDecoration = TextDecoration.LineThrough, color = grayedOut)
                 },
-                supportingContent = item.quantityText()?.let { { Text(it, color = grayedOut) } },
-                trailingContent = {
+                supporting = item.quantityText()?.let { { Text(it, color = grayedOut) } },
+                trailing = {
                     RowIconButton(
                         R.drawable.ic_undo,
                         stringResource(R.string.detail_uncheck_item, item.inputName),
                         onUncheck,
                     )
                 },
-                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
             )
         }
     }
@@ -157,6 +178,7 @@ private fun SwipeableRow(
     endToStartIcon: Int,
     endToStartColors: SwipeColors,
     modifier: Modifier = Modifier,
+    dragging: Boolean = false,
     content: @Composable RowScope.() -> Unit,
 ) {
     // rememberSwipeToDismissBoxState は状態を保存するため、LazyColumn が行の消えたあとも「確定済み」を
@@ -184,7 +206,7 @@ private fun SwipeableRow(
         state = state,
         // カードの間を空け、スワイプ中の背景もカードと同じ角丸にする
         modifier = modifier
-            .cardSlot(),
+            .cardSlot(elevation = if (dragging) DraggingElevation else 0.dp),
         enableDismissFromStartToEnd = enableStartToEnd,
         enableDismissFromEndToStart = true,
         onDismiss = onDismiss,

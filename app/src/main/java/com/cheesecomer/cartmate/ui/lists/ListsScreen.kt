@@ -8,13 +8,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -30,11 +29,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
@@ -48,8 +47,13 @@ import com.cheesecomer.cartmate.R
 import com.cheesecomer.cartmate.domain.model.ListId
 import com.cheesecomer.cartmate.domain.model.ShoppingList
 import com.cheesecomer.cartmate.ui.components.AccentCard
+import com.cheesecomer.cartmate.ui.components.CardContent
+import com.cheesecomer.cartmate.ui.components.DraggingElevation
+import com.cheesecomer.cartmate.ui.components.rememberDraggableOrder
 import com.cheesecomer.cartmate.ui.components.cardSlot
 import com.cheesecomer.cartmate.ui.theme.CartMateTheme
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
 
 @Composable
 fun ListsScreen(
@@ -62,6 +66,7 @@ fun ListsScreen(
         onOpenList = onOpenList,
         onCreateList = viewModel::createList,
         onRenameList = viewModel::renameList,
+        onMoveList = viewModel::moveList,
         onDeleteList = viewModel::deleteList,
     )
 }
@@ -73,6 +78,7 @@ fun ListsContent(
     onOpenList: (ListId) -> Unit,
     onCreateList: (String) -> Unit,
     onRenameList: (ListId, String) -> Unit,
+    onMoveList: (ListId, previous: ListId?, next: ListId?) -> Unit,
     onDeleteList: (ListId) -> Unit,
 ) {
     var showCreateDialog by rememberSaveable { mutableStateOf(false) }
@@ -92,7 +98,15 @@ fun ListsContent(
                 Text(stringResource(R.string.lists_empty))
             }
         } else {
+            val lazyListState = rememberLazyListState()
+            val order = rememberDraggableOrder(state.lists) { it.id.value }
+            val reorderState = rememberReorderableLazyListState(lazyListState) { from, to ->
+                order.move(from.key, to.key)
+            }
+            val moveUpLabel = stringResource(R.string.action_move_up)
+            val moveDownLabel = stringResource(R.string.action_move_down)
             LazyColumn(
+                state = lazyListState,
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(
                     top = innerPadding.calculateTopPadding(),
@@ -100,13 +114,37 @@ fun ListsContent(
                     bottom = innerPadding.calculateBottomPadding() + 88.dp,
                 ),
             ) {
-                items(state.lists, key = { it.id.value }) { list ->
-                    ListRow(
-                        list,
-                        onClick = { onOpenList(list.id) },
-                        onRename = { renameTarget = list },
-                        onDelete = { deleteTarget = list },
-                    )
+                items(order.items, key = { it.id.value }) { list ->
+                    ReorderableItem(reorderState, key = list.id.value) { dragging ->
+                        ListRow(
+                            list,
+                            onClick = { onOpenList(list.id) },
+                            onRename = { renameTarget = list },
+                            onDelete = { deleteTarget = list },
+                            dragging = dragging,
+                            modifier = Modifier.longPressDraggableHandle(
+                                onDragStarted = { order.startDrag() },
+                                onDragStopped = {
+                                    order.finishDrag(list.id.value)
+                                        ?.let { onMoveList(list.id, it.previous?.id, it.next?.id) }
+                                },
+                            ),
+                            actions = listOfNotNull(
+                                order.moveUpTarget(list.id.value)?.let { target ->
+                                    CustomAccessibilityAction(moveUpLabel) {
+                                        onMoveList(list.id, target.previous?.id, target.next?.id)
+                                        true
+                                    }
+                                },
+                                order.moveDownTarget(list.id.value)?.let { target ->
+                                    CustomAccessibilityAction(moveDownLabel) {
+                                        onMoveList(list.id, target.previous?.id, target.next?.id)
+                                        true
+                                    }
+                                },
+                            ),
+                        )
+                    }
                 }
             }
         }
@@ -157,18 +195,28 @@ fun ListsContent(
 }
 
 @Composable
-private fun ListRow(list: ListSummary, onClick: () -> Unit, onRename: () -> Unit, onDelete: () -> Unit) {
+private fun ListRow(
+    list: ListSummary,
+    onClick: () -> Unit,
+    onRename: () -> Unit,
+    onDelete: () -> Unit,
+    dragging: Boolean,
+    actions: List<CustomAccessibilityAction>,
+    // ロングタップでドラッグを始める部分
+    modifier: Modifier = Modifier,
+) {
     // 帯の色は、これから買うものがあるリスト（未購入あり・新しいリスト）はブランドカラー、買い終わったリストはグレー
     val active = list.openCount > 0 || list.isNew
     AccentCard(
         accent = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
         onClickLabel = stringResource(R.string.lists_open),
         onClick = onClick,
-        modifier = Modifier.cardSlot(),
+        modifier = Modifier.cardSlot(elevation = if (dragging) DraggingElevation else 0.dp).then(modifier),
+        customActions = actions,
     ) {
-        ListItem(
-            headlineContent = { Text(list.name) },
-            supportingContent = {
+        CardContent(
+            headline = { Text(list.name) },
+            supporting = {
                 Text(
                     if (list.isNew) {
                         stringResource(R.string.lists_new)
@@ -177,7 +225,7 @@ private fun ListRow(list: ListSummary, onClick: () -> Unit, onRename: () -> Unit
                     },
                 )
             },
-            trailingContent = {
+            trailing = {
                 Row {
                     ListIconButton(R.drawable.ic_edit, stringResource(R.string.lists_rename, list.name), onRename)
                     // 未購入が残っているリストは削除できない
@@ -186,7 +234,6 @@ private fun ListRow(list: ListSummary, onClick: () -> Unit, onRename: () -> Unit
                     }
                 }
             },
-            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         )
     }
 }
@@ -261,6 +308,7 @@ private fun ListsContentPreview() {
             onOpenList = {},
             onCreateList = {},
             onRenameList = { _, _ -> },
+            onMoveList = { _, _, _ -> },
             onDeleteList = {},
         )
     }

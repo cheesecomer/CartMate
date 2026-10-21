@@ -73,6 +73,10 @@ class ListsViewModel @Inject constructor(
         viewModelScope.launch { listRepository.renameList(id, trimmed) }
     }
 
+    fun moveList(id: ListId, previous: ListId?, next: ListId?) {
+        viewModelScope.launch { listRepository.moveList(id, previous, next) }
+    }
+
     fun deleteList(id: ListId) {
         viewModelScope.launch { listRepository.deleteList(id) }
     }

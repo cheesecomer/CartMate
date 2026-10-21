@@ -8,6 +8,7 @@ import com.cheesecomer.cartmate.domain.input.AddItemEvent
 import com.cheesecomer.cartmate.domain.input.AddItemReducer
 import com.cheesecomer.cartmate.domain.input.AddItemState
 import com.cheesecomer.cartmate.domain.model.Item
+import com.cheesecomer.cartmate.domain.model.ItemId
 import com.cheesecomer.cartmate.domain.model.ListId
 import com.cheesecomer.cartmate.domain.model.ListStatus
 import com.cheesecomer.cartmate.domain.model.NewItem
@@ -124,6 +125,10 @@ class ListDetailViewModel @Inject constructor(
                 is ReopenResult.Retry, is ReopenResult.Rejected -> _messages.send(DetailMessage.Failed)
             }
         }
+    }
+
+    fun move(id: ItemId, previous: ItemId?, next: ItemId?) {
+        viewModelScope.launch { itemRepository.moveItem(id, previous, next) }
     }
 
     fun delete(item: Item) {

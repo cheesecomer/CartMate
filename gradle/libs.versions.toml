@@ -9,6 +9,7 @@ coreKtx = "1.19.1"
 lifecycle = "2.11.0"
 navigation = "2.10.2"
 hiltAndroidx = "1.4.0"
+reorderable = "3.1.0"
 kotlinxSerialization = "1.12.0"
 coroutines = "1.11.0"
 junit = "6.1.3"
@@ -31,6 +32,7 @@ androidx-compose-ui-tooling = { module = "androidx.compose.ui:ui-tooling" }
 androidx-compose-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview" }
 hilt-android = { module = "com.google.dagger:hilt-android", version.ref = "hilt" }
 hilt-compiler = { module = "com.google.dagger:hilt-compiler", version.ref = "hilt" }
+reorderable = { module = "sh.calvin.reorderable:reorderable", version.ref = "reorderable" }
 androidx-hilt-lifecycle-viewmodel-compose = { module = "androidx.hilt:hilt-lifecycle-viewmodel-compose", version.ref = "hiltAndroidx" }
 kotlinx-serialization-core = { module = "org.jetbrains.kotlinx:kotlinx-serialization-core", version.ref = "kotlinxSerialization" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }

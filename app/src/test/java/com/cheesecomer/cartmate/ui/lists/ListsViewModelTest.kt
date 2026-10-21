@@ -106,4 +106,17 @@ class ListsViewModelTest {
             assertThat(awaitUntil { it.lists.single().name != "スーパー" }.lists.single().name).isEqualTo("イオン")
         }
     }
+
+    @Test
+    fun `リストを動かすと並び順が変わる`() = runTest {
+        val a = store.createList("A")
+        val b = store.createList("B")
+        viewModel.uiState.test {
+            awaitUntil { it.lists.size == 2 }
+
+            viewModel.moveList(b, previous = null, next = a)
+
+            awaitUntil { state -> state.lists.map { it.name } == listOf("B", "A") }
+        }
+    }
 }

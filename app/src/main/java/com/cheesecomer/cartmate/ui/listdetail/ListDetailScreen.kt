@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -33,6 +34,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -45,9 +47,12 @@ import com.cheesecomer.cartmate.domain.model.ItemId
 import com.cheesecomer.cartmate.domain.model.ItemStatus
 import com.cheesecomer.cartmate.domain.model.ListId
 import com.cheesecomer.cartmate.domain.model.UserId
+import com.cheesecomer.cartmate.ui.components.rememberDraggableOrder
 import com.cheesecomer.cartmate.ui.theme.CartMateTheme
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
 import java.time.Instant
 
 @Serializable
@@ -103,6 +108,7 @@ fun ListDetailScreen(
         onCheck = viewModel::check,
         onUncheck = viewModel::uncheck,
         onDelete = viewModel::delete,
+        onMove = viewModel::move,
     )
 }
 
@@ -116,6 +122,7 @@ fun ListDetailContent(
     onCheck: (Item) -> Unit,
     onUncheck: (Item) -> Unit,
     onDelete: (Item) -> Unit,
+    onMove: (ItemId, previous: ItemId?, next: ItemId?) -> Unit,
 ) {
     val focusManager = LocalFocusManager.current
 
@@ -148,7 +155,13 @@ fun ListDetailContent(
             )
         },
     ) { innerPadding ->
-        LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = innerPadding) {
+        val lazyListState = rememberLazyListState()
+        val order = rememberDraggableOrder(state.items) { it.id.value }
+        val reorderState = rememberReorderableLazyListState(lazyListState) { from, to -> order.move(from.key, to.key) }
+        val moveUpLabel = stringResource(R.string.action_move_up)
+        val moveDownLabel = stringResource(R.string.action_move_down)
+
+        LazyColumn(state = lazyListState, modifier = Modifier.fillMaxSize(), contentPadding = innerPadding) {
             if (!state.loading && state.items.isEmpty()) {
                 item(key = "empty") {
                     Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
@@ -160,22 +173,43 @@ fun ListDetailContent(
                 }
             }
             // チェック済みの項目も元の位置に残し、打ち消し線で示す
-            items(state.items, key = { it.id.value }) { item ->
-                when (item.status) {
-                    ItemStatus.OPEN -> OpenItemRow(
-                        item = item,
-                        editing = (state.addItem as? AddItemState.Editing)?.itemId == item.id,
-                        onEdit = { onAddItemEvent(AddItemEvent.EditRequested(item)) },
-                        onCancelEdit = { onAddItemEvent(AddItemEvent.Cancelled) },
-                        onCheck = { onCheck(item) },
-                        onDelete = { onDelete(item) },
-                        modifier = Modifier.animateItem(),
+            items(order.items, key = { it.id.value }) { item ->
+                ReorderableItem(reorderState, key = item.id.value) { dragging ->
+                    val drag = RowDrag(
+                        dragging = dragging,
+                        handle = Modifier.longPressDraggableHandle(
+                            onDragStarted = { order.startDrag() },
+                            onDragStopped = {
+                                order.finishDrag(item.id.value)?.let { onMove(item.id, it.previous?.id, it.next?.id) }
+                            },
+                        ),
+                        actions = listOfNotNull(
+                            order.moveUpTarget(item.id.value)?.let { target ->
+                                CustomAccessibilityAction(moveUpLabel) {
+                                    onMove(item.id, target.previous?.id, target.next?.id)
+                                    true
+                                }
+                            },
+                            order.moveDownTarget(item.id.value)?.let { target ->
+                                CustomAccessibilityAction(moveDownLabel) {
+                                    onMove(item.id, target.previous?.id, target.next?.id)
+                                    true
+                                }
+                            },
+                        ),
                     )
-                    ItemStatus.COMPLETED -> CompletedItemRow(
-                        item = item,
-                        onUncheck = { onUncheck(item) },
-                        modifier = Modifier.animateItem(),
-                    )
+                    when (item.status) {
+                        ItemStatus.OPEN -> OpenItemRow(
+                            item = item,
+                            editing = (state.addItem as? AddItemState.Editing)?.itemId == item.id,
+                            onEdit = { onAddItemEvent(AddItemEvent.EditRequested(item)) },
+                            onCancelEdit = { onAddItemEvent(AddItemEvent.Cancelled) },
+                            onCheck = { onCheck(item) },
+                            onDelete = { onDelete(item) },
+                            drag = drag,
+                        )
+                        ItemStatus.COMPLETED -> CompletedItemRow(item = item, onUncheck = { onUncheck(item) }, drag = drag)
+                    }
                 }
             }
         }
@@ -189,6 +223,7 @@ private fun ListDetailContentPreview() {
         id = ItemId(id),
         listId = ListId("1"),
         inputName = name,
+        sortKey = id.toDouble(),
         quantity = quantity,
         unit = unit,
         status = status,
@@ -215,6 +250,7 @@ private fun ListDetailContentPreview() {
             onCheck = {},
             onUncheck = {},
             onDelete = {},
+            onMove = { _, _, _ -> },
         )
     }
 }

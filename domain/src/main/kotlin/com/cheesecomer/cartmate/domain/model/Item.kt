@@ -7,6 +7,8 @@ data class Item(
     val id: ItemId,
     val listId: ListId,
     val inputName: String,
+    /** 並び順。小さいほど上（docs/design/data-model.md） */
+    val sortKey: Double,
     val quantity: Double?,
     val unit: String?,
     val status: ItemStatus,
