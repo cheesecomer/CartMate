@@ -1,19 +1,21 @@
 package com.cheesecomer.cartmate.ui.lists
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExtendedFloatingActionButton
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -28,11 +30,14 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.tooling.preview.Preview
@@ -42,6 +47,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.cheesecomer.cartmate.R
 import com.cheesecomer.cartmate.domain.model.ListId
 import com.cheesecomer.cartmate.domain.model.ShoppingList
+import com.cheesecomer.cartmate.ui.components.AccentCard
+import com.cheesecomer.cartmate.ui.components.cardSlot
 import com.cheesecomer.cartmate.ui.theme.CartMateTheme
 
 @Composable
@@ -54,6 +61,7 @@ fun ListsScreen(
         state = state,
         onOpenList = onOpenList,
         onCreateList = viewModel::createList,
+        onRenameList = viewModel::renameList,
         onDeleteList = viewModel::deleteList,
     )
 }
@@ -64,19 +72,19 @@ fun ListsContent(
     state: ListsUiState,
     onOpenList: (ListId) -> Unit,
     onCreateList: (String) -> Unit,
+    onRenameList: (ListId, String) -> Unit,
     onDeleteList: (ListId) -> Unit,
 ) {
     var showCreateDialog by rememberSaveable { mutableStateOf(false) }
+    var renameTarget by remember { mutableStateOf<ListSummary?>(null) }
     var deleteTarget by remember { mutableStateOf<ListSummary?>(null) }
 
     Scaffold(
         topBar = { TopAppBar(title = { Text(stringResource(R.string.lists_title)) }) },
         floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = { showCreateDialog = true },
-                icon = { Icon(painterResource(R.drawable.ic_add), contentDescription = null) },
-                text = { Text(stringResource(R.string.lists_create)) },
-            )
+            FloatingActionButton(onClick = { showCreateDialog = true }, shape = CircleShape) {
+                Icon(painterResource(R.drawable.ic_add), contentDescription = stringResource(R.string.lists_create))
+            }
         },
     ) { innerPadding ->
         if (!state.loading && state.lists.isEmpty()) {
@@ -93,20 +101,40 @@ fun ListsContent(
                 ),
             ) {
                 items(state.lists, key = { it.id.value }) { list ->
-                    ListRow(list, onClick = { onOpenList(list.id) }, onDelete = { deleteTarget = list })
-                    HorizontalDivider()
+                    ListRow(
+                        list,
+                        onClick = { onOpenList(list.id) },
+                        onRename = { renameTarget = list },
+                        onDelete = { deleteTarget = list },
+                    )
                 }
             }
         }
     }
 
     if (showCreateDialog) {
-        CreateListDialog(
+        ListNameDialog(
+            title = stringResource(R.string.lists_create_dialog_title),
+            confirmLabel = stringResource(R.string.lists_create_dialog_confirm),
+            initialName = "",
             onConfirm = { name ->
                 onCreateList(name)
                 showCreateDialog = false
             },
             onDismiss = { showCreateDialog = false },
+        )
+    }
+
+    renameTarget?.let { target ->
+        ListNameDialog(
+            title = stringResource(R.string.lists_rename_dialog_title),
+            confirmLabel = stringResource(R.string.lists_rename_dialog_confirm),
+            initialName = target.name,
+            onConfirm = { name ->
+                onRenameList(target.id, name)
+                renameTarget = null
+            },
+            onDismiss = { renameTarget = null },
         )
     }
 
@@ -129,49 +157,84 @@ fun ListsContent(
 }
 
 @Composable
-private fun ListRow(list: ListSummary, onClick: () -> Unit, onDelete: () -> Unit) {
-    ListItem(
-        modifier = Modifier.clickable(onClick = onClick),
-        headlineContent = { Text(list.name) },
-        supportingContent = { Text(stringResource(R.string.lists_open_count, list.openCount)) },
-        trailingContent = if (list.canDelete) {
-            {
-                IconButton(onClick = onDelete) {
-                    Icon(
-                        painterResource(R.drawable.ic_delete),
-                        contentDescription = stringResource(R.string.lists_delete, list.name),
-                    )
+private fun ListRow(list: ListSummary, onClick: () -> Unit, onRename: () -> Unit, onDelete: () -> Unit) {
+    // 帯の色は、これから買うものがあるリスト（未購入あり・新しいリスト）はブランドカラー、買い終わったリストはグレー
+    val active = list.openCount > 0 || list.isNew
+    AccentCard(
+        accent = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+        onClickLabel = stringResource(R.string.lists_open),
+        onClick = onClick,
+        modifier = Modifier.cardSlot(),
+    ) {
+        ListItem(
+            headlineContent = { Text(list.name) },
+            supportingContent = {
+                Text(
+                    if (list.isNew) {
+                        stringResource(R.string.lists_new)
+                    } else {
+                        stringResource(R.string.lists_open_count, list.openCount)
+                    },
+                )
+            },
+            trailingContent = {
+                Row {
+                    ListIconButton(R.drawable.ic_edit, stringResource(R.string.lists_rename, list.name), onRename)
+                    // 未購入が残っているリストは削除できない
+                    if (list.canDelete) {
+                        ListIconButton(R.drawable.ic_delete, stringResource(R.string.lists_delete, list.name), onDelete)
+                    }
                 }
-            }
-        } else {
-            null
-        },
-    )
+            },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        )
+    }
 }
 
 @Composable
-private fun CreateListDialog(onConfirm: (String) -> Unit, onDismiss: () -> Unit) {
-    var name by rememberSaveable { mutableStateOf("") }
+private fun ListIconButton(icon: Int, contentDescription: String, onClick: () -> Unit) {
+    IconButton(onClick = onClick) {
+        Icon(
+            painterResource(icon),
+            contentDescription = contentDescription,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/** リストの作成と名前の変更で共通のダイアログ */
+@Composable
+private fun ListNameDialog(
+    title: String,
+    confirmLabel: String,
+    initialName: String,
+    onConfirm: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    // 名前の変更では、今の名前を全選択しておき、そのまま入力すれば置き換わるようにする
+    var name by remember {
+        mutableStateOf(TextFieldValue(initialName, TextRange(0, initialName.length)))
+    }
     val focusRequester = remember { FocusRequester() }
-    val canCreate = name.isNotBlank()
+    val canConfirm = name.text.isNotBlank()
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.lists_create_dialog_title)) },
+        title = { Text(title) },
         text = {
             OutlinedTextField(
                 value = name,
-                onValueChange = { name = it.take(ShoppingList.MAX_NAME_LENGTH) },
+                onValueChange = { name = it.copy(text = it.text.take(ShoppingList.MAX_NAME_LENGTH)) },
                 label = { Text(stringResource(R.string.lists_create_dialog_label)) },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                keyboardActions = KeyboardActions(onDone = { if (canCreate) onConfirm(name) }),
+                keyboardActions = KeyboardActions(onDone = { if (canConfirm) onConfirm(name.text) }),
                 modifier = Modifier.focusRequester(focusRequester),
             )
         },
         confirmButton = {
-            TextButton(onClick = { onConfirm(name) }, enabled = canCreate) {
-                Text(stringResource(R.string.lists_create_dialog_confirm))
+            TextButton(onClick = { onConfirm(name.text) }, enabled = canConfirm) {
+                Text(confirmLabel)
             }
         },
         dismissButton = {
@@ -189,13 +252,15 @@ private fun ListsContentPreview() {
         ListsContent(
             state = ListsUiState(
                 lists = listOf(
-                    ListSummary(ListId("1"), "スーパー", 3),
-                    ListSummary(ListId("2"), "薬局", 0),
+                    ListSummary(ListId("1"), "スーパー", 3, hasPurchases = true),
+                    ListSummary(ListId("2"), "薬局", 0, hasPurchases = true),
+                    ListSummary(ListId("3"), "ホームセンター", 0, hasPurchases = false),
                 ),
                 loading = false,
             ),
             onOpenList = {},
             onCreateList = {},
+            onRenameList = { _, _ -> },
             onDeleteList = {},
         )
     }

@@ -10,6 +10,7 @@ import com.cheesecomer.cartmate.domain.repository.CompleteResult
 import com.cheesecomer.cartmate.domain.repository.DeleteItemResult
 import com.cheesecomer.cartmate.domain.repository.DeleteListResult
 import com.cheesecomer.cartmate.domain.repository.ItemUpdate
+import com.cheesecomer.cartmate.domain.repository.RenameListResult
 import com.cheesecomer.cartmate.domain.repository.ReopenResult
 import com.cheesecomer.cartmate.domain.repository.UpdateItemResult
 import com.cheesecomer.cartmate.testing.MutableClock
@@ -192,5 +193,25 @@ class InMemoryStoreTest {
             .isEqualTo(UpdateItemResult.AlreadyCompleted)
         assertThat(store.updateItem(ItemId("none"), ItemUpdate("低脂肪乳", 1.0, null)))
             .isEqualTo(UpdateItemResult.NotFound)
+    }
+
+    @Test
+    fun `リスト名を変更しても、購入の記録に残したリスト名は変わらない`() = runTest {
+        val (listId, itemId) = createListWithItem()
+        store.completeItem(itemId, clock.now)
+
+        assertThat(store.renameList(listId, "イオン")).isEqualTo(RenameListResult.Renamed)
+
+        assertThat(store.observeLists().first().single().name).isEqualTo("イオン")
+        assertThat(store.observePurchases(Instant.EPOCH).first().single().listNameSnapshot).isEqualTo("スーパー")
+    }
+
+    @Test
+    fun `削除したリストや存在しないリストの名前は変更できない`() = runTest {
+        val listId = store.createList("薬局")
+        store.deleteList(listId)
+
+        assertThat(store.renameList(listId, "ドラッグストア")).isEqualTo(RenameListResult.NotFound)
+        assertThat(store.renameList(ListId("none"), "ドラッグストア")).isEqualTo(RenameListResult.NotFound)
     }
 }

@@ -102,12 +102,15 @@ service cloud.firestore {
           && request.resource.data.createdBy == me()
           && request.resource.data.createdAt == request.time
           && request.resource.data.status == 'active';
-        allow update: if isMember(hid)
-          && changed().hasOnly(['status','deletedAt','deletedBy'])
-          && resource.data.status == 'active'
-          && request.resource.data.status == 'deleted'
-          && request.resource.data.deletedBy == me()
-          && request.resource.data.deletedAt == request.time;
+        allow update: if isMember(hid) && resource.data.status == 'active' && (
+          // 論理削除
+          (changed().hasOnly(['status','deletedAt','deletedBy'])
+            && request.resource.data.status == 'deleted'
+            && request.resource.data.deletedBy == me()
+            && request.resource.data.deletedAt == request.time)
+          // リスト名の変更。購入の記録の listNameSnapshot は書き換えない
+          || (changed().hasOnly(['name']) && str(request.resource.data.name, 40))
+        );
         allow delete: if false;
       }
 

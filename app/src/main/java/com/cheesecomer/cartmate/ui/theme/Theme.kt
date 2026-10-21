@@ -1,27 +1,13 @@
 package com.cheesecomer.cartmate.ui.theme
 
-import android.os.Build
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.platform.LocalContext
 
+/**
+ * 端末の設定に関係なく、白を基調にしたブランドカラーの配色を使う。
+ * ダークモードにも、端末の壁紙に合わせた配色（Dynamic Color）にも合わせない（docs/design/ui.md「見た目の基準」）。
+ */
 @Composable
-fun CartMateTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    content: @Composable () -> Unit,
-) {
-    val colorScheme = when {
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-        darkTheme -> darkColorScheme()
-        else -> lightColorScheme()
-    }
-    MaterialTheme(colorScheme = colorScheme, content = content)
+fun CartMateTheme(content: @Composable () -> Unit) {
+    MaterialTheme(colorScheme = LightColorScheme, content = content)
 }

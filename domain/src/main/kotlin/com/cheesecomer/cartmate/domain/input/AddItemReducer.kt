@@ -10,7 +10,7 @@ import com.cheesecomer.cartmate.domain.model.Item
 object AddItemReducer {
 
     fun reduce(state: AddItemState, event: AddItemEvent): AddItemTransition {
-        // 項目のタップは、どの状態からでも編集を始める。追加の途中だった数量・単位は破棄する
+        // 「編集」ボタンは、どの状態からでも編集を始める。追加の途中だった数量・単位は破棄する
         if (event is AddItemEvent.EditRequested) return AddItemTransition(startEditing(event.item, draftOf(state)))
         return when (state) {
             is Idle -> reduceIdle(state, event)

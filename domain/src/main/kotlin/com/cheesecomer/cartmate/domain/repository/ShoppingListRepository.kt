@@ -10,7 +10,15 @@ interface ShoppingListRepository {
 
     suspend fun createList(name: String): ListId
 
+    /** 削除していないリストの名前を変更する。購入の記録に残したリスト名は書き換えない */
+    suspend fun renameList(id: ListId, name: String): RenameListResult
+
     suspend fun deleteList(id: ListId): DeleteListResult
+}
+
+sealed interface RenameListResult {
+    data object Renamed : RenameListResult
+    data object NotFound : RenameListResult
 }
 
 sealed interface DeleteListResult {

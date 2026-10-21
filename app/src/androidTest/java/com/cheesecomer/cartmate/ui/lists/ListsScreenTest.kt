@@ -7,6 +7,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.cheesecomer.cartmate.data.memory.InMemoryStore
 import com.cheesecomer.cartmate.domain.model.NewItem
@@ -28,7 +29,7 @@ class ListsScreenTest {
     private val store = InMemoryStore(Clock.systemUTC()) { UserId("taro") }
 
     private fun setContent() {
-        val viewModel = ListsViewModel(store, store)
+        val viewModel = ListsViewModel(store, store, store, Clock.systemUTC())
         composeRule.setContent {
             CartMateTheme { ListsScreen(onOpenList = {}, viewModel = viewModel) }
         }
@@ -38,12 +39,12 @@ class ListsScreenTest {
     fun リストを作成すると一覧に表示される() {
         setContent()
 
-        composeRule.onNodeWithText("リストを作成", useUnmergedTree = true).performClick()
+        composeRule.onNodeWithContentDescription("リストを作成").performClick()
         composeRule.onNode(hasSetTextAction()).performTextInput("スーパー")
         composeRule.onNodeWithText("作成").performClick()
 
         composeRule.onNodeWithText("スーパー").assertIsDisplayed()
-        composeRule.onNodeWithText("未購入 0").assertIsDisplayed()
+        composeRule.onNodeWithText("まだ買うものを登録していません").assertIsDisplayed()
     }
 
     @Test
@@ -61,5 +62,18 @@ class ListsScreenTest {
 
         composeRule.waitUntil { runBlocking { store.observeLists().first().count { it.status.name == "ACTIVE" } } == 1 }
         composeRule.onNodeWithText("薬局").assertDoesNotExist()
+    }
+
+    @Test
+    fun 編集ボタンからリスト名を変更できる() {
+        runBlocking { store.createList("スーパー") }
+        setContent()
+
+        composeRule.onNodeWithContentDescription("スーパーの名前を変更").performClick()
+        composeRule.onNode(hasSetTextAction()).performTextReplacement("イオン")
+        composeRule.onNodeWithText("変更").performClick()
+
+        composeRule.onNodeWithText("イオン").assertIsDisplayed()
+        composeRule.onNodeWithText("スーパー").assertDoesNotExist()
     }
 }

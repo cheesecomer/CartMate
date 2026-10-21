@@ -57,7 +57,7 @@ sealed interface AddItemEvent {
     data object Confirmed : AddItemEvent
     /** ✕ ボタン、または戻るキー */
     data object Cancelled : AddItemEvent
-    /** 未購入の項目をタップした */
+    /** 未購入の項目の「編集」ボタンを押した */
     data class EditRequested(val item: Item) : AddItemEvent
 }
 

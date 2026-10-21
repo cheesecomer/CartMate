@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -68,12 +69,16 @@ fun AddItemBar(state: AddItemState, onEvent: (AddItemEvent) -> Unit, modifier: M
         if (editingItemId != null) quantityFocus.requestFocus()
     }
 
-    Surface(modifier = modifier.fillMaxWidth(), tonalElevation = 3.dp) {
-        Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-            when (state) {
-                is AddItemState.Detail -> DetailInput(state, onEvent, quantityFocus)
-                is AddItemState.Editing -> EditInput(state, onEvent, quantityFocus)
-                else -> NameInput(state, onEvent, nameFocus)
+    // クリーンな印象にするため、影や色付けは使わず、上辺の細い線でリストと区切る
+    Surface(modifier = modifier.fillMaxWidth()) {
+        Column {
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                when (state) {
+                    is AddItemState.Detail -> DetailInput(state, onEvent, quantityFocus)
+                    is AddItemState.Editing -> EditInput(state, onEvent, quantityFocus)
+                    else -> NameInput(state, onEvent, nameFocus)
+                }
             }
         }
     }

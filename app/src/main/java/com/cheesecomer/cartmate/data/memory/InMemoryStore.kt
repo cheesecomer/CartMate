@@ -15,6 +15,7 @@ import com.cheesecomer.cartmate.domain.repository.DeleteListResult
 import com.cheesecomer.cartmate.domain.repository.ItemRepository
 import com.cheesecomer.cartmate.domain.repository.ItemUpdate
 import com.cheesecomer.cartmate.domain.repository.PurchaseRepository
+import com.cheesecomer.cartmate.domain.repository.RenameListResult
 import com.cheesecomer.cartmate.domain.repository.ReopenResult
 import com.cheesecomer.cartmate.domain.repository.ShoppingListRepository
 import com.cheesecomer.cartmate.domain.repository.UpdateItemResult
@@ -71,6 +72,15 @@ class InMemoryStore @Inject constructor(
         )
         data.update { it.copy(lists = it.lists + (list.id to list)) }
         return list.id
+    }
+
+    override suspend fun renameList(id: ListId, name: String): RenameListResult = transact { d ->
+        val list = d.lists[id]
+        if (list == null || list.status == ListStatus.DELETED) {
+            d to RenameListResult.NotFound
+        } else {
+            d.copy(lists = d.lists + (id to list.copy(name = name))) to RenameListResult.Renamed
+        }
     }
 
     override suspend fun deleteList(id: ListId): DeleteListResult = transact { d ->

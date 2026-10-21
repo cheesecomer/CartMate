@@ -166,6 +166,7 @@ fun ListDetailContent(
                         item = item,
                         editing = (state.addItem as? AddItemState.Editing)?.itemId == item.id,
                         onEdit = { onAddItemEvent(AddItemEvent.EditRequested(item)) },
+                        onCancelEdit = { onAddItemEvent(AddItemEvent.Cancelled) },
                         onCheck = { onCheck(item) },
                         onDelete = { onDelete(item) },
                         modifier = Modifier.animateItem(),
