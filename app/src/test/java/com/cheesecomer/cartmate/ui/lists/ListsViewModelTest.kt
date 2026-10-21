@@ -25,20 +25,20 @@ class ListsViewModelTest {
 
     @Test
     fun `リストを作成すると、作成順に未購入件数とともに表示される`() = runTest {
+        // 状態が届く回数や順番は合成するデータの数で変わるので、期待する状態が届くまで待つ
         viewModel.uiState.test {
-            assertThat(awaitItem().loading).isTrue()
-            assertThat(awaitItem().lists).isEmpty()
+            assertThat(awaitUntil { !it.loading }.lists).isEmpty()
 
             viewModel.createList(" スーパー ")
-            val supermarket = awaitItem().lists.single()
+            val supermarket = awaitUntil { it.lists.isNotEmpty() }.lists.single()
             assertThat(supermarket.name).isEqualTo("スーパー")
 
             clock.advance(Duration.ofSeconds(1))
             viewModel.createList("薬局")
-            awaitItem()
+            awaitUntil { it.lists.size == 2 }
             store.addItem(NewItem(supermarket.id, "牛乳", null, null))
 
-            val lists = awaitItem().lists
+            val lists = awaitUntil { state -> state.lists.any { it.openCount == 1 } }.lists
             assertThat(lists.map { it.name to it.openCount }).containsExactly("スーパー" to 1, "薬局" to 0).inOrder()
             assertThat(lists.map { it.canDelete }).containsExactly(false, true).inOrder()
         }
@@ -55,12 +55,12 @@ class ListsViewModelTest {
     @Test
     fun `空のリストを削除すると一覧から消える`() = runTest {
         viewModel.uiState.test {
-            skipItems(2)
+            awaitUntil { !it.loading }
             viewModel.createList("スーパー")
-            val list = awaitItem().lists.single()
+            val list = awaitUntil { it.lists.isNotEmpty() }.lists.single()
 
             viewModel.deleteList(list.id)
-            assertThat(awaitItem().lists).isEmpty()
+            awaitUntil { it.lists.isEmpty() }
         }
     }
 
