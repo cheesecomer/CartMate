@@ -1,0 +1,67 @@
+/* アプリと同じ配色（docs/design-tokens.md） */
+:root {
+  --surface: #fff7ff;
+  --card: #ffffff;
+  --primary: #6b4e8c;
+  --on-primary: #ffffff;
+  --primary-container: #f2e7fe;
+  --on-surface: #1d1b20;
+  --on-surface-variant: #49454f;
+  --outline-variant: #cac4cf;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--surface);
+  color: var(--on-surface);
+  font-family: system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif;
+  line-height: 1.6;
+}
+
+main {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 48px 16px;
+}
+
+.brand { display: flex; align-items: center; gap: 12px; margin-bottom: 32px; }
+.brand img { width: 48px; height: 48px; border-radius: 12px; background: var(--primary-container); }
+.brand span { font-size: 22px; font-weight: 700; }
+
+h1 { font-size: 22px; margin: 0 0 8px; }
+p { margin: 0 0 16px; color: var(--on-surface-variant); font-size: 15px; }
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--outline-variant);
+  border-radius: 16px;
+  padding: 16px;
+  margin: 24px 0;
+}
+
+.label { font-size: 13px; color: var(--on-surface-variant); margin-bottom: 8px; }
+
+.code {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-align: center;
+  user-select: all;
+}
+
+.button {
+  display: block;
+  text-align: center;
+  background: var(--primary);
+  color: var(--on-primary);
+  text-decoration: none;
+  font-weight: 700;
+  padding: 14px 16px;
+  border-radius: 999px;
+}
+
+ol { padding-left: 20px; color: var(--on-surface-variant); }
+li { margin-bottom: 8px; }

@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- 招待コードを検索結果やリンクのプレビューに残さない -->
+  <meta name="robots" content="noindex">
+  <title>CartMate の家族に招待されました</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <!--
+    招待リンク（https://cartmate.cheesecomer.com/join/{code}）のフォールバックページ。
+    アプリが入っている端末では App Links でアプリが開くので、このページはアプリが入っていない端末で表示される
+    （docs/design/security.md「招待リンク（App Links）」）
+  -->
+  <main>
+    <div class="brand"><img src="/icon.svg" alt=""><span>CartMate</span></div>
+    <h1>家族の買い物リストに招待されました</h1>
+    <p>CartMate は、家族で買い物リストを共有するアプリです。アプリを入れてから、下の招待コードで家族に参加してください。</p>
+
+    <div class="card">
+      <div class="label">招待コード（24時間有効）</div>
+      <div class="code" id="code">----</div>
+    </div>
+
+    <a class="button" href="https://play.google.com/store/apps/details?id=com.cheesecomer.cartmate">Google Play でアプリを入れる</a>
+
+    <div class="card">
+      <ol>
+        <li>アプリを入れて、Google でログインします。</li>
+        <li>「招待コードで参加する」を選びます。</li>
+        <li>上の招待コードを入力して、参加します。</li>
+      </ol>
+    </div>
+  </main>
+  <script>
+    // アプリの InviteCode.normalize と同じ扱い（大文字にし、I・L は 1、O は 0 として読み、使える文字だけを残す）
+    const ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+    const raw = decodeURIComponent(location.pathname.replace(/^\/join\/?/, ""));
+    const code = [...raw.toUpperCase()]
+      .map((c) => (c === "I" || c === "L" ? "1" : c === "O" ? "0" : c))
+      .filter((c) => ALPHABET.includes(c))
+      .join("");
+    if (code.length === 10) {
+      document.getElementById("code").textContent = `${code.slice(0, 4)}-${code.slice(4, 8)}-${code.slice(8)}`;
+    } else {
+      document.getElementById("code").textContent = "コードが読み取れません";
+    }
+  </script>
+</body>
+</html>
