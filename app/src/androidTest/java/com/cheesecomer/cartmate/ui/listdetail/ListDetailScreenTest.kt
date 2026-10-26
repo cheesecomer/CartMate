@@ -329,7 +329,7 @@ class ListDetailScreenTest {
     }
 
     @Test
-    fun 買い物進捗に_のこりと完了の件数を表示する() {
+    fun のこりと完了の件数をバッジで表示する() {
         addItem("牛乳")
         val egg = addItem("卵")
         runBlocking { store.completeItem(egg, Instant.now()) }

@@ -44,7 +44,6 @@
     <string name="detail_delete_dialog_title">リストを削除しますか？</string>
     <string name="detail_delete_dialog_message">「%1$s」を削除します。購入の記録は残ります。</string>
     <string name="detail_cannot_delete_list">のこりの商品があるリストは削除できません</string>
-    <string name="detail_progress_title">買い物進捗</string>
     <string name="detail_progress_badge">のこり %1$d件 / %2$d完了</string>
     <string name="detail_tap_hint">カードをタップして購入完了</string>
     <string name="detail_empty">購入予定の商品はありません</string>

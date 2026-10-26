@@ -1,7 +1,6 @@
 package com.cheesecomer.cartmate.ui.listdetail
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,7 +10,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -27,7 +25,6 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -48,7 +45,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -300,7 +296,7 @@ private fun ItemList(
             }
         }
         if (state.items.isNotEmpty()) {
-            item(key = "progress") { ProgressCard(openCount = state.openCount, completedCount = state.completedCount) }
+            item(key = "progress") { ProgressBadge(openCount = state.openCount, completedCount = state.completedCount) }
             item(key = "hint") {
                 Text(
                     stringResource(R.string.detail_tap_hint),
@@ -355,55 +351,28 @@ private fun ItemList(
     }
 }
 
-/** 「買い物進捗」。のこりと完了（直近24時間）の件数と進捗バー */
+/** のこりと完了（直近24時間・片付けたあと）の件数のバッジ。見出しや進捗バーは置かず、軽く表示する */
 @Composable
-private fun ProgressCard(openCount: Int, completedCount: Int) {
+private fun ProgressBadge(openCount: Int, completedCount: Int) {
     val colors = MaterialTheme.colorScheme
-    val shape = MaterialTheme.shapes.large
-    Column(
+    Row(
         modifier = Modifier
-            .padding(horizontal = CartMateSpacing.large, vertical = CartMateSpacing.medium)
-            .fillMaxWidth()
-            .background(colors.surfaceContainerLow, shape)
-            .border(1.dp, colors.outlineVariant, shape)
-            .padding(CartMateSpacing.large),
+            .padding(horizontal = CartMateSpacing.large, vertical = CartMateSpacing.small)
+            .background(colors.primaryContainer, CircleShape)
+            .padding(horizontal = CartMateSpacing.medium, vertical = CartMateSpacing.xSmall),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(CartMateSpacing.xSmall),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                stringResource(R.string.detail_progress_title),
-                style = MaterialTheme.typography.titleSmall,
-                modifier = Modifier.weight(1f),
-            )
-            Row(
-                modifier = Modifier
-                    .background(colors.primaryContainer, CircleShape)
-                    .padding(horizontal = CartMateSpacing.medium, vertical = CartMateSpacing.xSmall),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(CartMateSpacing.xSmall),
-            ) {
-                Icon(
-                    painterResource(R.drawable.ic_check_circle),
-                    contentDescription = null,
-                    tint = colors.primary,
-                    modifier = Modifier.size(16.dp),
-                )
-                Text(
-                    stringResource(R.string.detail_progress_badge, openCount, completedCount),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = colors.primary,
-                )
-            }
-        }
-        Spacer(Modifier.height(CartMateSpacing.medium))
-        val total = openCount + completedCount
-        LinearProgressIndicator(
-            progress = { if (total == 0) 0f else completedCount.toFloat() / total },
-            modifier = Modifier.fillMaxWidth().height(8.dp),
+        Icon(
+            painterResource(R.drawable.ic_check_circle),
+            contentDescription = null,
+            tint = colors.primary,
+            modifier = Modifier.size(16.dp),
+        )
+        Text(
+            stringResource(R.string.detail_progress_badge, openCount, completedCount),
+            style = MaterialTheme.typography.labelLarge,
             color = colors.primary,
-            trackColor = colors.surfaceContainer,
-            strokeCap = StrokeCap.Round,
-            gapSize = 0.dp,
-            drawStopIndicator = {},
         )
     }
 }
