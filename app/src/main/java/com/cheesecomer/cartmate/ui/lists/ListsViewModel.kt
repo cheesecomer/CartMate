@@ -25,6 +25,7 @@ import java.time.Duration
 import javax.inject.Inject
 import com.cheesecomer.cartmate.domain.model.Member
 import com.cheesecomer.cartmate.domain.repository.MemberDirectory
+import com.cheesecomer.cartmate.domain.list.ShoppingRound
 
 data class ListSummary(
     val id: ListId,
@@ -67,8 +68,12 @@ class ListsViewModel @Inject constructor(
             val active = purchases.filter { it.active }
             val listsWithPurchases = active.mapTo(HashSet()) { it.listId }
             // 有効な購入はチェック済みの項目と1対1なので、直近24時間に完了した件数は購入の記録から数える
-            val completedSince = clock.instant().minus(COMPLETED_WINDOW)
-            val completedCounts = active.filter { it.purchasedAt >= completedSince }.groupingBy { it.listId }.eachCount()
+            // 前回の買い物を片付けたリストでは、片付けたあとの完了だけを数える
+            val windowStart = clock.instant().minus(COMPLETED_WINDOW)
+            val clearedAt = lists.associate { it.id to it.clearedAt }
+            val completedCounts = active
+                .filter { ShoppingRound.isShown(it.purchasedAt, windowStart, clearedAt[it.listId]) }
+                .groupingBy { it.listId }.eachCount()
             ListsUiState(
                 // 削除したリストの表示ルール（未購入が残っていれば表示）はフェーズ3で実装する
                 lists = lists.filter { it.status == ListStatus.ACTIVE }.map {

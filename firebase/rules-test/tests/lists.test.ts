@@ -130,6 +130,33 @@ describe("リスト", () => {
     await assertSucceeds(updateDoc(doc(as("hanako"), `households/${HID}/lists/l1`), { name: "イオン", memo: "火曜市" }));
   });
 
+  it("項目の追加と同じバッチで、前回の買い物のチェック済みを片付けられる", async () => {
+    await seedHousehold(HID, "taro", "hanako");
+    await seedList("l1", "taro", "shared");
+    const db = as("hanako");
+    await assertSucceeds(
+      writeBatch(db)
+        .update(doc(db, `households/${HID}/lists/l1`), { clearedAt: new Date() })
+        .set(doc(db, `households/${HID}/products/${PRODUCT}`), product("hanako"))
+        .set(doc(db, `households/${HID}/items/i1`), item("l1", "hanako", "shared"))
+        .commit(),
+    );
+  });
+
+  it("片付けた時刻は、未来の時刻にできない", async () => {
+    await seedHousehold(HID, "taro");
+    await seedList("l1", "taro", "shared");
+    await assertFails(
+      updateDoc(doc(as("taro"), `households/${HID}/lists/l1`), { clearedAt: new Date(Date.now() + 60 * 60 * 1000) }),
+    );
+  });
+
+  it("ほかの人のプライベートなリストは片付けられない", async () => {
+    await seedHousehold(HID, "taro", "hanako");
+    await seedList("l1", "taro", "private");
+    await assertFails(updateDoc(doc(as("hanako"), `households/${HID}/lists/l1`), { clearedAt: new Date() }));
+  });
+
   it("リストは物理削除できない", async () => {
     await seedHousehold(HID, "taro");
     await seedList("l1", "taro", "shared");

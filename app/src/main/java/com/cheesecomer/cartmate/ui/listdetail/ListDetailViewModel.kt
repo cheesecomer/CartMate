@@ -41,6 +41,7 @@ import java.time.Duration
 import javax.inject.Inject
 import com.cheesecomer.cartmate.domain.model.Member
 import com.cheesecomer.cartmate.domain.repository.MemberDirectory
+import com.cheesecomer.cartmate.domain.list.ShoppingRound
 
 data class ListDetailUiState(
     val listName: String = "",
@@ -110,7 +111,8 @@ class ListDetailViewModel @Inject constructor(
             listName = list?.name.orEmpty(),
             listMemo = list?.memo,
             listVisibility = list?.visibility ?: Visibility.SHARED,
-            items = items,
+            // 前回の買い物のチェック済みは、片付けたあとは表示しない
+            items = ShoppingRound.visible(items, windowStart = clock.instant().minus(COMPLETED_WINDOW), clearedAt = list?.clearedAt),
             addItem = addItem,
             loading = false,
         )

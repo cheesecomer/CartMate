@@ -41,6 +41,8 @@ import kotlinx.coroutines.tasks.await
 import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
+import com.cheesecomer.cartmate.domain.list.ShoppingRound
+import java.time.Clock
 
 /**
  * リスト・項目・購入の記録の Firestore 実装（docs/design/data-model.md、docs/design/sync.md）。
@@ -55,6 +57,7 @@ import javax.inject.Singleton
 class FirestoreShoppingStore @Inject constructor(
     private val session: FirestoreSession,
     private val db: FirebaseFirestore,
+    private val clock: Clock,
 ) : ShoppingListRepository, ItemRepository, PurchaseRepository {
 
     /** 共有と自分のプライベートの2本の購読を1つにまとめる */
@@ -179,8 +182,20 @@ class FirestoreShoppingStore @Inject constructor(
     override suspend fun addItem(newItem: NewItem): ItemId {
         val scope = session.requireScope()
         val ref = Paths.items(db, scope.householdId).document()
-        val sortKey = SortKeys.after(cachedItems(scope, newItem.listId).maxOfOrNull { it.sortKey })
+        val listItems = cachedItems(scope, newItem.listId)
+        val sortKey = SortKeys.after(listItems.maxOfOrNull { it.sortKey })
+        val now = clock.instant()
+        val list = cachedLists(scope).find { it.id == newItem.listId }
+        val shown = ShoppingRound.visible(
+            listItems,
+            windowStart = now - ShoppingRound.COMPLETED_WINDOW,
+                clearedAt = list?.clearedAt,
+        )
         db.batch().apply {
+            // 買い終わったリストに追加したら、前回の買い物のチェック済みを片付ける（docs/requirements.md §3.2）
+            if (list != null && ShoppingRound.clearsOnAdd(shown)) {
+                update(Paths.lists(db, scope.householdId).document(list.id.value), F.CLEARED_AT, now.toTimestamp())
+            }
             val productId = putProduct(scope, newItem.inputName)
             set(ref, mapOf(
                 F.LIST_ID to newItem.listId.value,

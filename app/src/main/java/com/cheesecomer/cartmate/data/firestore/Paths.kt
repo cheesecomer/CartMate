@@ -72,6 +72,7 @@ object F {
     const val REVOKED_AT = "revokedAt"
     const val REVOKED_BY = "revokedBy"
     const val IMPORTED_FROM = "importedFrom"
+    const val CLEARED_AT = "clearedAt"
 }
 
 /** フィールドの値 */

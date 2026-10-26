@@ -33,6 +33,7 @@ import java.time.Instant
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
+import com.cheesecomer.cartmate.domain.list.ShoppingRound
 
 /**
  * テスト用のインメモリ実装。プロセスが終了するとデータは消える。
@@ -163,7 +164,15 @@ class InMemoryStore @Inject constructor(
                 completedAt = null,
                 completedBy = null,
             )
-            d.copy(items = d.items + (id to item))
+            // 買い終わったリストに追加したら、前回の買い物のチェック済みを片付ける
+            val list = d.lists[newItem.listId]
+            val shown = ShoppingRound.visible(
+                d.items.values.filter { it.listId == newItem.listId && it.visible },
+                windowStart = now - ShoppingRound.COMPLETED_WINDOW,
+                clearedAt = list?.clearedAt,
+            )
+            val lists = if (list != null && ShoppingRound.clearsOnAdd(shown)) d.lists + (list.id to list.copy(clearedAt = now)) else d.lists
+            d.copy(items = d.items + (id to item), lists = lists)
         }
         return id
     }

@@ -33,6 +33,7 @@ fun DocumentSnapshot.toShoppingList(): ShoppingList? = ShoppingList(
     createdAt = instant(F.CREATED_AT) ?: return null,
     createdBy = UserId(getString(F.CREATED_BY) ?: return null),
     status = if (getString(F.STATUS) == V.DELETED) ListStatus.DELETED else ListStatus.ACTIVE,
+    clearedAt = instant(F.CLEARED_AT),
 )
 
 fun DocumentSnapshot.toItem(): Item? = Item(

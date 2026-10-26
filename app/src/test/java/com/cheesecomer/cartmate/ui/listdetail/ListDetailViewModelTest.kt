@@ -223,6 +223,36 @@ class ListDetailViewModelTest {
     }
 
     @Test
+    fun `買い終わったリストに追加すると、前回のチェック済みを片付けて新しい項目だけを表示する`() = runTest {
+        val milk = store.addItem(newItem(listId, "牛乳"))
+        store.completeItem(milk, clock.now)
+        viewModel.uiState.test {
+            assertThat(awaitUntil { it.items.isNotEmpty() }.items.map { it.inputName }).containsExactly("牛乳")
+
+            store.addItem(newItem(listId, "卵"))
+
+            val items = awaitUntil { state -> state.items.any { it.inputName == "卵" } }.items
+            assertThat(items.map { it.inputName }).containsExactly("卵")
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `買い物の途中の追加では、チェック済みを残す`() = runTest {
+        val milk = store.addItem(newItem(listId, "牛乳"))
+        store.addItem(newItem(listId, "卵"))
+        store.completeItem(milk, clock.now)
+        viewModel.uiState.test {
+            store.addItem(newItem(listId, "パン"))
+
+            val items = awaitUntil { state -> state.items.any { it.inputName == "パン" } }.items
+            assertThat(items.map { it.inputName }).containsExactly("牛乳", "卵", "パン").inOrder()
+            assertThat(items.first { it.inputName == "牛乳" }.status).isEqualTo(ItemStatus.COMPLETED)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
     fun `のこりの商品がないリストは削除でき、一覧に戻る`() = runTest {
         turbineScope {
             val states = viewModel.uiState.testIn(backgroundScope)

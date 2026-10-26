@@ -23,6 +23,7 @@ households/{hid}/lists/{listId}
   importedFrom?: string,                     # 合流で写したときだけ。コピー元の家族のID（lists・items・products・purchases に共通）
   sortKey: number, createdBy, createdAt,
   status: "active" | "deleted", deletedAt?, deletedBy?
+  clearedAt?: timestamp                      # 前回の買い物のチェック済みを片付けた時刻（端末の時刻）。これより前のチェックは表示しない
 
 households/{hid}/items/{itemId}              # リストの下ではなく家族直下（フラット）
   listId, productId, inputName, sortKey: number,

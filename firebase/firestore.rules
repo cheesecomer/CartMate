@@ -110,6 +110,10 @@ service cloud.firestore {
               && str(request.resource.data.name, 40) && optStr(request.resource.data.memo, 60))
           // 並び替え
           || (changed().hasOnly(['sortKey']) && request.resource.data.sortKey is number)
+          // 前回の買い物のチェック済みの片付け。端末の時刻なので、時計のずれを5分まで許す
+          || (changed().hasOnly(['clearedAt'])
+              && request.resource.data.clearedAt is timestamp
+              && request.resource.data.clearedAt <= request.time + duration.value(5, 'm'))
         );
         allow delete: if isMember(hid) && isOwnPrivate(resource.data, resource.data.createdBy);   // アカウントの削除
         allow create: if isImport('lists', listId, request.resource.data.createdBy, ['sortKey']);   // 合流

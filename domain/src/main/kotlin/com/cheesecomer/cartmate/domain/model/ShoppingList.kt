@@ -13,6 +13,11 @@ data class ShoppingList(
     val createdAt: Instant,
     val createdBy: UserId,
     val status: ListStatus,
+    /**
+     * 前回の買い物のチェック済みを片付けた時刻（docs/requirements.md §3.2）。これより前にチェックした項目は、
+     * リスト詳細にも進捗にも出さない。まだ片付けていなければ null
+     */
+    val clearedAt: Instant? = null,
 ) {
     companion object {
         const val MAX_NAME_LENGTH = 40
