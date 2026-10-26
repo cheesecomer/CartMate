@@ -8,6 +8,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
@@ -42,8 +43,9 @@ class FirestoreSession @Inject constructor(
         awaitClose { auth.removeAuthStateListener(listener) }
     }.distinctUntilChanged().shareIn(sharing, SharingStarted.Eagerly, replay = 1)
 
-    val householdId: Flow<HouseholdId?> = uid.flatMapLatest { uid ->
-        if (uid == null) flowOf(null)
+    /** 自分の users の householdId。どのユーザーの値かを付けて共有する */
+    private val userHousehold: Flow<UserValue<HouseholdId?>> = uid.flatMapLatest { uid ->
+        if (uid == null) flowOf(UserValue<HouseholdId?>(null, null))
         // 自分の users は拒否されないので、denied は流れない。通信の問題などでは購読し直す
         else recoverListen(
             listen = {
@@ -55,14 +57,19 @@ class FirestoreSession @Inject constructor(
             denied = null,
             awaitPendingWrites = { db.waitForPendingWrites().await() },
             onError = { Log.w("FirestoreSession", "listen failed", it) },
-        )
-    }.distinctUntilChanged().shareIn(sharing, SharingStarted.Eagerly, replay = 1)
+        ).map { UserValue(uid, it) }
+    }.shareIn(sharing, SharingStarted.Eagerly, replay = 1)
 
-    /** ログイン中のユーザーと所属する家族。どちらかがなければ流さない */
-    val scope: Flow<Scope?> = uid.flatMapLatest { uid ->
-        if (uid == null) flowOf(null)
-        else householdId.map { householdId -> householdId?.let { Scope(uid, it) } }
-    }.distinctUntilChanged().shareIn(sharing, SharingStarted.Eagerly, replay = 1)
+    /**
+     * 今ログインしているユーザーの所属する家族。共有している購読から、そのつど取り出す
+     * （取り出したものを共有すると、ログインやアカウントの切り替えのあとに、前のユーザーの値が残るため）
+     */
+    val householdId: Flow<HouseholdId?> = currentUserValue(uid, userHousehold)
+
+    /** ログイン中のユーザーと所属する家族。どちらかがなければ null */
+    val scope: Flow<Scope?> = combine(uid, householdId) { uid, householdId ->
+        if (uid != null && householdId != null) Scope(uid, householdId) else null
+    }.distinctUntilChanged()
 
     fun requireUid(): String = checkNotNull(auth.currentUser?.uid) { "ログインしていません" }
 
