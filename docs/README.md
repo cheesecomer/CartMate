@@ -19,5 +19,3 @@
 | [roadmap.md](roadmap.md) | 実装フェーズ |
 
 振る舞いを変える場合は、まず requirements.md を更新し、それから該当する設計資料を更新します。デザインの資料どうしで食い違う場合の優先順位は [design/ui.md](design/ui.md#見た目の基準) にあります。
-
-`stitch-prompt-*.md` は、デザインを検討したときの生成ツールへの指示文です。仕様としては参照しません。`stitch-prompt-lists-redesign.md` と `stitch-prompt-detail-redesign.md` は前提が古い（グリーン、3案の比較）ものです。`stitch-prompt-family.md` と `stitch-prompt-family-final.md` は、フェーズ2の家族とアカウントの画面をデザインし、最終稿として書き出すための指示文です。

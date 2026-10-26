@@ -26,3 +26,6 @@ keystore.properties
 
 # macOS
 .DS_Store
+
+# Stitch への指示文（デザインの検討用）
+docs/stitch-prompt-*.md
