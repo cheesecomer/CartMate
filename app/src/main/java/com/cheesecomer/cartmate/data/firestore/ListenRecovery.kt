@@ -3,6 +3,7 @@ package com.cheesecomer.cartmate.data.firestore
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.retryWhen
@@ -23,6 +24,8 @@ fun <T> recoverListen(
     awaitPendingWrites: suspend () -> Unit,
     isDenied: (Throwable) -> Boolean = { it.isPermissionDenied },
     onError: (Throwable) -> Unit = {},
+    /** 拒否以外のエラーで購読し直している間に流す値。null なら何も流さず、直前の値を保つ */
+    whileRetrying: T? = null,
 ): Flow<T> {
     var retriedAfterDenied = false
     return flow { emitAll(listen()) }
@@ -33,6 +36,7 @@ fun <T> recoverListen(
                 retriedAfterDenied = true
                 awaitPendingWrites()
             } else {
+                if (attempt == 0L && whileRetrying != null) emit(whileRetrying)
                 delay(retryDelay(attempt))
             }
             true
@@ -42,3 +46,18 @@ fun <T> recoverListen(
 
 /** 購読し直すまでの間隔。2秒から倍にしていき、30秒で止める */
 private fun retryDelay(attempt: Long): Duration = min(2L shl min(attempt, 4L).toInt(), 30L).seconds
+
+/**
+ * 複数の購読（[listens]）の結果を1つの一覧にまとめる。購読は1本ずつやり直す（[recoverListen]）。
+ * 1本が失敗し続けても（インデックスの作成中など）、ほかの購読の結果は出るよう、失敗した購読はやり直している間は空として扱う
+ */
+fun <T> combineListens(
+    listens: List<() -> Flow<List<T>>>,
+    awaitPendingWrites: suspend () -> Unit,
+    isDenied: (Throwable) -> Boolean = { it.isPermissionDenied },
+    onError: (Throwable) -> Unit = {},
+): Flow<List<T>> = combine(
+    listens.map { listen ->
+        recoverListen(listen, denied = emptyList(), awaitPendingWrites, isDenied, onError, whileRetrying = emptyList())
+    },
+) { results -> results.flatMap { it } }

@@ -71,16 +71,11 @@ class FirestoreShoppingStore @Inject constructor(
     ): Flow<List<T>> = session.scope.flatMapLatest { scope ->
         if (scope == null) flowOf(emptyList())
         // 家族から外されると読めなくなる（空にする）。表示する画面は CartMateApp が切り替える
-        else recoverListen(
-            listen = {
-                combine(queries(scope).map { it.snapshotFlow() }) { snapshots ->
-                    snapshots.flatMap { it.documents }.distinctBy { it.id }.mapNotNull(map)
-                }
-            },
-            denied = emptyList(),
+        else combineListens(
+            listens = queries(scope).map { query -> { query.snapshotFlow().map { it.documents } } },
             awaitPendingWrites = { db.waitForPendingWrites().await() },
             onError = { Log.w(TAG, "listen failed", it) },
-        )
+        ).map { documents -> documents.distinctBy { it.id }.mapNotNull(map) }
     }
 
     /** 端末のキャッシュにある、自分に見えるドキュメント（共有と自分のプライベート） */
