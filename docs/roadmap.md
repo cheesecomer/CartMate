@@ -55,6 +55,7 @@ MVP は5つのフェーズに分けて実装します。各フェーズの終わ
 - 合流で購入の記録も写す（ルールと rules-test を含む）。
 - ほかの端末が先にチェックしていて書き込みが拒否された場合の通知（アプリを開いている間）と、オフラインのまま7日を過ぎたチェックの通知。
 - ProductGraph、表記ゆれのチップ（商品詳細入力画面）、商品の統合画面（`NameNormalizer` と決定的な productId はフェーズ2で作成済み）。
+- 名寄せ辞書（[suggestions.md](design/suggestions.md#名寄せ辞書)）: 辞書の元データとビルド時の検証、実機での計測、`ProductResolver`（理由つき）、`dictionaryOptOut` とルール、統合画面での理由の表示と分離。辞書の中身は、利用許諾を確かめた出典で食品・日用品から拡充する。
 - リスト削除の表示ルール。
 - 他のメンバーによるチェックの通知と、チェック済みの項目へのチェックした人・時刻の表示。
 - rules-test（チェック・Undo・購入履歴・product）、同時実行テスト（[testing.md](testing.md#同時実行) の 1〜4, 7〜10）。
@@ -62,7 +63,7 @@ MVP は5つのフェーズに分けて実装します。各フェーズの終わ
 
 ## フェーズ4: 予測とサジェスト
 
-- CycleEstimator、ListSimilarity、SuggestionEngine、EarlyPurchaseDetector と、その単体テスト。
+- CycleEstimator、ListSimilarity、SuggestionEngine、EarlyPurchaseDetector と、その単体テスト。周期のグループ、補完の一致の理由、`suggestionExcluded` と除外の解除。
 - サジェストのシートの中身（時期が近い商品・補完・「追加済み」・前回の数量と単位）、補完候補と商品詳細入力画面の注意表示と前回の購入、備考の候補、補足テキスト。
 - 購入履歴の購読（365日分）。
 - テストデータの投入スクリプト。

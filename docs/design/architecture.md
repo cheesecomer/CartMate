@@ -20,6 +20,7 @@
 | 認証 | Firebase Auth + Credential Manager（`GetGoogleIdOption`） | 旧 GoogleSignIn API は非推奨 |
 | 画像の読み込み | Coil | メンバーのアバターに Google アカウントの写真を表示する |
 | DB | Cloud Firestore（永続キャッシュ有効） | 要件で確定。Room は使わない（ローカルキャッシュは Firestore に任せる） |
+| 名寄せ辞書 | アプリに同梱したテキスト（TSV）を、起動後に別スレッドでメモリに読み込む | 照合は完全一致が中心なので、HashMap で十分速い。辞書は読み取り専用で、Room の利点がない。数万件を超えるか、メモリの計測で問題が出たら、作成済みの SQLite を読み取り専用で開く方式に移る（[suggestions.md](suggestions.md#名寄せ辞書)） |
 | オフラインの書き込み | Firestore の書き込みキュー（永続キャッシュ） | チェックと Undo もバッチ書き込みにし、オフラインでもアプリを閉じても失わずに、接続時に送る（[sync.md](sync.md#オフラインの書き込み)） |
 | 時刻 | `java.time` + `Clock` を注入 | 予測ロジックのテストを決定的にする |
 | ホスティング | Firebase Hosting | 招待リンクの `assetlinks.json` とフォールバックページ |

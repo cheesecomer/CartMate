@@ -37,6 +37,8 @@ households/{hid}/products/{productId}        # productId = 正規化名から決
   displayName, normalizedName, searchKey,
   createdBy, createdAt,
   mergedInto: string | null, mergedAt?, mergedBy?
+  dictionaryOptOut?: bool                    # 名寄せ辞書でまとめない（手動の分離）。辞書を更新しても元に戻らない
+  suggestionExcluded?: bool                  # 時期が近い商品の提案から除外する（フェーズ4）
 
 households/{hid}/purchases/{purchaseId}      # purchaseId = itemId
   itemId, listId, listNameSnapshot, productId, inputName, quantity, unit, memo,
@@ -60,6 +62,7 @@ households/{hid}/purchases/{purchaseId}      # purchaseId = itemId
 | **公開範囲を各ドキュメントに持つ**（`visibility`） | Firestore のルールはフィルタにならないため、クエリ側で `visibility` と `createdBy` / `purchasedBy` を条件にして、ルールが必ず満たされる範囲だけを購読する（下記「購読とクエリ」）。リストの公開範囲を項目にも写しておくと、項目のルールでリストを読まずに判定できる。 |
 | **公開範囲はあとから変えない** | 変えられるようにすると、共有からプライベートに変えた時点で他の端末のキャッシュに残る、購入履歴の公開範囲も書き換える必要がある、など扱いが複雑になる。要件でも登録時だけ選べる（[要件](../requirements.md) §3.4）。 |
 | **product は公開範囲を持たない** | product は決定的ID（正規化名）で家族に1つなので、プライベートと共有で同じ名前の商品を分けられない。代わりに、補完の候補には「自分に見える項目か購入の記録がある product」だけを出す（[suggestions.md](suggestions.md#入力中の補完)）。そのため、プライベートだけで使った商品名は他のメンバーの画面には出ないが、データベース上の product の名前は家族のメンバーが読める。家族内のサプライズを画面に出さない程度の秘匿として受け入れる。 |
+| **名寄せ辞書は Firestore に置かず、アプリに同梱する** | 共通の商品辞書をサーバーに置くと、運用と読み取り数が増える。辞書は端末の中だけで照合し、家族ごとの訂正（`mergedInto`・`dictionaryOptOut`・`suggestionExcluded`）だけを既存の product に持たせて同期する（[suggestions.md](suggestions.md#名寄せ辞書)）。訂正は product に付くので、新たにプライベートの情報が家族に見えることはない |
 | **`users/{uid}` と `invites/{code}` を追加する** | 起動時に自分の所属家族を引くため。また、まだ家族に参加していないユーザーが招待コードを検証するため（家族の領域はメンバーしか読めない）。 |
 | **招待に `inviterName` を持つ** | 参加の確認画面の「○○さんの家族」を表示するため。参加前のユーザーは `members` を読めないので、発行した人の表示名を招待に写しておく。 |
 | **オーナーは `members.role` で表し、離脱時に引き継ぐ** | オーナーが抜けるときは、自分の `members` の削除と同じバッチで、`joinedAt` がいちばん早いメンバーの `role` を `owner` にする。 |
