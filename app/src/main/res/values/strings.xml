@@ -108,4 +108,59 @@
     <string name="onboarding_create_failed">家族を作成できませんでした。通信状態を確かめて、もう一度お試しください</string>
     <string name="action_sign_out">ログアウト</string>
     <string name="offline_unavailable">オフラインのため、この操作はできません</string>
+
+    <!-- 招待コードの入力・参加の確認 -->
+    <string name="join_code_title">招待コードで参加</string>
+    <string name="join_code_label">招待コード（10文字）</string>
+    <string name="join_code_supporting">家族から送られた招待コードを入力してください。大文字・小文字は問いません。</string>
+    <string name="join_code_next">次へ</string>
+    <string name="join_confirm_title">参加の確認</string>
+    <string name="join_confirm_question">%1$sさんの家族に参加しますか？</string>
+    <string name="join_confirm_message">参加すると、家族の共有リストを一緒に使えるようになります。</string>
+    <string name="join_confirm_merge_message">あなたのリスト（%1$d件）は%2$sさんの家族に移ります。プライベートなリストは、合流後もあなただけに表示されます。</string>
+    <string name="join_confirm_join">参加する</string>
+    <string name="join_confirm_merge">合流する</string>
+    <string name="join_merging">リストを移しています（%1$d / %2$d）</string>
+    <string name="join_not_found">招待コードが見つかりません</string>
+    <string name="join_not_found_message">コードが正しいか確認するか、家族に新しいコードを発行してもらってください</string>
+    <string name="join_expired">招待コードの有効期限が切れています</string>
+    <string name="join_expired_message">この招待コードは発行から24時間以上が経過しているため使用できません。家族に新しいコードを発行してもらってください。</string>
+    <string name="join_used">この招待コードはすでに使われています</string>
+    <string name="join_used_message">招待コードは1回だけ使えます。家族に新しいコードを発行してもらってください。</string>
+    <string name="join_already_member">すでに家族に参加しています</string>
+    <string name="join_already_member_message">別の家族に参加するには、今の家族から抜けてください。</string>
+    <string name="join_already_this_family">すでにこの家族に参加しています</string>
+    <string name="join_failed">参加できませんでした。通信状態を確かめて、もう一度お試しください</string>
+
+    <!-- 家族 -->
+    <string name="family_title">家族</string>
+    <string name="family_account">自分のアカウント</string>
+    <string name="family_members">メンバー（%1$d人）</string>
+    <string name="family_owner">オーナー</string>
+    <string name="family_me">（自分）</string>
+    <string name="family_remove">削除</string>
+    <string name="family_remove_description">%1$sさんを家族から外す</string>
+    <string name="family_invite_section">招待</string>
+    <string name="family_invite_solo_section">あなたの家族に招待する</string>
+    <string name="family_invite">家族を招待する</string>
+    <string name="family_invite_codes">有効な招待コード</string>
+    <string name="family_invite_remaining">あと %1$d 時間で期限切れ</string>
+    <string name="family_invite_revoke">取り消す</string>
+    <string name="family_invite_share">CartMate の家族に招待されました。%1$s （コード: %2$s、24時間有効）</string>
+    <string name="family_merge_title">ほかの家族に合流する</string>
+    <string name="family_merge_message">家族から招待コードを受け取っている場合は、その家族に合流できます。あなたのリストは合流先の家族に移ります。</string>
+    <string name="family_merge_action">招待コードを入力する</string>
+    <string name="family_leave">家族から抜ける</string>
+    <string name="family_delete_account">アカウントを削除</string>
+    <string name="family_leave_title">家族から抜けますか？</string>
+    <string name="family_leave_message">あなたのプライベートなリストは見られなくなります。同じ家族にもう一度参加すると、また見られます。</string>
+    <string name="family_leave_confirm">抜ける</string>
+    <string name="family_remove_title">%1$sさんを家族から外しますか？</string>
+    <string name="family_remove_message">外されたメンバーは、この家族のリストを見られなくなります。</string>
+    <string name="family_remove_confirm">外す</string>
+    <string name="family_delete_title">アカウントを削除しますか？</string>
+    <string name="family_delete_message">プライベートなリストと購入の記録を削除します。共有のリストは家族に残ります。この操作は取り消せません。削除の前に、Google で再度ログインします。</string>
+    <string name="family_delete_confirm">削除する</string>
+    <string name="family_action_failed">操作できませんでした。通信状態を確かめて、もう一度お試しください</string>
+    <string name="family_open">家族</string>
 </resources>

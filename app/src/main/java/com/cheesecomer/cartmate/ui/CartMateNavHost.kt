@@ -1,18 +1,28 @@
 package com.cheesecomer.cartmate.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.lifecycle.Lifecycle
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavController
+import androidx.navigation.NavGraphBuilder
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.cheesecomer.cartmate.domain.input.formatQuantity
 import com.cheesecomer.cartmate.domain.model.ItemId
+import com.cheesecomer.cartmate.ui.family.FamilyRoute
+import com.cheesecomer.cartmate.ui.family.FamilyScreen
 import com.cheesecomer.cartmate.ui.itementry.ItemEntryResult
 import com.cheesecomer.cartmate.ui.itementry.ItemEntryRoute
 import com.cheesecomer.cartmate.ui.itementry.ItemEntryScreen
+import com.cheesecomer.cartmate.ui.join.JoinCodeRoute
+import com.cheesecomer.cartmate.ui.join.JoinCodeScreen
+import com.cheesecomer.cartmate.ui.join.JoinConfirmRoute
+import com.cheesecomer.cartmate.ui.join.JoinConfirmScreen
 import com.cheesecomer.cartmate.ui.listdetail.ListDetailRoute
 import com.cheesecomer.cartmate.ui.listdetail.ListDetailScreen
 import com.cheesecomer.cartmate.ui.lists.ListsScreen
@@ -25,13 +35,32 @@ import kotlinx.serialization.Serializable
 @Serializable
 data object ListsRoute
 
+/** 家族に参加しているときの画面。[pending] の予約（家族を作成した直後、招待リンク）があれば、その画面を開く */
 @Composable
-fun CartMateNavHost() {
+fun CartMateNavHost(pending: PendingNavigation, onDeleteAccount: () -> Unit) {
     val navController = rememberNavController()
+    val joinCode by pending.joinCode.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit) {
+        if (pending.consumeFamilyScreen()) navController.navigate(FamilyRoute)
+    }
+    LaunchedEffect(joinCode) {
+        pending.consumeJoin()?.let { navController.navigate(JoinConfirmRoute(it)) }
+    }
     NavHost(navController = navController, startDestination = ListsRoute) {
         composable<ListsRoute> {
-            ListsScreen(onOpenList = { navController.navigate(ListDetailRoute(it.value)) })
+            ListsScreen(
+                onOpenList = { navController.navigate(ListDetailRoute(it.value)) },
+                onOpenFamily = { navController.navigate(FamilyRoute) },
+            )
         }
+        composable<FamilyRoute> {
+            FamilyScreen(
+                onBack = { navController.popBackStack() },
+                onJoinWithCode = { navController.navigate(JoinCodeRoute) },
+                onDeleteAccount = onDeleteAccount,
+            )
+        }
+        joinGraph(navController)
         composable<ListDetailRoute> { backStackEntry ->
             val listId = backStackEntry.arguments?.getString(ListDetailRoute::listId.name).orEmpty()
             ListDetailScreen(
@@ -44,6 +73,19 @@ fun CartMateNavHost() {
         composable<ItemEntryRoute> { backStackEntry ->
             ItemEntryScreen(onClose = { navController.closeEntry(backStackEntry, it) })
         }
+    }
+}
+
+/** 招待コードの入力と参加の確認。家族の作成・参加の画面からも、自分しかいない家族の画面（合流）からも開く */
+fun NavGraphBuilder.joinGraph(navController: NavController) {
+    composable<JoinCodeRoute> {
+        JoinCodeScreen(
+            onBack = { navController.popBackStack() },
+            onFound = { navController.navigate(JoinConfirmRoute(it.value)) },
+        )
+    }
+    composable<JoinConfirmRoute> {
+        JoinConfirmScreen(onClose = { navController.popBackStack() })
     }
 }
 

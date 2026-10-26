@@ -37,6 +37,7 @@ import javax.inject.Singleton
 class FirestoreHouseholdRepository @Inject constructor(
     private val session: FirestoreSession,
     private val db: FirebaseFirestore,
+    private val merger: FamilyMerger,
     private val clock: Clock,
 ) : HouseholdRepository {
 
@@ -143,7 +144,26 @@ class FirestoreHouseholdRepository @Inject constructor(
         account: Account,
         from: HouseholdId,
         onProgress: (done: Int, total: Int) -> Unit,
-    ): JoinResult = throw UnsupportedOperationException("合流は、リストと項目の Firestore 実装のあとで実装する")
+    ): JoinResult {
+        val uid = account.userId.value
+        // 合流先に参加する。所属（users）は写し終えてから切り替える（途中で画面が切り替わらないように）
+        val joined = runCatching {
+            db.batch()
+                .set(Paths.member(db, invite.householdId, uid), memberData(account, MemberRole.MEMBER, joinedVia = invite.code))
+                .update(Paths.invite(db, invite.code), F.USED_COUNT, FieldValue.increment(1))
+                .commit().await()
+        }
+        joined.exceptionOrNull()?.let { return if (it.isPermissionDenied) JoinResult.InviteUnavailable else JoinResult.Failed(it) }
+        val pending = FamilyMerger.Pending(uid, from, invite.householdId)
+        merger.start(pending)
+        return runCatching { merger.resume(pending, onProgress) }
+            .fold(onSuccess = { JoinResult.Joined }, onFailure = { JoinResult.Failed(it) })
+    }
+
+    override suspend fun resumePendingMerge() {
+        val pending = merger.pending(session.uid.first() ?: return) ?: return
+        merger.resume(pending) { _, _ -> }
+    }
 
     override suspend fun leave() {
         val uid = requireUid()

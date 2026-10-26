@@ -71,6 +71,7 @@ object F {
     const val ACTIVE = "active"
     const val REVOKED_AT = "revokedAt"
     const val REVOKED_BY = "revokedBy"
+    const val IMPORTED_FROM = "importedFrom"
 }
 
 /** フィールドの値 */

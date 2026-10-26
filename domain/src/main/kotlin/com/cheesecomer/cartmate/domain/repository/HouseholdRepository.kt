@@ -34,10 +34,13 @@ interface HouseholdRepository {
     suspend fun join(invite: Invite, account: Account): JoinResult
 
     /**
-     * 自分しかいない家族 [from] から、[invite] の家族に合流する。リスト・項目・商品を写してから、[from] を抜ける。
-     * [onProgress] には写した件数と全体の件数を渡す。中断しても、もう一度呼べば続きから写す
+     * 自分しかいない家族 [from] から、[invite] の家族に合流する。合流先に参加し、リスト・項目・商品を写してから、
+     * 所属を切り替えて [from] を抜ける。[onProgress] には写した件数と全体の件数を渡す
      */
     suspend fun merge(invite: Invite, account: Account, from: HouseholdId, onProgress: (done: Int, total: Int) -> Unit): JoinResult
+
+    /** 途中で止まった合流があれば、続きから写して終える。起動時に呼ぶ */
+    suspend fun resumePendingMerge()
 
     /** 今の家族から抜ける。オーナーなら、参加がいちばん早いメンバーに引き継ぐ（domain の OwnerSuccession） */
     suspend fun leave()

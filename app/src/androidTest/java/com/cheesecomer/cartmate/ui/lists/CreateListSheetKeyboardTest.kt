@@ -18,6 +18,7 @@ import androidx.compose.ui.test.performClick
 import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.cheesecomer.cartmate.data.memory.InMemoryStore
+import com.cheesecomer.cartmate.data.memory.FixedAccountRepository
 import com.cheesecomer.cartmate.domain.model.NewList
 import com.cheesecomer.cartmate.domain.model.UserId
 import com.cheesecomer.cartmate.domain.model.Visibility
@@ -29,6 +30,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.time.Clock
+import kotlinx.coroutines.flow.flowOf
 
 /**
  * 「＋ リスト作成」を押したときの、ソフトキーボードとリスト作成のシートの順番。
@@ -54,7 +56,7 @@ class CreateListSheetKeyboardTest {
             composeRule.activity.enableEdgeToEdge()
             composeRule.activity.window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
         }
-        val viewModel = ListsViewModel(store, store, store, Clock.systemUTC())
+        val viewModel = ListsViewModel(store, store, store, Clock.systemUTC(), FixedAccountRepository(null), { flowOf(true) })
         composeRule.setContent {
             val bottom = WindowInsets.ime.getBottom(LocalDensity.current)
             SideEffect { imeBottom = bottom }

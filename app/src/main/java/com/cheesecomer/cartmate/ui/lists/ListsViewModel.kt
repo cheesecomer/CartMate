@@ -3,12 +3,15 @@ package com.cheesecomer.cartmate.ui.lists
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.cheesecomer.cartmate.domain.list.ListProgress
+import com.cheesecomer.cartmate.domain.model.Account
 import com.cheesecomer.cartmate.domain.model.ListId
 import com.cheesecomer.cartmate.domain.model.ListStatus
 import com.cheesecomer.cartmate.domain.model.NewList
 import com.cheesecomer.cartmate.domain.model.ShoppingList
 import com.cheesecomer.cartmate.domain.model.Visibility
+import com.cheesecomer.cartmate.domain.repository.AccountRepository
 import com.cheesecomer.cartmate.domain.repository.ItemRepository
+import com.cheesecomer.cartmate.domain.repository.OnlineStatus
 import com.cheesecomer.cartmate.domain.repository.PurchaseRepository
 import com.cheesecomer.cartmate.domain.repository.ShoppingListRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -32,8 +35,10 @@ data class ListSummary(
 data class ListsUiState(
     val lists: List<ListSummary> = emptyList(),
     val loading: Boolean = true,
-    /** オフラインならバナーを表示する。オンライン判定はフェーズ2で追加する */
+    /** オフラインならバナーを表示する */
     val offline: Boolean = false,
+    /** 上部バーのアバター。タップで家族画面を開く */
+    val account: Account? = null,
 )
 
 @HiltViewModel
@@ -42,6 +47,8 @@ class ListsViewModel @Inject constructor(
     itemRepository: ItemRepository,
     purchaseRepository: PurchaseRepository,
     clock: Clock,
+    accountRepository: AccountRepository,
+    onlineStatus: OnlineStatus,
 ) : ViewModel() {
 
     val uiState: StateFlow<ListsUiState> =
@@ -74,7 +81,9 @@ class ListsViewModel @Inject constructor(
                 },
                 loading = false,
             )
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), ListsUiState())
+        }.combine(accountRepository.observeAccount()) { state, account -> state.copy(account = account) }
+            .combine(onlineStatus.observeOnline()) { state, online -> state.copy(offline = !online) }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), ListsUiState())
 
     fun createList(name: String, memo: String, visibility: Visibility) {
         val trimmed = name.trim()

@@ -48,16 +48,25 @@ import com.cheesecomer.cartmate.ui.theme.CartMateSpacing
 import com.cheesecomer.cartmate.ui.theme.CartMateTheme
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyGridState
+import androidx.compose.material3.IconButton
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import com.cheesecomer.cartmate.domain.model.Account
+import com.cheesecomer.cartmate.domain.model.UserId
+import com.cheesecomer.cartmate.ui.components.Avatar
+import com.cheesecomer.cartmate.ui.components.AvatarSmall
 
 @Composable
 fun ListsScreen(
     onOpenList: (ListId) -> Unit,
+    onOpenFamily: () -> Unit = {},
     viewModel: ListsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     ListsContent(
         state = state,
         onOpenList = onOpenList,
+        onOpenFamily = onOpenFamily,
         onCreateList = viewModel::createList,
         onMoveList = viewModel::moveList,
     )
@@ -68,10 +77,12 @@ fun ListsScreen(
 fun ListsContent(
     state: ListsUiState,
     onOpenList: (ListId) -> Unit,
+    onOpenFamily: () -> Unit,
     onCreateList: (name: String, memo: String, Visibility) -> Unit,
     onMoveList: (ListId, previous: ListId?, next: ListId?) -> Unit,
 ) {
     var showCreateSheet by rememberSaveable { mutableStateOf(false) }
+    val familyLabel = stringResource(R.string.family_open)
     val empty = !state.loading && state.lists.isEmpty()
 
     // リスト作成のシートは画面の上に重ねて表示する
@@ -80,6 +91,19 @@ fun ListsContent(
             topBar = {
                 TopAppBar(
                     title = { Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineMedium) },
+                    actions = {
+                        // 自分のアカウントのアバター。家族画面への入口（docs/requirements.md §3.1）
+                        state.account?.let { account ->
+                            IconButton(onClick = onOpenFamily) {
+                                Avatar(
+                                    name = account.displayName,
+                                    photoUrl = account.photoUrl,
+                                    size = AvatarSmall,
+                                    modifier = Modifier.semantics { contentDescription = familyLabel },
+                                )
+                            }
+                        }
+                    },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
                 )
             },
@@ -227,8 +251,14 @@ private val PreviewLists = listOf(
 @Composable
 internal fun ListsContentPreviewBackground(offline: Boolean = false) {
     ListsContent(
-        state = ListsUiState(lists = PreviewLists, loading = false, offline = offline),
+        state = ListsUiState(
+            lists = PreviewLists,
+            loading = false,
+            offline = offline,
+            account = Account(UserId("taro"), "山田 太郎", "taro.yamada@gmail.com", null),
+        ),
         onOpenList = {},
+        onOpenFamily = {},
         onCreateList = { _, _, _ -> },
         onMoveList = { _, _, _ -> },
     )
@@ -253,6 +283,7 @@ private fun EmptyListsPreview() {
         ListsContent(
             state = ListsUiState(loading = false),
             onOpenList = {},
+            onOpenFamily = {},
             onCreateList = { _, _, _ -> },
             onMoveList = { _, _, _ -> },
         )

@@ -12,4 +12,10 @@ interface AccountRepository {
     suspend fun signInWithGoogle(idToken: String)
 
     suspend fun signOut()
+
+    /**
+     * アカウントを削除する（docs/requirements.md §3.5「アカウントの削除」）。[idToken] は直前に再ログインして取得した
+     * Google の ID トークン。自分のプライベートなリスト・項目・購入の記録を消し、家族から抜けてから、アカウントを消す
+     */
+    suspend fun deleteAccount(idToken: String)
 }

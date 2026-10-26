@@ -1,9 +1,11 @@
 package com.cheesecomer.cartmate.di
 
 import com.cheesecomer.cartmate.data.auth.FirebaseAccountRepository
+import com.cheesecomer.cartmate.data.connectivity.ConnectivityObserver
 import com.cheesecomer.cartmate.data.firestore.FirestoreHouseholdRepository
 import com.cheesecomer.cartmate.domain.repository.AccountRepository
 import com.cheesecomer.cartmate.domain.repository.HouseholdRepository
+import com.cheesecomer.cartmate.domain.repository.OnlineStatus
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import dagger.Binds
@@ -18,6 +20,9 @@ abstract class FirebaseModule {
 
     @Binds
     abstract fun bindAccountRepository(repository: FirebaseAccountRepository): AccountRepository
+
+    @Binds
+    abstract fun bindOnlineStatus(observer: ConnectivityObserver): OnlineStatus
 
     @Binds
     abstract fun bindHouseholdRepository(repository: FirestoreHouseholdRepository): HouseholdRepository

@@ -50,4 +50,25 @@ class InviteValidationTest {
         val used = invite.copy(usedCount = 1)
         assertThat(InviteValidation.check(used, invite.expiresAt)).isEqualTo(InviteCheck.Used)
     }
+
+    @Test
+    fun `有効な招待だけを一覧に出す`() {
+        val used = invite.copy(code = InviteCode.parse("AAAAAAAAAA")!!, usedCount = 1)
+        val expired = invite.copy(code = InviteCode.parse("BBBBBBBBBB")!!, expiresAt = createdAt)
+        assertThat(InviteValidation.active(listOf(invite, used, expired), createdAt + Duration.ofMinutes(1)))
+            .containsExactly(invite)
+    }
+
+    @Test
+    fun `残り時間は切り上げで数える`() {
+        assertThat(InviteValidation.remainingHours(invite, createdAt)).isEqualTo(24)
+        assertThat(InviteValidation.remainingHours(invite, createdAt + Duration.ofMinutes(61))).isEqualTo(23)
+        assertThat(InviteValidation.remainingHours(invite, invite.expiresAt.minusSeconds(30 * 60))).isEqualTo(1)
+    }
+
+    @Test
+    fun `期限を過ぎていれば残り時間は 0`() {
+        assertThat(InviteValidation.remainingHours(invite, invite.expiresAt)).isEqualTo(0)
+        assertThat(InviteValidation.remainingHours(invite, invite.expiresAt.plusSeconds(60))).isEqualTo(0)
+    }
 }

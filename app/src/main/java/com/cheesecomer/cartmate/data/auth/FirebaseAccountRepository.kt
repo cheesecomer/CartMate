@@ -1,5 +1,6 @@
 package com.cheesecomer.cartmate.data.auth
 
+import com.cheesecomer.cartmate.data.firestore.AccountDeletion
 import com.cheesecomer.cartmate.domain.model.Account
 import com.cheesecomer.cartmate.domain.model.UserId
 import com.cheesecomer.cartmate.domain.repository.AccountRepository
@@ -17,6 +18,7 @@ import javax.inject.Singleton
 @Singleton
 class FirebaseAccountRepository @Inject constructor(
     private val auth: FirebaseAuth,
+    private val deletion: AccountDeletion,
 ) : AccountRepository {
 
     override fun observeAccount(): Flow<Account?> = callbackFlow {
@@ -31,6 +33,10 @@ class FirebaseAccountRepository @Inject constructor(
 
     override suspend fun signOut() {
         auth.signOut()
+    }
+
+    override suspend fun deleteAccount(idToken: String) {
+        deletion.delete(idToken)
     }
 }
 

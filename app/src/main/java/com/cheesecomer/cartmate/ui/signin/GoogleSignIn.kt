@@ -7,6 +7,7 @@ import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.credentials.exceptions.GetCredentialException
+import androidx.credentials.exceptions.NoCredentialException
 import com.cheesecomer.cartmate.R
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
@@ -30,6 +31,9 @@ object GoogleSignIn {
             }
         } catch (e: GetCredentialCancellationException) {
             Result.Cancelled
+        } catch (e: NoCredentialException) {
+            // 端末に Google アカウントがない
+            Result.Failed(e)
         } catch (e: GetCredentialException) {
             Result.Failed(e)
         }

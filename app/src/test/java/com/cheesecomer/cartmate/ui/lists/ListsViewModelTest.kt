@@ -2,6 +2,7 @@ package com.cheesecomer.cartmate.ui.lists
 
 import app.cash.turbine.test
 import com.cheesecomer.cartmate.data.memory.InMemoryStore
+import com.cheesecomer.cartmate.data.memory.FixedAccountRepository
 import com.cheesecomer.cartmate.domain.list.ListProgress
 import com.cheesecomer.cartmate.domain.model.UserId
 import com.cheesecomer.cartmate.domain.model.Visibility
@@ -15,6 +16,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
 import java.time.Duration
+import kotlinx.coroutines.flow.flowOf
 
 class ListsViewModelTest {
 
@@ -25,7 +27,7 @@ class ListsViewModelTest {
     private val clock = MutableClock()
     private var user = UserId("taro")
     private val store = InMemoryStore(clock) { user }
-    private val viewModel = ListsViewModel(store, store, store, clock)
+    private val viewModel = ListsViewModel(store, store, store, clock, FixedAccountRepository(null), { flowOf(true) })
 
     @Test
     fun `リストを作成すると、作成順に名前・備考・公開範囲・件数とともに表示される`() = runTest {
@@ -83,7 +85,7 @@ class ListsViewModelTest {
         val itemId = store.addItem(newItem(listId, "牛乳"))
         store.completeItem(itemId, clock.now)
         clock.advance(Duration.ofHours(25))
-        val viewModel = ListsViewModel(store, store, store, clock)
+        val viewModel = ListsViewModel(store, store, store, clock, FixedAccountRepository(null), { flowOf(true) })
 
         viewModel.uiState.test {
             val progress = awaitUntil { !it.loading }.lists.single().progress

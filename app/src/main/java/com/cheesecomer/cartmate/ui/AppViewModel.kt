@@ -8,22 +8,49 @@ import com.cheesecomer.cartmate.domain.repository.AccountRepository
 import com.cheesecomer.cartmate.domain.repository.HouseholdRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /** ログインと所属から、表示する画面を決める（docs/design/ui.md「最初に表示する画面」） */
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class AppViewModel @Inject constructor(
-    accountRepository: AccountRepository,
+    private val accountRepository: AccountRepository,
     householdRepository: HouseholdRepository,
+    /** 画面の切り替えをまたいで渡す遷移の予約 */
+    val pendingNavigation: PendingNavigation,
 ) : ViewModel() {
+
+    private val _deleteFailed = Channel<Unit>(Channel.BUFFERED)
+    /** アカウントの削除に失敗した */
+    val deleteFailed: Flow<Unit> = _deleteFailed.receiveAsFlow()
+
+    /** [idToken] は直前に再ログインして取得した Google の ID トークン。削除するとログイン画面に戻る */
+    fun deleteAccount(idToken: String) {
+        viewModelScope.launch {
+            runCatching { accountRepository.deleteAccount(idToken) }.onFailure { _deleteFailed.send(Unit) }
+        }
+    }
+
+    init {
+        // 途中で止まった合流があれば、ログインしたときに続きから終える
+        viewModelScope.launch {
+            accountRepository.observeAccount().filterNotNull().collect {
+                runCatching { householdRepository.resumePendingMerge() }
+            }
+        }
+    }
 
     val destination: StateFlow<Destination> = accountRepository.observeAccount()
         .map { it != null }
