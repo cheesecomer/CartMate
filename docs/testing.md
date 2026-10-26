@@ -81,6 +81,19 @@ GitHub Actions で次を実行します。
 
 Instrumented テストは、MVP ではローカルで実行します。
 
+## rules-test
+
+Firestore のルール（`firebase/firestore.rules`）を、Firestore Emulator で検証します。テストは `firebase/rules-test/tests/` にあり、アプリの Repository と同じ書き込み（バッチの組み合わせ）で、通るべき操作が通り、拒否すべき操作が拒否されることを確かめます。
+
+```
+cd firebase/rules-test
+npm ci
+npm test
+```
+
+- Firebase CLI は rules-test の依存に含めているので、グローバルに入れる必要はありません。エミュレータには Java が必要です。
+- エミュレータはポート 8085 を使い、実際のプロジェクトには接続しません（`demo-` で始まるプロジェクトID）。
+
 ## キーボードのタイミングに依存するテスト
 
 シートとソフトキーボードの表示の順番を確かめるテスト（`AddItemSheetKeyboardTest`、`CreateListSheetKeyboardTest`）には `@KeyboardTimingTest` を付け、通常の `connectedDebugAndroidTest` からは外しています。キーボードの起動が遅い端末（起動したばかりのエミュレータや、テストを続けて実行して遅くなったエミュレータ）では、アプリがキーボードを待つ上限を過ぎてシートを先に出すため、アプリに問題がなくても失敗することがあるためです。

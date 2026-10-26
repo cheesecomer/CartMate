@@ -58,3 +58,29 @@ jobs:
             **/build/reports/
             **/build/test-results/
           retention-days: 7
+
+  rules-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: firebase/rules-test
+    steps:
+      - uses: actions/checkout@v7
+
+      # Firestore Emulator は Java で動く
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: firebase/rules-test/package-lock.json
+
+      - run: npm ci
+
+      - name: rules-test（Firestore Emulator）
+        run: npm test

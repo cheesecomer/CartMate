@@ -92,7 +92,8 @@ class FirestoreHouseholdRepository @Inject constructor(
         val householdId = HouseholdId(household.id)
         db.batch()
             .set(household, mapOf(
-                F.NAME to "${account.displayName}さんの家族",
+                // 画面には表示しない。ルールの長さの上限（40文字）に収まるよう、表示名を切り詰める
+                F.NAME to "${account.displayName.take(MAX_NAME_IN_HOUSEHOLD)}さんの家族",
                 F.CREATED_BY to uid,
                 F.CREATED_AT to FieldValue.serverTimestamp(),
             ))
@@ -223,5 +224,6 @@ class FirestoreHouseholdRepository @Inject constructor(
         const val ROLE_MEMBER = "member"
         val INVITE_LIFETIME: Duration = Duration.ofHours(24)
         val CLOCK_SKEW_MARGIN: Duration = Duration.ofMinutes(10)
+        const val MAX_NAME_IN_HOUSEHOLD = 30
     }
 }
