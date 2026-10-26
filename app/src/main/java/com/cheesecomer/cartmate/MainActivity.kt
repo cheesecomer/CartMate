@@ -6,7 +6,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import com.cheesecomer.cartmate.ui.CartMateNavHost
+import com.cheesecomer.cartmate.ui.CartMateApp
 import com.cheesecomer.cartmate.ui.theme.CartMateTheme
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -21,7 +21,7 @@ class MainActivity : ComponentActivity() {
         )
         setContent {
             CartMateTheme {
-                CartMateNavHost()
+                CartMateApp()
             }
         }
     }
