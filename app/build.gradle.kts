@@ -66,6 +66,9 @@ dependencies {
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.auth)
     implementation(libs.firebase.firestore)
+    // App Check。リリース版は Play Integrity、デバッグ版はデバッグ用のプロバイダ（src/debug, src/release の AppCheckSetup）
+    releaseImplementation(libs.firebase.appcheck.playintegrity)
+    debugImplementation(libs.firebase.appcheck.debug)
     implementation(libs.kotlinx.coroutines.play.services)
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play.services.auth)

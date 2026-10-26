@@ -78,6 +78,9 @@ Google Play は、アカウントを作るアプリに、アプリ内とアプ�
 
 Firebase App Check（Play Integrity）を導入します。招待コードの総当たりや、改造したクライアントからのアクセスを、少ない手間で抑えられます。
 
+- リリース版は Play Integrity、デバッグ版はデバッグ用のプロバイダを使います（`app/src/release`、`app/src/debug` の `AppCheckSetup`）。デバッグ版は、起動時に Logcat（`DebugAppCheckProvider`）に出るトークンを Firebase コンソールの App Check に登録します。
+- Firestore での App Check の強制は、Play Console にアプリを登録して Play Integrity を Firebase とつないでから有効にします。それまでは強制しません（強制すると、登録のない端末から読み書きできなくなるため）。
+
 ## リポジトリに含めないもの
 
 - `google-services.json`: 秘密情報ではありませんが、公開リポジトリには含めず、各自の Firebase プロジェクトから取得します。
