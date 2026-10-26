@@ -1,5 +1,6 @@
 package com.cheesecomer.cartmate.data.firestore
 
+import android.util.Log
 import com.cheesecomer.cartmate.domain.model.HouseholdId
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -12,6 +13,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -30,7 +32,13 @@ class FirestoreSession @Inject constructor(
 
     val householdId: Flow<HouseholdId?> = uid.flatMapLatest { uid ->
         if (uid == null) flowOf(null)
-        else Paths.user(db, uid).snapshotFlow().map { it.getString(F.HOUSEHOLD_ID)?.let(::HouseholdId) }
+        // 自分の users は拒否されないので、denied は流れない。通信の問題などでは購読し直す
+        else recoverListen(
+            listen = { Paths.user(db, uid).snapshotFlow().map { it.getString(F.HOUSEHOLD_ID)?.let(::HouseholdId) } },
+            denied = null,
+            awaitPendingWrites = { db.waitForPendingWrites().await() },
+            onError = { Log.w("FirestoreSession", "listen failed", it) },
+        )
     }.distinctUntilChanged()
 
     /** ログイン中のユーザーと所属する家族。どちらかがなければ流さない */

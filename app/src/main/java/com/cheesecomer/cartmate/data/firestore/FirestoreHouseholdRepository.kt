@@ -1,5 +1,6 @@
 package com.cheesecomer.cartmate.data.firestore
 
+import android.util.Log
 import com.cheesecomer.cartmate.domain.family.InviteCode
 import com.cheesecomer.cartmate.domain.family.OwnerSuccession
 import com.cheesecomer.cartmate.domain.model.Account
@@ -17,7 +18,6 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
@@ -51,34 +51,47 @@ class FirestoreHouseholdRepository @Inject constructor(
         db.waitForPendingWrites().await()
     }
 
+    private fun logListenError(error: Throwable) {
+        Log.w(TAG, "listen failed", error)
+    }
+
     override fun observeMembership(): Flow<Membership> = session.uid.flatMapLatest { uid ->
         if (uid == null) return@flatMapLatest emptyFlow()
-        Paths.user(db, uid).snapshotFlow()
-            .map { it.getString(F.HOUSEHOLD_ID)?.let(::HouseholdId) }
-            .distinctUntilChanged()
+        session.householdId
             .flatMapLatest { householdId ->
                 if (householdId == null) flowOf(Membership(null, null))
                 else memberPresence(
                     listen = { Paths.member(db, householdId, uid).snapshotFlow().map { it.exists() } },
                     awaitPendingWrites = ::awaitPendingWrites,
+                    onError = ::logListenError,
                 ).map { Membership(householdId, it) }
             }
     }
 
     override fun observeMembers(): Flow<List<Member>> = householdId.flatMapLatest { householdId ->
         if (householdId == null) flowOf(emptyList())
-        else Paths.members(db, householdId).snapshotFlow()
-            .map { snapshot -> snapshot.documents.mapNotNull { it.toMember() }.sortedBy { it.joinedAt } }
-            .retryAfterPendingWrites(::awaitPendingWrites)
-            .catch { if (it.isPermissionDenied) emit(emptyList()) else throw it }
+        else recoverListen(
+            listen = {
+                Paths.members(db, householdId).snapshotFlow()
+                    .map { snapshot -> snapshot.documents.mapNotNull { it.toMember() }.sortedBy { it.joinedAt } }
+            },
+            denied = emptyList(),
+            awaitPendingWrites = ::awaitPendingWrites,
+            onError = ::logListenError,
+        )
     }
 
     override fun observeInvites(): Flow<List<Invite>> = householdId.flatMapLatest { householdId ->
         if (householdId == null) flowOf(emptyList())
-        else Paths.invites(db).whereEqualTo(F.HOUSEHOLD_ID, householdId.value).snapshotFlow()
-            .map { snapshot -> snapshot.documents.mapNotNull { it.toInvite() }.sortedBy { it.createdAt } }
-            .retryAfterPendingWrites(::awaitPendingWrites)
-            .catch { if (it.isPermissionDenied) emit(emptyList()) else throw it }
+        else recoverListen(
+            listen = {
+                Paths.invites(db).whereEqualTo(F.HOUSEHOLD_ID, householdId.value).snapshotFlow()
+                    .map { snapshot -> snapshot.documents.mapNotNull { it.toInvite() }.sortedBy { it.createdAt } }
+            },
+            denied = emptyList(),
+            awaitPendingWrites = ::awaitPendingWrites,
+            onError = ::logListenError,
+        )
     }
 
     override suspend fun createHousehold(account: Account): HouseholdId {
@@ -239,5 +252,6 @@ class FirestoreHouseholdRepository @Inject constructor(
         val INVITE_LIFETIME: Duration = Duration.ofHours(24)
         val CLOCK_SKEW_MARGIN: Duration = Duration.ofMinutes(10)
         const val MAX_NAME_IN_HOUSEHOLD = 30
+        const val TAG = "FirestoreHouseholdRepository"
     }
 }

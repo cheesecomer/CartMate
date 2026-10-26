@@ -54,11 +54,17 @@ class MemberPresenceTest {
     }
 
     @Test
-    fun `拒否以外のエラーはそのまま流す`() = runTest {
-        val listen = { flow<Boolean> { throw IllegalStateException("network") } }
+    fun `拒否以外のエラーでは外されたとせず、購読し直す`() = runTest {
+        var calls = 0
+        val listen = {
+            calls++
+            if (calls == 1) flow<Boolean> { throw IllegalStateException("network") } else flowOf(true)
+        }
 
         memberPresence(listen, awaitPendingWrites = {}, isDenied = isDenied).test {
-            assertThat(awaitError()).isInstanceOf(IllegalStateException::class.java)
+            assertThat(awaitItem()).isTrue()
+            awaitComplete()
         }
+        assertThat(calls).isEqualTo(2)
     }
 }

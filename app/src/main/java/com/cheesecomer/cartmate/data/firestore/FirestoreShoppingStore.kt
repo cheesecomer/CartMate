@@ -34,7 +34,6 @@ import com.google.firebase.firestore.Source
 import com.google.firebase.firestore.WriteBatch
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
@@ -67,13 +66,17 @@ class FirestoreShoppingStore @Inject constructor(
         map: (DocumentSnapshot) -> T?,
     ): Flow<List<T>> = session.scope.flatMapLatest { scope ->
         if (scope == null) flowOf(emptyList())
-        else combine(shared(scope).snapshotFlow(), private(scope).snapshotFlow()) { a, b ->
-            (a.documents + b.documents).mapNotNull(map)
-        }
-            // 家族を作成・参加した直後は、自分の書き込みがサーバーに届く前に購読が始まって拒否されることがある
-            .retryAfterPendingWrites({ db.waitForPendingWrites().await() })
-            // 家族から外されると読めなくなる。表示する画面は CartMateApp が切り替える
-            .catch { if (it.isPermissionDenied) emit(emptyList()) else throw it }
+        // 家族から外されると読めなくなる（空にする）。表示する画面は CartMateApp が切り替える
+        else recoverListen(
+            listen = {
+                combine(shared(scope).snapshotFlow(), private(scope).snapshotFlow()) { a, b ->
+                    (a.documents + b.documents).mapNotNull(map)
+                }
+            },
+            denied = emptyList(),
+            awaitPendingWrites = { db.waitForPendingWrites().await() },
+            onError = { Log.w(TAG, "listen failed", it) },
+        )
     }
 
     /** 端末のキャッシュにある、自分に見えるドキュメント（共有と自分のプライベート） */
