@@ -3,10 +3,11 @@
 ## Security Rules の方針
 
 - 家族の領域（`households/{hid}` 以下）のドキュメントは、`members/{request.auth.uid}` が存在するときだけ読み書きを許可する。
+- **公開範囲**: `visibility == "private"` のリスト・項目は `createdBy`、購入履歴は `purchasedBy` が本人のときだけ読み書きを許可する。プライベートのリストには、本人がプライベートの項目だけを追加できる。`visibility` はあとから変更できない（[要件](../requirements.md) §3.4）。
 - **状態遷移をルールで強制する**。項目の open→completed は、同じ書き込みの中で `purchases/{itemId}` が `active == true` になる場合に限って許可する（`getAfter`）。逆方向（Undo）も同じ扱いにする。クライアントにバグがあっても、「チェック済みなのに購入履歴がない」「Undo したのに履歴が有効なまま」という状態は作れない。
 - サーバー時刻を強制する（`createdAt/completedAt/purchasedAt == request.time`）。購入日時の改ざんや、端末の時計のずれを防ぐ。端末時刻の `checkedAt` だけは、許容範囲（未来5分〜過去7日）を検証して受け付ける（[sync.md](sync.md#保留チェック)）。
 - フィールドを `keys().hasOnly(...)` で制限し、型と長さを検証する。
-- 編集: 未購入の項目の商品名・数量・単位だけを変更できる。チェック済みの項目は、購入の記録と食い違わないよう変更できない。
+- 編集: 未購入の項目の商品名・数量・単位・備考と、リストの名前・備考だけを変更できる。チェック済みの項目は、購入の記録と食い違わないよう変更できない。
 - 削除: 家族・購入履歴・商品は削除できない。リストは論理削除のみ。物理削除できるのは未購入の項目だけ（誤って追加したものの取り消し。[ui.md](ui.md#スワイプ操作)）。
 - 招待コードは `get`（IDを指定した読み取り）だけを許可し、一覧の取得は同じ家族のメンバーに限る。参加処理は、「members の作成」と「invite の usedCount +1」が同じバッチに含まれる場合だけ成立させる。
 
@@ -29,6 +30,9 @@ service cloud.firestore {
     function changed() { return request.resource.data.diff(resource.data).affectedKeys(); }
     function str(v, max) { return v is string && v.size() > 0 && v.size() <= max; }
     function optStr(v, max) { return v == null || str(v, max); }
+    function validVisibility(v) { return v in ['shared', 'private']; }
+    // 公開範囲。owner は lists/items では createdBy、purchases では purchasedBy
+    function canSee(d, owner) { return d.visibility == 'shared' || owner == me(); }
 
     match /users/{uid} {
       allow read: if signedIn() && me() == uid;
@@ -95,22 +99,26 @@ service cloud.firestore {
       }
 
       match /lists/{listId} {
-        allow read: if isMember(hid);
+        allow read: if isMember(hid) && canSee(resource.data, resource.data.createdBy);
         allow create: if isMember(hid)
-          && request.resource.data.keys().hasOnly(['name','sortKey','createdBy','createdAt','status'])
+          && request.resource.data.keys().hasOnly(['name','memo','visibility','sortKey','createdBy','createdAt','status'])
           && request.resource.data.sortKey is number
           && str(request.resource.data.name, 40)
+          && optStr(request.resource.data.memo, 60)
+          && validVisibility(request.resource.data.visibility)
           && request.resource.data.createdBy == me()
           && request.resource.data.createdAt == request.time
           && request.resource.data.status == 'active';
-        allow update: if isMember(hid) && resource.data.status == 'active' && (
+        allow update: if isMember(hid) && canSee(resource.data, resource.data.createdBy)
+          && resource.data.status == 'active' && (
           // 論理削除
           (changed().hasOnly(['status','deletedAt','deletedBy'])
             && request.resource.data.status == 'deleted'
             && request.resource.data.deletedBy == me()
             && request.resource.data.deletedAt == request.time)
-          // リスト名の変更。購入の記録の listNameSnapshot は書き換えない
-          || (changed().hasOnly(['name']) && str(request.resource.data.name, 40))
+          // リスト名と備考の変更。購入の記録の listNameSnapshot は書き換えない
+          || (changed().hasOnly(['name','memo'])
+              && str(request.resource.data.name, 40) && optStr(request.resource.data.memo, 60))
           // 並び替え
           || (changed().hasOnly(['sortKey']) && request.resource.data.sortKey is number)
         );
@@ -119,13 +127,17 @@ service cloud.firestore {
 
       function purchasePath(id) { return /databases/$(db)/documents/households/$(hid)/purchases/$(id); }
       function itemPath(id) { return /databases/$(db)/documents/households/$(hid)/items/$(id); }
+      function listPath(id) { return /databases/$(db)/documents/households/$(hid)/lists/$(id); }
 
       match /items/{itemId} {
-        allow read: if isMember(hid);
+        allow read: if isMember(hid) && canSee(resource.data, resource.data.createdBy);
         allow create: if isMember(hid)
-          && request.resource.data.keys().hasOnly(['listId','productId','inputName','sortKey','quantity','unit',
-                'status','createdBy','createdAt','completedAt','completedBy'])
+          && request.resource.data.keys().hasOnly(['listId','productId','inputName','sortKey','quantity','unit','memo',
+                'visibility','status','createdBy','createdAt','completedAt','completedBy'])
           && str(request.resource.data.inputName, 60)
+          && optStr(request.resource.data.memo, 100)
+          && validVisibility(request.resource.data.visibility)
+          && canAddToList(get(listPath(request.resource.data.listId)).data, request.resource.data.visibility)
           && request.resource.data.sortKey is number
           && (request.resource.data.quantity == null
               || (request.resource.data.quantity is number
@@ -136,10 +148,17 @@ service cloud.firestore {
           && request.resource.data.completedBy == null
           && request.resource.data.createdBy == me()
           && request.resource.data.createdAt == request.time
-          && exists(/databases/$(db)/documents/households/$(hid)/lists/$(request.resource.data.listId))
           && existsAfter(/databases/$(db)/documents/households/$(hid)/products/$(request.resource.data.productId));
-        allow update: if isMember(hid) && (isCompleting() || isReopening() || isEditing() || isReordering());
-        allow delete: if isMember(hid) && resource.data.status == 'open';   // 誤って追加した項目の削除
+        allow update: if isMember(hid) && canSee(resource.data, resource.data.createdBy)
+          && (isCompleting() || isReopening() || isEditing() || isReordering());
+        allow delete: if isMember(hid) && canSee(resource.data, resource.data.createdBy)
+          && resource.data.status == 'open';   // 誤って追加した項目の削除
+
+        // 共有のリストには共有・プライベートのどちらも、プライベートのリストには本人がプライベートだけを追加できる
+        function canAddToList(list, visibility) {
+          return list.visibility == 'shared'
+            || (list.createdBy == me() && visibility == 'private');
+        }
 
         function isCompleting() {
           let p = getAfter(purchasePath(itemId)).data;
@@ -150,10 +169,11 @@ service cloud.firestore {
             && request.resource.data.completedAt == request.time
             && p.active == true && p.purchasedAt == request.time;
         }
-        // 未購入の項目の商品名・数量・単位の変更。チェック済みの項目は変更できない
+        // 未購入の項目の商品名・数量・単位・備考の変更。チェック済みの項目は変更できない
         function isEditing() {
           return resource.data.status == 'open'
-            && changed().hasOnly(['inputName','quantity','unit'])
+            && changed().hasOnly(['inputName','quantity','unit','memo'])
+            && optStr(request.resource.data.memo, 100)
             && str(request.resource.data.inputName, 60)
             && (request.resource.data.quantity == null
                 || (request.resource.data.quantity is number
@@ -175,9 +195,9 @@ service cloud.firestore {
       }
 
       match /purchases/{pid} {
-        allow read: if isMember(hid);
+        allow read: if isMember(hid) && canSee(resource.data, resource.data.purchasedBy);
         allow create: if isMember(hid) && isRecording();
-        allow update: if isMember(hid)
+        allow update: if isMember(hid) && canSee(resource.data, resource.data.purchasedBy)
           && ((resource.data.active == false && isRecording()) || isRevoking());
         allow delete: if false;
 
@@ -185,8 +205,8 @@ service cloud.firestore {
         function isRecording() {
           let d = request.resource.data;
           let item = getAfter(itemPath(pid)).data;
-          return d.keys().hasOnly(['itemId','listId','listNameSnapshot','productId','inputName','quantity','unit',
-                   'checkedAt','purchasedAt','purchasedBy','active','revokedAt','revokedBy'])
+          return d.keys().hasOnly(['itemId','listId','listNameSnapshot','productId','inputName','quantity','unit','memo',
+                   'visibility','checkedAt','purchasedAt','purchasedBy','active','revokedAt','revokedBy'])
             && d.itemId == pid && d.active == true
             && d.purchasedBy == me() && d.purchasedAt == request.time
             // 端末時刻。時計のずれを5分まで許容し、7日より古い保留は受け付けない
@@ -197,6 +217,7 @@ service cloud.firestore {
             && item.status == 'completed' && item.completedAt == request.time
             && d.productId == item.productId && d.listId == item.listId
             && d.inputName == item.inputName && d.quantity == item.quantity && d.unit == item.unit
+            && d.memo == item.memo && d.visibility == item.visibility
             && d.listNameSnapshot == get(/databases/$(db)/documents/households/$(hid)/lists/$(item.listId)).data.name;
         }
         function isRevoking() {
@@ -244,6 +265,8 @@ service cloud.firestore {
 ```
 
 1回の書き込みで評価される `get/exists` は、購入完了のトランザクションで最大4件程度です（上限は20件）。
+
+プライベートな項目は、作った本人しか読めない（＝チェックできない）ため、その購入履歴の `purchasedBy` は必ず項目を作った本人になります。そのため、購入履歴の公開範囲の判定には `purchasedBy` を使えます。
 
 ## 招待
 

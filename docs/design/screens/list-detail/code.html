@@ -1,0 +1,222 @@
+<!DOCTYPE html><html lang="ja" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport">
+<meta content="list-detail" name="shell-type">
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">tailwind.config = {darkMode: "class", theme: {extend: {colors: {primary: "#005cb8", "primary-container": "#1275e2", "on-primary-container": "#000512", surface: "#f9f9ff", "surface-container-low": "#f1f3fc", "surface-container-lowest": "#ffffff", "surface-container": "#ebedf7", "surface-container-high": "#e6e8f1", "surface-track": "#F5EBF9", "border-subtle": "#CAC4CF", "on-surface": "#181c22", "on-surface-variant": "#414753", outline: "#717785", "outline-variant": "#c1c6d5", "tertiary-container": "#c05900", "inverse-on-surface": "#eef0fa", "on-secondary-fixed": "#001b3d", "tertiary-fixed": "#ffdbc9", "on-tertiary-fixed": "#321200", "secondary-fixed": "#d6e3ff", "secondary-fixed-dim": "#aec7f7", "secondary-container": "#b6d0ff", "on-secondary": "#ffffff", "on-background": "#181c22", "surface-container-highest": "#e0e2eb", "on-tertiary": "#ffffff", secondary: "#465f88", "on-error": "#ffffff", "surface-tint": "#005db8", "on-primary-fixed-variant": "#00458d", "on-error-container": "#93000a", "surface-variant": "#e0e2eb", "on-secondary-fixed-variant": "#2d476f", "on-secondary-container": "#3f5881", "surface-bright": "#f9f9ff", background: "#f9f9ff", "on-primary": "#ffffff", tertiary: "#9a4600", "primary-fixed-dim": "#aac7ff", "surface-dim": "#d7dae3", "inverse-primary": "#aac7ff", error: "#ba1a1a", "primary-fixed": "#d6e3ff", "error-container": "#ffdad6", "on-tertiary-fixed-variant": "#763400", "tertiary-fixed-dim": "#ffb68c", "on-tertiary-container": "#0d0300", "inverse-surface": "#2d3037", "on-primary-fixed": "#001b3e"}, fontFamily: {sans: ["Plus Jakarta Sans", "sans-serif"], "label-lg": ["Inter"], "body-sm": ["Inter"], "label-md": ["Inter"], "body-md": ["Inter"], "headline-md": ["Inter"], "body-lg": ["Inter"], "headline-lg": ["Inter"], "headline-sm": ["Inter"], "label-sm": ["Inter"]}, fontSize: {"label-lg": ["14px", {lineHeight: "20px", fontWeight: "500"}], "body-sm": ["12px", {lineHeight: "16px", fontWeight: "400"}], "label-md": ["12px", {lineHeight: "16px", fontWeight: "500"}], "body-md": ["14px", {lineHeight: "20px", fontWeight: "400"}], "headline-md": ["24px", {lineHeight: "32px", fontWeight: "600"}], "body-lg": ["16px", {lineHeight: "24px", fontWeight: "400"}], "headline-lg": ["32px", {lineHeight: "40px", fontWeight: "600"}], "headline-sm": ["20px", {lineHeight: "28px", fontWeight: "600"}], "label-sm": ["11px", {lineHeight: "14px", fontWeight: "500"}]}, spacing: {gutter: "1.5rem", "space-md": "1rem", margin: "2rem", "space-lg": "1.5rem", "space-xl": "2.5rem", "space-xs": "0.25rem", "space-sm": "0.5rem"}, borderRadius: {DEFAULT: "0.25rem", lg: "0.5rem", xl: "0.75rem", full: "9999px"}}}};</script>
+<style>
+    @layer base {
+      html, body {
+        width: 100%;
+        margin: 0;
+        padding: 0;
+        background-color: #FFF7FF;
+        font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      }
+      body {
+        overscroll-behavior-y: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+      .pb-safe {
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+      }
+      .pt-safe {
+        padding-top: env(safe-area-inset-top, 0px);
+      }
+    }
+    ::-webkit-scrollbar {
+      display: none;
+    }
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  <style>:root { --primary-override: #6B4E8C; --primary-container-override: #F2E7FE; --on-primary-container-override: #260E43; } .bg-primary { background-color: #6B4E8C !important; } .text-primary { color: #6B4E8C !important; } .bg-primary-container { background-color: #F2E7FE !important; } .text-on-primary-container { color: #260E43 !important; } .focus-within\:border-primary:focus-within { border-color: #6B4E8C !important; } .focus-within\:ring-primary\/20:focus-within { --tw-ring-color: rgba(107, 78, 140, 0.2) !important; } .hover\:text-primary:hover { color: #6B4E8C !important; } .hover\:bg-primary-container:hover { background-color: #F2E7FE !important; }</style></head>
+<body class="bg-surface text-on-surface antialiased min-h-screen flex flex-col selection:bg-primary-container selection:text-on-primary-container">
+<!-- Top App Bar -->
+<header class="sticky top-0 inset-x-0 z-40 bg-surface/95 backdrop-blur-xl border-b border-surface-container-high pt-safe">
+<div class="h-16 px-4 flex items-center justify-between">
+<div class="flex items-center gap-1 min-w-0">
+<button aria-label="戻る" class="w-12 h-12 -ml-2 rounded-full flex items-center justify-center text-on-surface hover:bg-surface-container-high active:scale-95 transition-all" onclick="history.back()" type="button">
+<span class="material-symbols-outlined text-[24px]">arrow_back</span>
+</button>
+<h1 class="text-[20px] leading-tight font-semibold text-on-surface tracking-tight truncate">スーパー</h1>
+</div>
+<!-- 共同編集メンバーアバター群 -->
+<div class="flex items-center -space-x-2 shrink-0 pr-1">
+<div class="w-8 h-8 rounded-full ring-2 ring-surface bg-[#E9DDFF] text-[#260E43] flex items-center justify-center text-[12px] font-bold shadow-sm" title="太郎">
+          太
+        </div>
+<div class="w-8 h-8 rounded-full ring-2 ring-surface bg-[#FFD7F3] text-[#3B0733] flex items-center justify-center text-[12px] font-bold shadow-sm" title="花子">
+          花
+        </div>
+<div class="w-8 h-8 rounded-full ring-2 ring-surface bg-surface-container-high text-primary flex items-center justify-center text-[11px] font-bold shadow-sm border border-border-subtle/40">
+          +1
+        </div>
+</div>
+</div>
+</header>
+<!-- Main Content Area -->
+<main class="flex-1 flex flex-col relative w-full bg-surface pb-safe">
+<div class="flex flex-col w-full relative pb-28">
+<!-- 進行状況バー＆バッジ -->
+<section class="px-4 pt-4 pb-2">
+<div class="bg-surface-container-low rounded-2xl p-4 shadow-[0_1px_3px_rgba(107,78,140,0.06)] border border-surface-container-high flex flex-col gap-3">
+<div class="flex items-center justify-between">
+<span class="text-[14px] font-semibold text-on-surface tracking-tight">買い物進捗</span>
+<div class="flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary-container text-primary">
+<span class="material-symbols-outlined text-[15px]" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<span class="text-[12px] font-bold">のこり 4件 / 2完了</span>
+</div>
+</div>
+<!-- プログレスバー（トラック #F5EBF9、インジケータ #6B4E8C） -->
+<div class="w-full bg-surface-track rounded-full h-2 overflow-hidden flex">
+<div class="bg-primary h-full rounded-full transition-all duration-300" style="width: 33.3%;"></div>
+</div>
+</div>
+</section>
+<!-- 直感的操作案内 -->
+<div class="px-4 py-1 flex items-center justify-center text-on-surface-variant text-[12px] font-medium opacity-80">
+<span class="material-symbols-outlined text-[15px] mr-1 text-primary">touch_app</span>
+        カードをタップして購入完了
+      </div>
+<!-- 商品リスト一覧 -->
+<div class="flex flex-col px-4 gap-2.5 mt-2" id="shopping-list">
+<!-- 1. 牛乳 2本（未完了） -->
+<div class="group relative w-full min-h-[72px] bg-surface-container-lowest rounded-2xl p-3.5 pl-4 flex items-center justify-between border border-border-subtle shadow-sm active:scale-[0.99] transition-all cursor-pointer select-none">
+<div class="flex flex-col min-w-0 flex-1 pr-3">
+<div class="flex items-center gap-2 flex-wrap">
+<span class="text-[16px] leading-tight text-on-surface font-bold tracking-tight truncate">牛乳</span>
+<span class="px-2.5 py-0.5 rounded-full bg-primary-container text-primary text-[14px] font-medium leading-none flex items-center">2 本</span>
+</div>
+<div class="flex items-center gap-2 mt-1">
+<span class="text-[12px] leading-tight text-on-surface-variant truncate">無調整・特売のもの</span>
+</div>
+</div>
+<div class="flex items-center shrink-0"><div class="flex items-center gap-1"><button aria-label="牛乳を編集" class="w-10 h-10 rounded-full flex items-center justify-center text-on-surface-variant hover:text-primary hover:bg-surface-container-high transition-colors active:scale-95" type="button"><span class="material-symbols-outlined text-[20px]">edit</span></button><button aria-label="牛乳を削除" class="w-10 h-10 rounded-full flex items-center justify-center text-on-surface-variant hover:text-error hover:bg-surface-container-high transition-colors active:scale-95" type="button"><span class="material-symbols-outlined text-[20px]">delete</span></button></div></div>
+</div>
+<!-- 2. 卵 1パック（未完了・プライベート） -->
+<div class="group relative w-full min-h-[72px] bg-surface-container-lowest rounded-2xl p-3.5 pl-4 flex items-center justify-between border border-border-subtle shadow-sm active:scale-[0.99] transition-all cursor-pointer select-none">
+<div class="flex flex-col min-w-0 flex-1 pr-3">
+<div class="flex items-center gap-2 flex-wrap">
+<span class="text-[16px] leading-tight text-on-surface font-bold tracking-tight truncate">卵</span>
+<span class="px-2.5 py-0.5 rounded-full bg-primary-container text-primary text-[14px] font-medium leading-none flex items-center">1 パック</span>
+<span class="inline-flex items-center justify-center text-outline text-[16px]" title="プライベート">
+<span class="material-symbols-outlined text-[16px]">lock</span>
+</span>
+</div>
+<div class="flex items-center gap-2 mt-1">
+<span class="text-[12px] leading-tight text-on-surface-variant truncate">10個入り・Lサイズ推奨</span>
+</div>
+</div>
+<div class="flex items-center shrink-0"><div class="flex items-center gap-1"><button aria-label="卵を編集" class="w-10 h-10 rounded-full flex items-center justify-center text-on-surface-variant hover:text-primary hover:bg-surface-container-high transition-colors active:scale-95" type="button"><span class="material-symbols-outlined text-[20px]">edit</span></button><button aria-label="卵を削除" class="w-10 h-10 rounded-full flex items-center justify-center text-on-surface-variant hover:text-error hover:bg-surface-container-high transition-colors active:scale-95" type="button"><span class="material-symbols-outlined text-[20px]">delete</span></button></div></div>
+</div>
+<!-- 3. バナナ 1房（完了） -->
+<div class="group relative w-full min-h-[72px] bg-surface-container-low rounded-2xl p-3.5 pl-4 flex items-center justify-between border border-surface-container-high transition-colors select-none">
+<div class="flex flex-col min-w-0 flex-1 pr-3">
+<div class="flex items-center gap-2 flex-wrap">
+<span class="text-[16px] leading-tight text-on-surface/40 line-through font-bold tracking-tight truncate">バナナ</span>
+<span class="px-2.5 py-0.5 rounded-full bg-surface-container-high/60 text-on-surface-variant/70 text-[14px] font-medium leading-none flex items-center">1 房</span>
+</div>
+<div class="flex items-center gap-1.5 text-primary mt-1">
+<span class="material-symbols-outlined text-[15px]" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<span class="text-[12px] leading-tight text-on-surface-variant font-medium">花子 10:02</span>
+</div>
+</div>
+<div class="flex items-center shrink-0">
+<button class="px-3.5 py-1.5 rounded-full bg-surface-container-lowest text-primary border border-border-subtle/80 text-[13px] font-semibold hover:bg-primary-container active:scale-95 transition-all shadow-xs" type="button">
+              元に戻す
+            </button>
+</div>
+</div>
+<!-- 4. 食パン 1斤（未完了） -->
+<div class="group relative w-full min-h-[72px] bg-surface-container-lowest rounded-2xl p-3.5 pl-4 flex items-center justify-between border border-border-subtle shadow-sm active:scale-[0.99] transition-all cursor-pointer select-none">
+<div class="flex flex-col min-w-0 flex-1 pr-3">
+<div class="flex items-center gap-2 flex-wrap">
+<span class="text-[16px] leading-tight text-on-surface font-bold tracking-tight truncate">食パン</span>
+<span class="px-2.5 py-0.5 rounded-full bg-primary-container text-primary text-[14px] font-medium leading-none flex items-center">1 斤</span>
+</div>
+<div class="flex items-center gap-2 mt-1">
+<span class="text-[12px] leading-tight text-on-surface-variant truncate">6枚切り</span>
+</div>
+</div>
+<div class="flex items-center shrink-0"><div class="flex items-center gap-1"><button aria-label="食パンを編集" class="w-10 h-10 rounded-full flex items-center justify-center text-on-surface-variant hover:text-primary hover:bg-surface-container-high transition-colors active:scale-95" type="button"><span class="material-symbols-outlined text-[20px]">edit</span></button><button aria-label="食パンを削除" class="w-10 h-10 rounded-full flex items-center justify-center text-on-surface-variant hover:text-error hover:bg-surface-container-high transition-colors active:scale-95" type="button"><span class="material-symbols-outlined text-[20px]">delete</span></button></div></div>
+</div>
+<!-- 5. 豆腐 2丁（完了） -->
+<div class="group relative w-full min-h-[72px] bg-surface-container-low rounded-2xl p-3.5 pl-4 flex items-center justify-between border border-surface-container-high transition-colors select-none">
+<div class="flex flex-col min-w-0 flex-1 pr-3">
+<div class="flex items-center gap-2 flex-wrap">
+<span class="text-[16px] leading-tight text-on-surface/40 line-through font-bold tracking-tight truncate">豆腐</span>
+<span class="px-2.5 py-0.5 rounded-full bg-surface-container-high/60 text-on-surface-variant/70 text-[14px] font-medium leading-none flex items-center">2 丁</span>
+</div>
+<div class="flex items-center gap-1.5 text-primary mt-1">
+<span class="material-symbols-outlined text-[15px]" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<span class="text-[12px] leading-tight text-on-surface-variant font-medium">太郎 10:05</span>
+</div>
+</div>
+<div class="flex items-center shrink-0">
+<button class="px-3.5 py-1.5 rounded-full bg-surface-container-lowest text-primary border border-border-subtle/80 text-[13px] font-semibold hover:bg-primary-container active:scale-95 transition-all shadow-xs" type="button">
+              元に戻す
+            </button>
+</div>
+</div>
+<!-- 6. キャベツ 1玉（未完了・プライベート） -->
+<div class="group relative w-full min-h-[72px] bg-surface-container-lowest rounded-2xl p-3.5 pl-4 flex items-center justify-between border border-border-subtle shadow-sm active:scale-[0.99] transition-all cursor-pointer select-none">
+<div class="flex flex-col min-w-0 flex-1 pr-3">
+<div class="flex items-center gap-2 flex-wrap">
+<span class="text-[16px] leading-tight text-on-surface font-bold tracking-tight truncate">キャベツ</span>
+<span class="px-2.5 py-0.5 rounded-full bg-primary-container text-primary text-[14px] font-medium leading-none flex items-center">1 玉</span>
+<span class="inline-flex items-center justify-center text-outline text-[16px]" title="プライベート">
+<span class="material-symbols-outlined text-[16px]">lock</span>
+</span>
+</div>
+<div class="flex items-center gap-2 mt-1">
+<span class="text-[12px] leading-tight text-on-surface-variant truncate">1/2カットでも可</span>
+</div>
+</div>
+<div class="flex items-center shrink-0"><div class="flex items-center gap-1"><button aria-label="キャベツを編集" class="w-10 h-10 rounded-full flex items-center justify-center text-on-surface-variant hover:text-primary hover:bg-surface-container-high transition-colors active:scale-95" type="button"><span class="material-symbols-outlined text-[20px]">edit</span></button><button aria-label="キャベツを削除" class="w-10 h-10 rounded-full flex items-center justify-center text-on-surface-variant hover:text-error hover:bg-surface-container-high transition-colors active:scale-95" type="button"><span class="material-symbols-outlined text-[20px]">delete</span></button></div></div>
+</div>
+</div>
+</div>
+<!-- 画面最下部固定「ボトム入力バー」 -->
+<footer class="fixed bottom-0 inset-x-0 z-50 bg-surface/95 backdrop-blur-md pb-safe border-t border-surface-container-high">
+<div class="max-w-lg mx-auto px-4 py-2.5">
+<div class="flex items-center gap-2.5 bg-surface-container-low rounded-full px-4 h-12 border border-border-subtle shadow-sm focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-all">
+<span class="material-symbols-outlined text-[22px] text-primary shrink-0">add</span>
+<input aria-label="商品名を入力して追加" class="w-full bg-transparent border-0 outline-none text-[15px] text-on-surface placeholder:text-outline focus:ring-0 focus:outline-none" placeholder="商品名を入力して追加..." type="text">
+<button aria-label="検索" class="w-8 h-8 rounded-full flex items-center justify-center text-outline hover:text-primary active:scale-95 transition-colors shrink-0" type="button">
+<span class="material-symbols-outlined text-[20px]">search</span>
+</button>
+</div>
+</div>
+</footer>
+</main>
+<script>
+    // タップによる即時フィードバック
+    document.addEventListener('DOMContentLoaded', () => {
+      const items = document.querySelectorAll('#shopping-list > div');
+      items.forEach((item) => {
+        item.addEventListener('click', (e) => {
+          if (e.target.closest('button')) return;
+          item.classList.add('scale-[0.98]');
+          setTimeout(() => item.classList.remove('scale-[0.98]'), 100);
+        });
+      });
+    });
+  </script>
+
+
+
+
+
+
+</body></html>

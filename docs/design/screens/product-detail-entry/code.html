@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+
+<html lang="ja"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><meta content="mobile_stack" name="shell-type"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;family=Epilogue:wght@600;700&amp;family=Noto+Sans+JP:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{width:100vw;margin:0;padding:0;}body{overscroll-behavior:none;font-family:'Plus Jakarta Sans','Noto Sans JP',sans-serif;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script><script id="tailwind-config">
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        colors: {
+          "primary": "#6B4E8C",
+          "on-primary": "#ffffff",
+          "primary-container": "#F2E7FE",
+          "on-primary-container": "#260E43",
+          "surface": "#FFF7FF",
+          "on-surface": "#1F1925",
+          "surface-container-lowest": "#FFFFFF",
+          "surface-container-low": "#FBF0FF",
+          "surface-container": "#F6EAFB",
+          "surface-container-high": "#F0E4F5",
+          "surface-container-highest": "#EADFEF",
+          "on-surface-variant": "#4A454F",
+          "outline": "#7C7580",
+          "outline-variant": "#CCC3D0",
+          "secondary": "#6E528D",
+          "secondary-container": "#F2E7FE",
+          "on-secondary-container": "#260E43",
+          "background": "#FFF7FF",
+          "error": "#BA1A1A"
+        },
+        borderRadius: {
+          "DEFAULT": "1rem",
+          "lg": "1.25rem",
+          "xl": "1.5rem",
+          "full": "9999px"
+        },
+        spacing: {
+          "space-xs": "0.25rem",
+          "space-sm": "0.5rem",
+          "space-md": "1rem",
+          "space-lg": "1.5rem",
+          "space-xl": "2.5rem"
+        }
+      }
+    }
+  };
+</script><title>product-detail-entry</title><meta content="product-detail-entry" name="screen-id"/></head><body class="bg-background text-on-surface antialiased min-h-screen flex flex-col"><header class="fixed top-0 inset-x-0 z-50 bg-surface/90 backdrop-blur-xl pt-safe border-b border-surface-container-high/60"><div class="h-14 px-space-sm flex items-center justify-between"><div class="flex items-center gap-1"><button aria-label="閉じる" class="w-12 h-12 flex items-center justify-center rounded-full text-on-surface hover:bg-surface-container active:bg-surface-container-high transition-colors" onclick="history.back()"><span class="material-symbols-outlined text-[24px]">close</span></button><h1 class="text-[20px] font-semibold text-on-surface tracking-tight ml-1">商品の詳細入力</h1></div><div class="flex items-center pr-2"><button class="text-[15px] font-semibold text-primary px-3 py-1.5 rounded-full hover:bg-primary-container/40 active:bg-primary-container/70 transition-colors" onclick="document.getElementById('submit-item-btn').click()" type="button">保存</button></div></div></header><main class="flex-1 flex flex-col relative w-full pt-14 pb-safe bg-surface"><div class="flex flex-col w-full pb-28">
+<!-- Target List Banner (Subtle) -->
+<div class="px-space-md pt-3 pb-1">
+<div class="flex items-center justify-between bg-surface-container-low border border-surface-container-highest px-3.5 py-2.5 rounded-xl">
+<div class="flex items-center gap-2 min-w-0">
+<span class="material-symbols-outlined text-[18px] text-primary shrink-0">storefront</span>
+<div class="flex items-center gap-1.5 truncate">
+<span class="text-xs text-on-surface-variant shrink-0">追加先:</span>
+<span class="text-sm font-semibold text-on-surface truncate">スーパー</span>
+<span class="text-xs text-on-surface-variant shrink-0">（共有リスト 3人）</span>
+</div>
+</div>
+<button class="text-xs font-semibold text-primary hover:opacity-80 transition-opacity shrink-0 ml-2" type="button">変更</button>
+</div>
+</div>
+<!-- Item Preview / Title Card -->
+<div class="px-space-md py-2">
+<div class="relative bg-surface-container-lowest rounded-2xl p-space-md border border-surface-container-highest/60 shadow-[0_2px_8px_rgba(107,78,140,0.04)]">
+<div class="flex items-start justify-between gap-space-sm">
+<div class="min-w-0 flex-1">
+<div class="flex items-center gap-2">
+<h2 class="text-[18px] font-bold text-on-surface tracking-tight truncate leading-snug" id="item-title-display">
+              たまご (Mサイズ 10個パック)
+            </h2>
+<button aria-label="商品名を編集" class="w-8 h-8 rounded-full flex items-center justify-center text-primary hover:bg-surface-container transition-colors shrink-0" id="edit-title-btn" type="button">
+<span class="material-symbols-outlined text-[18px]">edit</span>
+</button>
+</div>
+<!-- History Metadata (Subtle) -->
+<div class="flex items-center gap-1.5 mt-1.5 text-on-surface-variant">
+<span class="material-symbols-outlined text-[15px] text-primary/70 shrink-0">history</span>
+<p class="text-xs text-on-surface-variant/90 truncate">
+              前回: 1パック（10/18 購入・約14日ごと）
+            </p>
+</div>
+</div>
+</div>
+<!-- Inline Title Editor (Hidden by default) -->
+<div class="hidden mt-3 pt-2 border-t border-surface-container" id="inline-title-editor">
+<input class="w-full h-11 px-3 rounded-xl bg-surface-container-low border border-outline-variant text-on-surface text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all" id="item-title-input" type="text" value="たまご (Mサイズ 10個パック)"/>
+<div class="flex justify-end gap-2 mt-2">
+<button class="px-3 py-1.5 rounded-full text-xs font-medium text-on-surface-variant hover:bg-surface-container" id="cancel-title-btn" type="button">キャンセル</button>
+<button class="px-4 py-1.5 rounded-full bg-primary text-on-primary text-xs font-semibold shadow-sm" id="save-title-btn" type="button">更新</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Input Fields Area -->
+<div class="flex flex-col gap-3 px-space-md">
+<!-- 1. 数量 (Quantity) -->
+<div class="bg-surface-container-lowest rounded-2xl p-space-md border border-surface-container-highest/60 shadow-[0_2px_8px_rgba(107,78,140,0.04)]">
+<div class="flex items-center justify-between mb-2">
+<label class="text-sm font-bold text-on-surface">数量</label>
+<span class="text-xs text-on-surface-variant">タップして微調整</span>
+</div>
+<!-- Stepper Controls -->
+<div class="flex items-center justify-center gap-6 py-2">
+<button aria-label="1減らす" class="w-12 h-12 min-w-[48px] min-h-[48px] rounded-full bg-surface-container text-on-surface flex items-center justify-center hover:bg-surface-container-high active:scale-95 transition-all" id="btn-qty-minus" type="button">
+<span class="material-symbols-outlined text-[24px]">remove</span>
+</button>
+<div class="flex items-baseline min-w-[100px] justify-center">
+<span class="text-[28px] font-bold text-on-surface tracking-tight" id="qty-val">1</span>
+<span class="text-sm font-semibold text-on-surface-variant ml-1.5" id="unit-indicator">パック</span>
+</div>
+<button aria-label="1増やす" class="w-12 h-12 min-w-[48px] min-h-[48px] rounded-full bg-primary text-on-primary flex items-center justify-center hover:opacity-95 active:scale-95 transition-all shadow-sm" id="btn-qty-plus" type="button">
+<span class="material-symbols-outlined text-[24px]">add</span>
+</button>
+</div>
+<!-- Quick Quantity Chips -->
+<div class="flex items-center justify-between gap-2 mt-3 pt-1">
+<button class="qty-chip flex-1 h-9 rounded-xl bg-primary text-on-primary font-semibold text-xs flex items-center justify-center active:scale-95 transition-all shadow-xs" data-value="1" type="button">1</button>
+<button class="qty-chip flex-1 h-9 rounded-xl bg-surface-container-low text-on-surface font-semibold text-xs flex items-center justify-center hover:bg-surface-container active:scale-95 transition-all" data-value="2" type="button">2</button>
+<button class="qty-chip flex-1 h-9 rounded-xl bg-surface-container-low text-on-surface font-semibold text-xs flex items-center justify-center hover:bg-surface-container active:scale-95 transition-all" data-value="3" type="button">3</button>
+<button class="qty-chip flex-1 h-9 rounded-xl bg-surface-container-low text-on-surface font-semibold text-xs flex items-center justify-center hover:bg-surface-container active:scale-95 transition-all" data-value="4" type="button">4</button>
+<button class="qty-chip flex-1 h-9 rounded-xl bg-surface-container-low text-on-surface font-semibold text-xs flex items-center justify-center hover:bg-surface-container active:scale-95 transition-all" data-value="5" type="button">5</button>
+<button class="qty-chip flex-1 h-9 rounded-xl bg-surface-container-low text-on-surface font-semibold text-xs flex items-center justify-center hover:bg-surface-container active:scale-95 transition-all" data-value="6" type="button">6</button>
+</div>
+</div>
+<!-- 2. 単位 (Unit) -->
+<div class="bg-surface-container-lowest rounded-2xl p-space-md border border-surface-container-highest/60 shadow-[0_2px_8px_rgba(107,78,140,0.04)]">
+<div class="flex items-center justify-between mb-1.5">
+<label class="text-sm font-bold text-on-surface" for="unit-input-field">単位</label>
+<span class="text-xs text-primary font-medium">履歴から自動入力</span>
+</div>
+<!-- Free-text input field -->
+<div class="relative mt-1">
+<input class="w-full h-11 px-3.5 pr-10 rounded-xl bg-surface-container-low border border-outline-variant text-on-surface text-sm placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all" id="unit-input-field" placeholder="単位（例: パック、個、袋、本など）" type="text" value="パック"/>
+<button aria-label="単位をクリア" class="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container transition-colors" id="clear-unit-btn" type="button">
+<span class="material-symbols-outlined text-[16px]">close</span>
+</button>
+</div>
+<!-- Quick Unit Chips -->
+<div class="flex flex-wrap gap-2 mt-2.5">
+<button class="unit-chip h-8 px-3.5 rounded-full bg-primary text-on-primary text-xs font-semibold flex items-center justify-center transition-all shadow-xs" data-unit="パック" type="button">パック</button>
+<button class="unit-chip h-8 px-3.5 rounded-full bg-surface-container-low text-on-surface text-xs font-medium border border-surface-container-highest flex items-center justify-center hover:bg-surface-container transition-all" data-unit="個" type="button">個</button>
+<button class="unit-chip h-8 px-3.5 rounded-full bg-surface-container-low text-on-surface text-xs font-medium border border-surface-container-highest flex items-center justify-center hover:bg-surface-container transition-all" data-unit="本" type="button">本</button>
+<button class="unit-chip h-8 px-3.5 rounded-full bg-surface-container-low text-on-surface text-xs font-medium border border-surface-container-highest flex items-center justify-center hover:bg-surface-container transition-all" data-unit="袋" type="button">袋</button>
+<button class="unit-chip h-8 px-3.5 rounded-full bg-surface-container-low text-on-surface text-xs font-medium border border-surface-container-highest flex items-center justify-center hover:bg-surface-container transition-all" data-unit="箱" type="button">箱</button>
+<button class="unit-chip h-8 px-3.5 rounded-full bg-surface-container-low text-on-surface text-xs font-medium border border-surface-container-highest flex items-center justify-center hover:bg-surface-container transition-all" data-unit="g" type="button">g</button>
+</div>
+</div>
+<!-- 3. 公開範囲 (Visibility) -->
+<div class="bg-surface-container-lowest rounded-2xl p-space-md border border-surface-container-highest/60 shadow-[0_2px_8px_rgba(107,78,140,0.04)]">
+<div class="flex items-center justify-between mb-1">
+<label class="text-sm font-bold text-on-surface">公開範囲</label>
+<span class="text-xs text-on-surface-variant">共有リスト設定</span>
+</div>
+<p class="text-xs text-on-surface-variant mb-3">
+        同居家族や共有メンバーに見せるかどうかを選択します。
+      </p>
+<!-- Segmented Choice Cards -->
+<div class="grid grid-cols-2 gap-2.5">
+<!-- Shared (Default) -->
+<label class="relative flex flex-col p-3 rounded-xl cursor-pointer border-2 border-primary bg-primary-container text-on-primary-container transition-all" id="visibility-shared-card">
+<input checked="" class="sr-only" id="radio-shared" name="visibility" type="radio" value="shared"/>
+<div class="flex items-center justify-between mb-1">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[18px] text-primary">groups</span>
+<span class="text-xs font-bold">全員に共有</span>
+</div>
+<span class="material-symbols-outlined text-[18px] text-primary" id="icon-shared-check" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+<span class="text-[11px] opacity-80">標準・リスト全員に通知</span>
+</label>
+<!-- Private -->
+<label class="relative flex flex-col p-3 rounded-xl cursor-pointer border-2 border-transparent bg-surface-container-low text-on-surface-variant transition-all hover:bg-surface-container" id="visibility-private-card">
+<input class="sr-only" id="radio-private" name="visibility" type="radio" value="private"/>
+<div class="flex items-center justify-between mb-1">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[18px]">lock</span>
+<span class="text-xs font-bold text-on-surface">自分のみ</span>
+</div>
+<span class="material-symbols-outlined text-[18px] text-outline" id="icon-private-check">radio_button_unchecked</span>
+</div>
+<span class="text-[11px] opacity-80">サプライズや自分専用</span>
+</label>
+</div>
+<!-- Spec Notice -->
+<div class="flex items-start gap-1.5 mt-2.5">
+<span class="material-symbols-outlined text-[15px] text-outline shrink-0 mt-0.5">info</span>
+<p class="text-[11px] text-outline leading-tight">
+          ※ 登録後に公開範囲を変更することはできません
+        </p>
+</div>
+</div>
+<!-- 4. 備考 (OutlinedTextField) -->
+<div class="bg-surface-container-lowest rounded-2xl p-space-md border border-surface-container-highest/60 shadow-[0_2px_8px_rgba(107,78,140,0.04)]">
+<div class="flex items-center justify-between mb-1.5">
+<label class="text-sm font-bold text-on-surface" for="memo-input">備考・メモ</label>
+<span class="text-xs text-outline">任意</span>
+</div>
+<div class="relative">
+<textarea class="w-full p-3 rounded-xl bg-surface-container-low border border-outline-variant text-on-surface text-sm placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all resize-none" id="memo-input" placeholder="メモ（例: 特売品なら2個、賞味期限が長いものなど）" rows="3"></textarea>
+</div>
+<!-- Memo Chips -->
+<div class="flex flex-wrap items-center gap-1.5 mt-2.5">
+<span class="text-xs text-on-surface-variant mr-0.5">候補:</span>
+<button class="memo-chip h-7 px-3 rounded-full bg-surface-container text-on-surface-variant text-xs font-medium hover:bg-surface-container-high transition-colors active:scale-95" data-text="特売品なら2個" type="button">特売品なら2個</button>
+<button class="memo-chip h-7 px-3 rounded-full bg-surface-container text-on-surface-variant text-xs font-medium hover:bg-surface-container-high transition-colors active:scale-95" data-text="賞味期限長め" type="button">賞味期限長め</button>
+<button class="memo-chip h-7 px-3 rounded-full bg-surface-container text-on-surface-variant text-xs font-medium hover:bg-surface-container-high transition-colors active:scale-95" data-text="赤玉推奨" type="button">赤玉推奨</button>
+</div>
+</div>
+</div>
+<!-- Fixed Bottom Action CTA -->
+<div class="fixed bottom-0 inset-x-0 z-40 bg-surface/90 backdrop-blur-xl px-space-md pt-2 pb-safe border-t border-surface-container-high/60 shadow-[0_-4px_16px_rgba(107,78,140,0.08)]">
+<div class="max-w-md mx-auto py-1">
+<button class="w-full h-12 min-h-[48px] rounded-full bg-primary text-on-primary font-bold text-[15px] flex items-center justify-center gap-2 shadow-md hover:opacity-95 active:scale-[0.99] transition-all" id="submit-item-btn" type="button">
+<span>リストに追加する</span>
+<span class="material-symbols-outlined text-[20px]">check</span>
+</button>
+</div>
+</div>
+</div>
+<script>
+  (function() {
+    // Quantity logic
+    let qty = 1;
+    const qtyVal = document.getElementById('qty-val');
+    const btnMinus = document.getElementById('btn-qty-minus');
+    const btnPlus = document.getElementById('btn-qty-plus');
+    const qtyChips = document.querySelectorAll('.qty-chip');
+
+    function updateQty(newVal) {
+      qty = Math.max(1, newVal);
+      qtyVal.textContent = qty;
+      
+      qtyChips.forEach(chip => {
+        if (parseInt(chip.getAttribute('data-value'), 10) === qty) {
+          chip.className = 'qty-chip flex-1 h-9 rounded-xl bg-primary text-on-primary font-semibold text-xs flex items-center justify-center active:scale-95 transition-all shadow-xs';
+        } else {
+          chip.className = 'qty-chip flex-1 h-9 rounded-xl bg-surface-container-low text-on-surface font-semibold text-xs flex items-center justify-center hover:bg-surface-container active:scale-95 transition-all';
+        }
+      });
+    }
+
+    btnMinus.addEventListener('click', () => updateQty(qty - 1));
+    btnPlus.addEventListener('click', () => updateQty(qty + 1));
+    qtyChips.forEach(chip => {
+      chip.addEventListener('click', () => {
+        updateQty(parseInt(chip.getAttribute('data-value'), 10));
+      });
+    });
+
+    // Unit input & chips logic
+    const unitInput = document.getElementById('unit-input-field');
+    const unitIndicator = document.getElementById('unit-indicator');
+    const unitChips = document.querySelectorAll('.unit-chip');
+    const clearUnitBtn = document.getElementById('clear-unit-btn');
+
+    unitInput.addEventListener('input', (e) => {
+      const val = e.target.value.trim();
+      unitIndicator.textContent = val || '';
+      highlightActiveUnitChip(val);
+    });
+
+    clearUnitBtn.addEventListener('click', () => {
+      unitInput.value = '';
+      unitIndicator.textContent = '';
+      highlightActiveUnitChip('');
+      unitInput.focus();
+    });
+
+    function highlightActiveUnitChip(selectedUnit) {
+      unitChips.forEach(chip => {
+        if (chip.getAttribute('data-unit') === selectedUnit) {
+          chip.className = 'unit-chip h-8 px-3.5 rounded-full bg-primary text-on-primary text-xs font-semibold flex items-center justify-center transition-all shadow-xs';
+        } else {
+          chip.className = 'unit-chip h-8 px-3.5 rounded-full bg-surface-container-low text-on-surface text-xs font-medium border border-surface-container-highest flex items-center justify-center hover:bg-surface-container transition-all';
+        }
+      });
+    }
+
+    unitChips.forEach(chip => {
+      chip.addEventListener('click', () => {
+        const u = chip.getAttribute('data-unit');
+        unitInput.value = u;
+        unitIndicator.textContent = u;
+        highlightActiveUnitChip(u);
+      });
+    });
+
+    // Memo suggestions
+    const memoInput = document.getElementById('memo-input');
+    const memoChips = document.querySelectorAll('.memo-chip');
+    memoChips.forEach(chip => {
+      chip.addEventListener('click', () => {
+        const text = chip.getAttribute('data-text');
+        if (memoInput.value.length > 0) {
+          memoInput.value += '、' + text;
+        } else {
+          memoInput.value = text;
+        }
+        memoInput.focus();
+      });
+    });
+
+    // Visibility Selector
+    const radioShared = document.getElementById('radio-shared');
+    const radioPrivate = document.getElementById('radio-private');
+    const cardShared = document.getElementById('visibility-shared-card');
+    const cardPrivate = document.getElementById('visibility-private-card');
+    const iconShared = document.getElementById('icon-shared-check');
+    const iconPrivate = document.getElementById('icon-private-check');
+
+    function syncVisibilityUI() {
+      if (radioShared.checked) {
+        cardShared.className = 'relative flex flex-col p-3 rounded-xl cursor-pointer border-2 border-primary bg-primary-container text-on-primary-container transition-all';
+        cardPrivate.className = 'relative flex flex-col p-3 rounded-xl cursor-pointer border-2 border-transparent bg-surface-container-low text-on-surface-variant transition-all hover:bg-surface-container';
+        iconShared.textContent = 'check_circle';
+        iconShared.className = 'material-symbols-outlined text-[18px] text-primary';
+        iconShared.style.fontVariationSettings = "'FILL' 1";
+        iconPrivate.textContent = 'radio_button_unchecked';
+        iconPrivate.className = 'material-symbols-outlined text-[18px] text-outline';
+        iconPrivate.style.fontVariationSettings = "'FILL' 0";
+      } else {
+        cardPrivate.className = 'relative flex flex-col p-3 rounded-xl cursor-pointer border-2 border-primary bg-primary-container text-on-primary-container transition-all';
+        cardShared.className = 'relative flex flex-col p-3 rounded-xl cursor-pointer border-2 border-transparent bg-surface-container-low text-on-surface-variant transition-all hover:bg-surface-container';
+        iconPrivate.textContent = 'check_circle';
+        iconPrivate.className = 'material-symbols-outlined text-[18px] text-primary';
+        iconPrivate.style.fontVariationSettings = "'FILL' 1";
+        iconShared.textContent = 'radio_button_unchecked';
+        iconShared.className = 'material-symbols-outlined text-[18px] text-outline';
+        iconShared.style.fontVariationSettings = "'FILL' 0";
+      }
+    }
+
+    radioShared.addEventListener('change', syncVisibilityUI);
+    radioPrivate.addEventListener('change', syncVisibilityUI);
+
+    // Title editing inline
+    const titleDisplay = document.getElementById('item-title-display');
+    const editTitleBtn = document.getElementById('edit-title-btn');
+    const inlineEditor = document.getElementById('inline-title-editor');
+    const titleInput = document.getElementById('item-title-input');
+    const saveTitleBtn = document.getElementById('save-title-btn');
+    const cancelTitleBtn = document.getElementById('cancel-title-btn');
+
+    editTitleBtn.addEventListener('click', () => {
+      inlineEditor.classList.remove('hidden');
+      titleInput.focus();
+    });
+
+    cancelTitleBtn.addEventListener('click', () => {
+      inlineEditor.classList.add('hidden');
+      titleInput.value = titleDisplay.textContent.trim();
+    });
+
+    saveTitleBtn.addEventListener('click', () => {
+      if (titleInput.value.trim().length > 0) {
+        titleDisplay.textContent = titleInput.value.trim();
+      }
+      inlineEditor.classList.add('hidden');
+    });
+
+    // Submit Action -> Return to list
+    const submitBtn = document.getElementById('submit-item-btn');
+    submitBtn.addEventListener('click', () => {
+      submitBtn.classList.add('opacity-80', 'scale-[0.98]');
+      setTimeout(() => {
+        history.back();
+      }, 150);
+    });
+  })();
+</script></main></body></html>

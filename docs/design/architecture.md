@@ -37,7 +37,7 @@
 │     ├─ data/auth/
 │     ├─ data/connectivity/  # オンライン判定
 │     ├─ data/pending/       # 保留チェック（DataStore, Syncer, Worker）
-│     └─ ui/{signin,onboarding,lists,listdetail,settings,theme}/
+│     └─ ui/{signin,onboarding,lists,listdetail,itementry,settings,theme}/
 ├─ domain/                   # 純Kotlin（JVM）モジュール。Android/Firebase に依存しない
 │  ├─ model/                 # ShoppingList, Item, Product, Purchase, Member …
 │  ├─ repository/            # Repository インターフェース

@@ -19,12 +19,14 @@ households/{hid}/members/{uid}
   role: "owner" | "member", displayName, photoUrl?, joinedAt, joinedVia: string | null(招待コード)
 
 households/{hid}/lists/{listId}
-  name, sortKey: number, createdBy, createdAt,
+  name, memo: string | null, visibility: "shared" | "private",
+  sortKey: number, createdBy, createdAt,
   status: "active" | "deleted", deletedAt?, deletedBy?
 
 households/{hid}/items/{itemId}              # リストの下ではなく家族直下（フラット）
   listId, productId, inputName, sortKey: number,
-  quantity: number | null, unit: string | null,
+  quantity: number | null, unit: string | null, memo: string | null,
+  visibility: "shared" | "private",          # プライベートのリストでは常に private
   status: "open" | "completed",
   createdBy, createdAt, completedAt: timestamp | null, completedBy: string | null
 
@@ -34,7 +36,8 @@ households/{hid}/products/{productId}        # productId = 正規化名から決
   mergedInto: string | null, mergedAt?, mergedBy?
 
 households/{hid}/purchases/{purchaseId}      # purchaseId = itemId
-  itemId, listId, listNameSnapshot, productId, inputName, quantity, unit,
+  itemId, listId, listNameSnapshot, productId, inputName, quantity, unit, memo,
+  visibility,                                # 項目と同じ。private は purchasedBy（＝項目を作った本人）だけが読める
   checkedAt,                                 # 端末でチェックした時刻（保留チェックの場合は確定より前）
   purchasedAt, purchasedBy, active: bool, revokedAt: timestamp | null, revokedBy: string | null
 ```
@@ -51,6 +54,9 @@ households/{hid}/purchases/{purchaseId}      # purchaseId = itemId
 | **並び順は `sortKey`（小数）で持つ** | 並び替えでは、動かした1件だけを、前後の項目の `sortKey` の中間の値に書き換える。動かした1件だけを書き込めばよく、オフラインでもキューに積める。別々の項目を同時に動かしても競合しない。同じ項目を同時に動かした場合は、後から反映された位置になる。新しいリスト・項目は、その時点の最大値 + 1 にして末尾に置く。中間の値が取れなくなったとき（小数の精度の限界）は、その一覧の `sortKey` を振り直す（まれな一括書き込み）。計算は domain の `SortKeys` が行う。 |
 | **`version` フィールドを持たない** | 状態遷移（open↔completed）を Security Rules とトランザクションで守るため、楽観ロック用の番号は要らない。 |
 | **購入履歴に `checkedAt` を持つ** | オフライン中のチェックは確定が遅れるため、実際にチェックした時刻を別に残す。周期の計算にはこちらを使う（[suggestions.md](suggestions.md#周期推定)）。 |
+| **公開範囲を各ドキュメントに持つ**（`visibility`） | Firestore のルールはフィルタにならないため、クエリ側で `visibility` と `createdBy` / `purchasedBy` を条件にして、ルールが必ず満たされる範囲だけを購読する（下記「購読とクエリ」）。リストの公開範囲を項目にも写しておくと、項目のルールでリストを読まずに判定できる。 |
+| **公開範囲はあとから変えない** | 変えられるようにすると、共有からプライベートに変えた時点で他の端末のキャッシュに残る、購入履歴の公開範囲も書き換える必要がある、など扱いが複雑になる。要件でも登録時だけ選べる（[要件](../requirements.md) §3.4）。 |
+| **product は公開範囲を持たない** | product は決定的ID（正規化名）で家族に1つなので、プライベートと共有で同じ名前の商品を分けられない。代わりに、補完の候補には「自分に見える項目か購入の記録がある product」だけを出す（[suggestions.md](suggestions.md#入力中の補完)）。そのため、プライベートだけで使った商品名は他のメンバーの画面には出ないが、データベース上の product の名前は家族のメンバーが読める。家族内のサプライズを画面に出さない程度の秘匿として受け入れる。 |
 | **`users/{uid}` と `invites/{code}` を追加する** | 起動時に自分の所属家族を引くため。また、まだ家族に参加していないユーザーが招待コードを検証するため（家族の領域はメンバーしか読めない）。 |
 
 ## 購読とクエリ
@@ -61,13 +67,15 @@ households/{hid}/purchases/{purchaseId}      # purchaseId = itemId
 |---|---|---|
 | 所属家族 | `users/{uid}` | listener |
 | メンバー | `households/{hid}/members` | listener（数件） |
-| リスト | `households/{hid}/lists`（全件。表示するかどうかはクライアントで判定） | listener（数十件） |
-| 未購入項目 | `items where status == "open"` | listener |
-| リスト詳細の項目 | `items where listId == X and (status == "open" or completedAt >= now-24h)`（OR クエリ。並び順は sortKey でクライアント側） | 画面を表示している間だけ listener |
+| リスト | `lists where visibility == "shared"` と `lists where visibility == "private" and createdBy == 自分`（全件。表示するかどうかはクライアントで判定） | listener 2本（数十件） |
+| 未購入項目 | `items where status == "open" and visibility == "shared"` と、同じ条件で `visibility == "private" and createdBy == 自分` | listener 2本 |
+| リスト詳細の項目 | `items where listId == X and visibility == "shared" and (status == "open" or completedAt >= now-24h)` と、プライベートの同じ条件（OR クエリ。並び順は sortKey でクライアント側） | 画面を表示している間だけ listener 2本 |
 | 商品 | `households/{hid}/products`（全件） | listener |
-| 購入履歴 | `purchases where purchasedAt >= now-365d` | listener。`active` の絞り込みはクライアント側 |
+| 購入履歴 | `purchases where visibility == "shared" and purchasedAt >= now-365d` と `purchases where visibility == "private" and purchasedBy == 自分 and purchasedAt >= now-365d` | listener 2本。`active` の絞り込みはクライアント側 |
 
-複合インデックスは、リスト詳細のクエリ（`listId` と、`status` / `completedAt` の OR）に必要なものだけを作ります。具体的な定義は、フェーズ2でクエリを実装するときに `firestore.indexes.json` で確定させます。
+共有とプライベートを2本に分けるのは、ルールで読めない可能性のあるドキュメントを含むクエリが拒否されるためです。Firestore の OR クエリ（`visibility == "shared" or createdBy == 自分`）がルールで許可されることを実装時に確認できれば、1本にまとめます。
+
+複合インデックスは、上のクエリ（`visibility` と `createdBy` / `purchasedBy`、リスト詳細の `listId` と `status` / `completedAt` の OR）に必要なものだけを作ります。具体的な定義は、フェーズ2でクエリを実装するときに `firestore.indexes.json` で確定させます。
 
 ### 購入履歴の取得範囲（365日）
 
