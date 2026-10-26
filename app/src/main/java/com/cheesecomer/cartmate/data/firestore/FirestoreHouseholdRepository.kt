@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.tasks.await
 import java.security.SecureRandom
 import java.time.Clock
@@ -61,7 +62,11 @@ class FirestoreHouseholdRepository @Inject constructor(
             .flatMapLatest { householdId ->
                 if (householdId == null) flowOf(Membership(null, null))
                 else memberPresence(
-                    listen = { Paths.member(db, householdId, uid).snapshotFlow().map { it.exists() } },
+                    listen = {
+                        Paths.member(db, householdId, uid).snapshotFlow()
+                            // まだ分からない（キャッシュにないだけ）間は流さない
+                            .mapNotNull { documentPresence(it.exists(), it.metadata.isFromCache) }
+                    },
                     awaitPendingWrites = ::awaitPendingWrites,
                     onError = ::logListenError,
                 ).map { Membership(householdId, it) }

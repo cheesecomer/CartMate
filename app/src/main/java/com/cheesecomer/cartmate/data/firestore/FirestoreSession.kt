@@ -9,6 +9,7 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
@@ -45,7 +46,12 @@ class FirestoreSession @Inject constructor(
         if (uid == null) flowOf(null)
         // 自分の users は拒否されないので、denied は流れない。通信の問題などでは購読し直す
         else recoverListen(
-            listen = { Paths.user(db, uid).snapshotFlow().map { it.getString(F.HOUSEHOLD_ID)?.let(::HouseholdId) } },
+            listen = {
+                Paths.user(db, uid).snapshotFlow()
+                    // まだ分からない（キャッシュにないだけ）間は流さない
+                    .filter { documentPresence(it.exists(), it.metadata.isFromCache) != null }
+                    .map { it.getString(F.HOUSEHOLD_ID)?.let(::HouseholdId) }
+            },
             denied = null,
             awaitPendingWrites = { db.waitForPendingWrites().await() },
             onError = { Log.w("FirestoreSession", "listen failed", it) },
