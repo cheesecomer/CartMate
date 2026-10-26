@@ -17,25 +17,7 @@
           "order": "ASCENDING"
         },
         {
-          "fieldPath": "completedAt",
-          "order": "ASCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "items",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "listId",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "visibility",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "completedAt",
+          "fieldPath": "checkedAt",
           "order": "ASCENDING"
         }
       ]
@@ -61,29 +43,7 @@
           "order": "ASCENDING"
         },
         {
-          "fieldPath": "completedAt",
-          "order": "ASCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "items",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "createdBy",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "listId",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "visibility",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "completedAt",
+          "fieldPath": "checkedAt",
           "order": "ASCENDING"
         }
       ]

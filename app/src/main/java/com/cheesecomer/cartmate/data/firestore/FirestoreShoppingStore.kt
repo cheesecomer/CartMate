@@ -27,7 +27,6 @@ import com.google.android.gms.tasks.Task
 import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
-import com.google.firebase.firestore.Filter
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.Source
@@ -63,13 +62,19 @@ class FirestoreShoppingStore @Inject constructor(
         shared: (FirestoreSession.Scope) -> Query,
         private: (FirestoreSession.Scope) -> Query,
         map: (DocumentSnapshot) -> T?,
+    ): Flow<List<T>> = observeAll({ listOf(shared(it), private(it)) }, map)
+
+    /** [queries] の結果を1つにまとめる。同じドキュメントが複数のクエリに入っていれば1つにする */
+    private fun <T> observeAll(
+        queries: (FirestoreSession.Scope) -> List<Query>,
+        map: (DocumentSnapshot) -> T?,
     ): Flow<List<T>> = session.scope.flatMapLatest { scope ->
         if (scope == null) flowOf(emptyList())
         // 家族から外されると読めなくなる（空にする）。表示する画面は CartMateApp が切り替える
         else recoverListen(
             listen = {
-                combine(shared(scope).snapshotFlow(), private(scope).snapshotFlow()) { a, b ->
-                    (a.documents + b.documents).mapNotNull(map)
+                combine(queries(scope).map { it.snapshotFlow() }) { snapshots ->
+                    snapshots.flatMap { it.documents }.distinctBy { it.id }.mapNotNull(map)
                 }
             },
             denied = emptyList(),
@@ -159,18 +164,13 @@ class FirestoreShoppingStore @Inject constructor(
         map = { it.toItem() },
     ).mapSorted { it.createdAt }
 
-    override fun observeListItems(listId: ListId, completedSince: Instant): Flow<List<Item>> {
-        // 未購入か、completedSince 以降にチェックされた項目（OR クエリ）
-        val recent = Filter.or(
-            Filter.equalTo(F.STATUS, V.OPEN),
-            Filter.greaterThanOrEqualTo(F.COMPLETED_AT, completedSince.toTimestamp()),
-        )
-        return observeVisible(
-            shared = { Paths.items(db, it.householdId).whereEqualTo(F.LIST_ID, listId.value).visibleShared().where(recent) },
-            private = { Paths.items(db, it.householdId).whereEqualTo(F.LIST_ID, listId.value).visiblePrivate(it.uid).where(recent) },
-            map = { it.toItem() },
-        ).mapSorted { it.sortKey }
-    }
+    override fun observeListItems(listId: ListId, completedSince: Instant): Flow<List<Item>> = observeAll(
+        queries = {
+            val items = Paths.items(db, it.householdId).whereEqualTo(F.LIST_ID, listId.value)
+            items.visibleShared().listItemQueries(completedSince) + items.visiblePrivate(it.uid).listItemQueries(completedSince)
+        },
+        map = { it.toItem() },
+    ).mapSorted { it.sortKey }
 
     private suspend fun cachedItems(scope: FirestoreSession.Scope, listId: ListId): List<Item> {
         val items = Paths.items(db, scope.householdId).whereEqualTo(F.LIST_ID, listId.value)
@@ -300,7 +300,7 @@ class FirestoreShoppingStore @Inject constructor(
         if (item.status == ItemStatus.COMPLETED) return CompleteResult.AlreadyCompleted(item.completedBy!!, item.completedAt!!)
         val listName = cached(Paths.lists(db, scope.householdId).document(item.listId.value))?.getString(F.NAME).orEmpty()
         db.batch()
-            .update(itemRef, F.STATUS, V.COMPLETED, F.COMPLETED_AT, FieldValue.serverTimestamp(), F.COMPLETED_BY, scope.uid)
+            .markCompleted(itemRef, scope.uid, checkedAt)
             .set(Paths.purchases(db, scope.householdId).document(id.value), mapOf(
                 F.ITEM_ID to id.value,
                 F.LIST_ID to item.listId.value,
@@ -329,7 +329,7 @@ class FirestoreShoppingStore @Inject constructor(
         val item = cached(itemRef)?.toItem() ?: return ReopenResult.Rejected(null)
         if (item.status == ItemStatus.OPEN) return ReopenResult.AlreadyOpen
         db.batch()
-            .update(itemRef, F.STATUS, V.OPEN, F.COMPLETED_AT, null, F.COMPLETED_BY, null)
+            .markOpen(itemRef)
             .update(
                 Paths.purchases(db, scope.householdId).document(id.value),
                 F.ACTIVE, false, F.REVOKED_AT, FieldValue.serverTimestamp(), F.REVOKED_BY, scope.uid,

@@ -166,9 +166,11 @@ service cloud.firestore {
           let p = getAfter(purchasePath(itemId)).data;
           return resource.data.status == 'open'
             && request.resource.data.status == 'completed'
-            && changed().hasOnly(['status','completedAt','completedBy'])
+            && changed().hasOnly(['status','completedAt','completedBy','checkedAt'])
             && request.resource.data.completedBy == me()
             && request.resource.data.completedAt == request.time
+            // 端末でチェックした時刻。リスト詳細の購読に使う（completedAt はサーバーに届くまで端末の中で値がないため）
+            && request.resource.data.checkedAt == p.checkedAt
             && p.active == true && p.purchasedAt == request.time;
         }
         // 未購入の項目の商品名・数量・単位・備考の変更。チェック済みの項目は変更できない
@@ -189,9 +191,10 @@ service cloud.firestore {
         function isReopening() {
           return resource.data.status == 'completed'
             && request.resource.data.status == 'open'
-            && changed().hasOnly(['status','completedAt','completedBy'])
+            && changed().hasOnly(['status','completedAt','completedBy','checkedAt'])
             && request.resource.data.completedAt == null
             && request.resource.data.completedBy == null
+            && request.resource.data.get('checkedAt', null) == null
             && getAfter(purchasePath(itemId)).data.active == false;
         }
       }

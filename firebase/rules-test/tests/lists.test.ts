@@ -197,13 +197,23 @@ describe("項目の追加", () => {
   });
 });
 
+/** 端末でチェックした時刻。項目と購入の記録に同じ値を書く */
+const CHECKED_AT = new Date();
+
 /** アプリの FirestoreShoppingStore.completeItem と同じ書き込み */
-function complete(db: Firestore, uid: string, itemId: string, purchase: Record<string, unknown> = {}) {
+function complete(
+  db: Firestore,
+  uid: string,
+  itemId: string,
+  purchase: Record<string, unknown> = {},
+  checkedAt: Date = CHECKED_AT,
+) {
   return writeBatch(db)
     .update(doc(db, `households/${HID}/items/${itemId}`), {
       status: "completed",
       completedAt: serverTimestamp(),
       completedBy: uid,
+      checkedAt,
     })
     .set(doc(db, `households/${HID}/purchases/${itemId}`), {
       itemId,
@@ -215,7 +225,7 @@ function complete(db: Firestore, uid: string, itemId: string, purchase: Record<s
       unit: "本",
       memo: null,
       visibility: "shared",
-      checkedAt: new Date(),
+      checkedAt: CHECKED_AT,
       purchasedAt: serverTimestamp(),
       purchasedBy: uid,
       active: true,
@@ -229,7 +239,12 @@ function complete(db: Firestore, uid: string, itemId: string, purchase: Record<s
 /** アプリの FirestoreShoppingStore.reopenItem と同じ書き込み */
 function reopen(db: Firestore, uid: string, itemId: string) {
   return writeBatch(db)
-    .update(doc(db, `households/${HID}/items/${itemId}`), { status: "open", completedAt: null, completedBy: null })
+    .update(doc(db, `households/${HID}/items/${itemId}`), {
+      status: "open",
+      completedAt: null,
+      completedBy: null,
+      checkedAt: null,
+    })
     .update(doc(db, `households/${HID}/purchases/${itemId}`), {
       active: false,
       revokedAt: serverTimestamp(),
@@ -266,6 +281,23 @@ describe("チェックと Undo", () => {
     await seedOpenItem();
     await assertFails(complete(as("hanako"), "hanako", "i1", { listNameSnapshot: "別の名前" }));
     await assertFails(complete(as("hanako"), "hanako", "i1", { quantity: 3 }));
+  });
+
+  it("項目と購入の記録で、チェックした時刻が食い違う書き込みは拒否される", async () => {
+    await seedOpenItem();
+    await assertFails(complete(as("hanako"), "hanako", "i1", {}, new Date(CHECKED_AT.getTime() - 60_000)));
+  });
+
+  it("チェックを外すときは、チェックした時刻も消さなければならない", async () => {
+    await seedOpenItem();
+    await complete(as("taro"), "taro", "i1");
+    const db = as("taro");
+    await assertFails(
+      writeBatch(db)
+        .update(doc(db, `households/${HID}/items/i1`), { status: "open", completedAt: null, completedBy: null })
+        .update(doc(db, `households/${HID}/purchases/i1`), { active: false, revokedAt: serverTimestamp(), revokedBy: "taro" })
+        .commit(),
+    );
   });
 
   it("チェック済みの項目はもう一度チェックできない", async () => {

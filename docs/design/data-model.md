@@ -30,6 +30,7 @@ households/{hid}/items/{itemId}              # リストの下ではなく家族
   visibility: "shared" | "private",          # プライベートのリストでは常に private
   status: "open" | "completed",
   createdBy, createdAt, completedAt: timestamp | null, completedBy: string | null
+  checkedAt: timestamp | null              # 端末でチェックした時刻。リスト詳細の購読に使う（completedAt はサーバーに届くまで端末の中で値がないため）
 
 households/{hid}/products/{productId}        # productId = 正規化名から決まる決定的ID
   displayName, normalizedName, searchKey,
@@ -74,13 +75,13 @@ households/{hid}/purchases/{purchaseId}      # purchaseId = itemId
 | メンバー | `households/{hid}/members` | listener（数件） |
 | リスト | `lists where visibility == "shared"` と `lists where visibility == "private" and createdBy == 自分`（全件。表示するかどうかはクライアントで判定） | listener 2本（数十件） |
 | 未購入項目 | `items where status == "open" and visibility == "shared"` と、同じ条件で `visibility == "private" and createdBy == 自分` | listener 2本 |
-| リスト詳細の項目 | `items where listId == X and visibility == "shared" and (status == "open" or completedAt >= now-24h)` と、プライベートの同じ条件（OR クエリ。並び順は sortKey でクライアント側） | 画面を表示している間だけ listener 2本 |
+| リスト詳細の項目 | `items where listId == X and visibility == "shared" and status == "open"` と `items where listId == X and visibility == "shared" and status == "completed" and checkedAt >= now-24h`、プライベートの同じ2本（範囲の条件はフィールドのないドキュメントを除くので、OR クエリにしない。並び順は sortKey でクライアント側） | 画面を表示している間だけ listener 4本 |
 | 商品 | `households/{hid}/products`（全件） | listener |
 | 購入履歴 | `purchases where visibility == "shared" and purchasedAt >= now-365d` と `purchases where visibility == "private" and purchasedBy == 自分 and purchasedAt >= now-365d` | listener 2本。`active` の絞り込みはクライアント側 |
 
 共有とプライベートを2本に分けるのは、ルールで読めない可能性のあるドキュメントを含むクエリが拒否されるためです。Firestore の OR クエリ（`visibility == "shared" or createdBy == 自分`）がルールで許可されることを実装時に確認できれば、1本にまとめます。
 
-複合インデックスは、上のクエリ（`visibility` と `createdBy` / `purchasedBy`、リスト詳細の `listId` と `status` / `completedAt` の OR）に必要なものだけを作ります。具体的な定義は、フェーズ2でクエリを実装するときに `firestore.indexes.json` で確定させます。
+複合インデックスは、上のクエリ（`visibility` と `createdBy` / `purchasedBy`、リスト詳細の `listId`・`status`・`checkedAt`）に必要なものだけを作ります。定義は `firebase/firestore.indexes.json` にあります。等号の条件のフィールドはアルファベット順に並べ、範囲の条件のフィールドを最後に置きます（Firestore が求める並びと合わせるため）。
 
 ### 購入履歴の取得範囲（365日）
 
