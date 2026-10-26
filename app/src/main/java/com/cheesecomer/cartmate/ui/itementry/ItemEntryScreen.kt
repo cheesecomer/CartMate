@@ -92,9 +92,11 @@ fun ItemEntryScreen(
     viewModel: ItemEntryViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val memberCount by viewModel.memberCount.collectAsStateWithLifecycle()
     LaunchedEffect(viewModel) { viewModel.results.collect(onClose) }
     ItemEntryContent(
         state = state,
+        memberCount = memberCount,
         onClose = { onClose(ItemEntryResult.CANCELLED) },
         onNameChange = viewModel::onNameChange,
         onQuantityChange = viewModel::onQuantityChange,
@@ -120,6 +122,8 @@ fun ItemEntryContent(
     onMemoChange: (String) -> Unit,
     onVisibilityChange: (Visibility) -> Unit,
     onConfirm: () -> Unit,
+    /** 家族の人数。「追加先: スーパー（共有リスト 3人）」に表示する（読めるまでは 0） */
+    memberCount: Int = 0,
 ) {
     val entry = state.entry
     val editing = entry?.editing != null
@@ -170,7 +174,7 @@ fun ItemEntryContent(
                 .padding(horizontal = CartMateSpacing.large, vertical = CartMateSpacing.medium),
             verticalArrangement = Arrangement.spacedBy(CartMateSpacing.medium),
         ) {
-            Destination(state.listName, state.listVisibility)
+            Destination(state.listName, state.listVisibility, memberCount)
             Section {
                 OutlinedTextField(
                     value = entry.name,
@@ -192,7 +196,7 @@ fun ItemEntryContent(
 }
 
 @Composable
-private fun Destination(listName: String, listVisibility: Visibility) {
+private fun Destination(listName: String, listVisibility: Visibility, memberCount: Int) {
     val colors = MaterialTheme.colorScheme
     Row(
         modifier = Modifier
@@ -206,9 +210,11 @@ private fun Destination(listName: String, listVisibility: Visibility) {
         Text(stringResource(R.string.entry_destination), style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
         Text(listName, style = MaterialTheme.typography.titleSmall)
         Text(
-            stringResource(
-                if (listVisibility == Visibility.SHARED) R.string.entry_destination_shared else R.string.entry_destination_private,
-            ),
+            when {
+                listVisibility == Visibility.PRIVATE -> stringResource(R.string.entry_destination_private)
+                memberCount > 0 -> stringResource(R.string.entry_destination_shared_members, memberCount)
+                else -> stringResource(R.string.entry_destination_shared)
+            },
             style = MaterialTheme.typography.bodySmall,
             color = colors.onSurfaceVariant,
         )

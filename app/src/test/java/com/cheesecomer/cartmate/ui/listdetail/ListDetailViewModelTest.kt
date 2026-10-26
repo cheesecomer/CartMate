@@ -10,6 +10,8 @@ import com.cheesecomer.cartmate.domain.model.ItemStatus
 import com.cheesecomer.cartmate.domain.model.ListId
 import com.cheesecomer.cartmate.domain.model.UserId
 import com.cheesecomer.cartmate.domain.model.Visibility
+import com.cheesecomer.cartmate.domain.repository.ShoppingListRepository
+import com.cheesecomer.cartmate.domain.repository.DeleteListResult
 import com.cheesecomer.cartmate.testing.MainDispatcherExtension
 import com.cheesecomer.cartmate.testing.MutableClock
 import com.cheesecomer.cartmate.testing.awaitUntil
@@ -25,6 +27,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
 import java.time.Duration
 import java.time.Instant
+import kotlinx.coroutines.flow.flowOf
 
 class ListDetailViewModelTest {
 
@@ -46,6 +49,7 @@ class ListDetailViewModelTest {
         itemRepository = store,
         lastVisibility = lastVisibility,
         clock = clock,
+        memberDirectory = { flowOf(emptyList()) },
     )
 
     @Test
@@ -244,6 +248,49 @@ class ListDetailViewModelTest {
             viewModel.move(egg, previous = null, next = milk)
 
             awaitUntil { state -> state.items.map { it.inputName } == listOf("卵", "牛乳") }
+        }
+    }
+
+    /** リストの削除だけを [delete] に差し替えた ViewModel */
+    private fun viewModelDeleting(delete: suspend (ListId) -> DeleteListResult) = ListDetailViewModel(
+        savedStateHandle = SavedStateHandle(mapOf("listId" to listId.value)),
+        listRepository = object : ShoppingListRepository by store {
+            override suspend fun deleteList(id: ListId): DeleteListResult = delete(id)
+        },
+        itemRepository = store,
+        lastVisibility = lastVisibility,
+        clock = clock,
+        memberDirectory = { flowOf(emptyList()) },
+    )
+
+    @Test
+    fun `リストの削除に失敗しても落ちずに失敗を知らせる`() = runTest {
+        // オフラインで「リストを削除」を押すと、サーバーへの問い合わせが例外で失敗する
+        val viewModel = viewModelDeleting { throw IllegalStateException("Failed to get document from server") }
+        turbineScope {
+            val states = viewModel.uiState.testIn(backgroundScope)
+            val messages = viewModel.messages.testIn(backgroundScope)
+            states.awaitUntil { !it.loading }
+
+            viewModel.deleteList()
+
+            assertThat(messages.awaitItem()).isEqualTo(DetailMessage.Failed)
+        }
+    }
+
+    @Test
+    fun `オフラインのときはリストを削除せず、理由を知らせる`() = runTest {
+        val viewModel = viewModelDeleting { DeleteListResult.Offline }
+        turbineScope {
+            val states = viewModel.uiState.testIn(backgroundScope)
+            val messages = viewModel.messages.testIn(backgroundScope)
+            val navigation = viewModel.navigation.testIn(backgroundScope)
+            states.awaitUntil { !it.loading }
+
+            viewModel.deleteList()
+
+            assertThat(messages.awaitItem()).isEqualTo(DetailMessage.Offline)
+            navigation.expectNoEvents()
         }
     }
 }

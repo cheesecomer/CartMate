@@ -29,6 +29,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.time.Clock
+import kotlinx.coroutines.flow.flowOf
 
 /**
  * 商品追加欄をタップしたときの、ソフトキーボードとサジェストのシートの順番。
@@ -61,6 +62,7 @@ class AddItemSheetKeyboardTest {
             itemRepository = store,
             lastVisibility = LastVisibilityStore(),
             clock = clock,
+            memberDirectory = { flowOf(emptyList()) },
         )
         composeRule.setContent {
             val bottom = WindowInsets.ime.getBottom(LocalDensity.current)

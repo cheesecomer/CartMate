@@ -50,6 +50,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import java.time.Clock
 import java.time.Instant
+import kotlinx.coroutines.flow.flowOf
 
 /** リスト詳細と商品詳細入力画面の行き来。アプリと同じ Navigation の配線で確かめる */
 @RunWith(AndroidJUnit4::class)
@@ -77,7 +78,7 @@ class ItemEntryFlowTest {
                 NavHost(navController, startDestination = ListDetailRoute(listId.value)) {
                     composable<ListDetailRoute> { backStackEntry ->
                         val viewModel = viewModel {
-                            ListDetailViewModel(createSavedStateHandle(), store, store, lastVisibility, clock)
+                            ListDetailViewModel(createSavedStateHandle(), store, store, lastVisibility, clock, { flowOf(emptyList()) })
                         }
                         ListDetailScreen(
                             onBack = {},
@@ -91,7 +92,7 @@ class ItemEntryFlowTest {
                     }
                     composable<ItemEntryRoute> { backStackEntry ->
                         val viewModel = viewModel {
-                            ItemEntryViewModel(createSavedStateHandle(), store, store, lastVisibility, clock)
+                            ItemEntryViewModel(createSavedStateHandle(), store, store, lastVisibility, clock, { flowOf(emptyList()) })
                         }
                         ItemEntryScreen(onClose = { navController.closeEntry(backStackEntry, it) }, viewModel = viewModel)
                     }

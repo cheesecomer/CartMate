@@ -138,7 +138,14 @@ class FirestoreShoppingStore @Inject constructor(
     }
 
     /** オンラインのときだけ行える（docs/requirements.md §3.3）。未購入は自分に見える項目でサーバーに問い合わせて数える */
-    override suspend fun deleteList(id: ListId): DeleteListResult {
+    override suspend fun deleteList(id: ListId): DeleteListResult = try {
+        deleteListOnServer(id)
+    } catch (e: FirebaseFirestoreException) {
+        // オフラインではサーバーに問い合わせられない
+        if (e.code == FirebaseFirestoreException.Code.UNAVAILABLE) DeleteListResult.Offline else throw e
+    }
+
+    private suspend fun deleteListOnServer(id: ListId): DeleteListResult {
         val scope = session.requireScope()
         val ref = Paths.lists(db, scope.householdId).document(id.value)
         val list = ref.get(Source.SERVER).await().toShoppingList()

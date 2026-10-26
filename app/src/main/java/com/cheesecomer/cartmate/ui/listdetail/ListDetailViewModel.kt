@@ -39,6 +39,8 @@ import kotlinx.coroutines.launch
 import java.time.Clock
 import java.time.Duration
 import javax.inject.Inject
+import com.cheesecomer.cartmate.domain.model.Member
+import com.cheesecomer.cartmate.domain.repository.MemberDirectory
 
 data class ListDetailUiState(
     val listName: String = "",
@@ -48,6 +50,8 @@ data class ListDetailUiState(
     val items: List<Item> = emptyList(),
     val addItem: AddItemState = AddItemState.Initial,
     val loading: Boolean = true,
+    /** 家族のメンバー。共有のリストでは上部バーにアバターを表示する */
+    val members: List<Member> = emptyList(),
 ) {
     val openCount: Int get() = items.count { it.status == ItemStatus.OPEN }
     val completedCount: Int get() = items.count { it.status == ItemStatus.COMPLETED }
@@ -68,6 +72,8 @@ sealed interface DetailMessage {
     data object EditedItemNotFound : DetailMessage
     /** のこりの商品があるため、リストを削除できない */
     data object CannotDeleteList : DetailMessage
+    /** オフラインのため、この操作はできない */
+    data object Offline : DetailMessage
     data object Failed : DetailMessage
 }
 
@@ -86,6 +92,7 @@ class ListDetailViewModel @Inject constructor(
     private val itemRepository: ItemRepository,
     private val lastVisibility: LastVisibilityStore,
     private val clock: Clock,
+    memberDirectory: MemberDirectory,
 ) : ViewModel() {
 
     private val listId = ListId(checkNotNull(savedStateHandle.get<String>(ListDetailRoute::listId.name)))
@@ -109,7 +116,8 @@ class ListDetailViewModel @Inject constructor(
             addItem = addItem,
             loading = false,
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), ListDetailUiState())
+    }.combine(memberDirectory.observeMembers()) { state, members -> state.copy(members = members) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), ListDetailUiState())
 
     fun onAddItemEvent(event: AddItemEvent) {
         val transition = AddItemReducer.reduce(addItemState.value, event)
@@ -192,9 +200,12 @@ class ListDetailViewModel @Inject constructor(
 
     fun deleteList() {
         viewModelScope.launch {
-            when (listRepository.deleteList(listId)) {
+            when (runCatching { listRepository.deleteList(listId) }.getOrNull()) {
                 DeleteListResult.Deleted, DeleteListResult.NotFound -> _navigation.send(DetailNavigation.ListDeleted)
                 DeleteListResult.NotEmpty -> _messages.send(DetailMessage.CannotDeleteList)
+                DeleteListResult.Offline -> _messages.send(DetailMessage.Offline)
+                // 通信の問題など
+                null -> _messages.send(DetailMessage.Failed)
             }
         }
     }

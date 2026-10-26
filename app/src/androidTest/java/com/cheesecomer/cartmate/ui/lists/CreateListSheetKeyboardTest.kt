@@ -56,7 +56,7 @@ class CreateListSheetKeyboardTest {
             composeRule.activity.enableEdgeToEdge()
             composeRule.activity.window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
         }
-        val viewModel = ListsViewModel(store, store, store, Clock.systemUTC(), FixedAccountRepository(null), { flowOf(true) })
+        val viewModel = ListsViewModel(store, store, store, Clock.systemUTC(), FixedAccountRepository(null), { flowOf(true) }, { flowOf(emptyList()) })
         composeRule.setContent {
             val bottom = WindowInsets.ime.getBottom(LocalDensity.current)
             SideEffect { imeBottom = bottom }

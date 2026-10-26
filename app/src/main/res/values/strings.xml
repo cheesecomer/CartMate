@@ -73,6 +73,7 @@
     <string name="entry_title_edit">商品の編集</string>
     <string name="entry_destination">追加先:</string>
     <string name="entry_destination_shared">（共有リスト）</string>
+    <string name="entry_destination_shared_members">（共有リスト %1$d人）</string>
     <string name="entry_destination_private">（プライベートリスト）</string>
     <string name="entry_name_label">商品名</string>
     <string name="entry_quantity">数量</string>

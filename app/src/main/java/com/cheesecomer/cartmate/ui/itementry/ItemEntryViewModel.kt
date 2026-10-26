@@ -28,6 +28,10 @@ import kotlinx.serialization.Serializable
 import java.time.Clock
 import java.time.Duration
 import javax.inject.Inject
+import com.cheesecomer.cartmate.domain.repository.MemberDirectory
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 
 /**
  * 商品詳細入力画面。[itemId] があれば編集、なければ [name]・[quantity]・[unit] を初期値にした新規。
@@ -56,7 +60,13 @@ class ItemEntryViewModel @Inject constructor(
     private val itemRepository: ItemRepository,
     private val lastVisibility: LastVisibilityStore,
     private val clock: Clock,
+    memberDirectory: MemberDirectory,
 ) : ViewModel() {
+
+    /** 「追加先: スーパー（共有リスト 3人）」の人数 */
+    val memberCount: StateFlow<Int> = memberDirectory.observeMembers().map { it.size }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), 0)
+
 
     private val listId = ListId(checkNotNull(savedStateHandle.get<String>(ItemEntryRoute::listId.name)))
     private val itemId = savedStateHandle.get<String>(ItemEntryRoute::itemId.name)?.let(::ItemId)
@@ -143,6 +153,7 @@ class ItemEntryViewModel @Inject constructor(
     }
 
     private companion object {
+        const val STOP_TIMEOUT_MILLIS = 5_000L
         val COMPLETED_WINDOW: Duration = Duration.ofHours(24)
     }
 }

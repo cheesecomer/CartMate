@@ -46,6 +46,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import java.time.Clock
 import java.time.Instant
+import kotlinx.coroutines.flow.flowOf
 
 @RunWith(AndroidJUnit4::class)
 class ListDetailScreenTest {
@@ -68,6 +69,7 @@ class ListDetailScreenTest {
             itemRepository = store,
             lastVisibility = LastVisibilityStore(),
             clock = clock,
+            memberDirectory = { flowOf(emptyList()) },
         )
         // アプリと同じく、キーボードの高さを画面側で受け取る（シートはキーボードが出てから表示する）
         composeRule.runOnUiThread {

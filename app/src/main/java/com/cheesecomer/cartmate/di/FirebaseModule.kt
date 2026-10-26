@@ -5,6 +5,7 @@ import com.cheesecomer.cartmate.data.connectivity.ConnectivityObserver
 import com.cheesecomer.cartmate.data.firestore.FirestoreHouseholdRepository
 import com.cheesecomer.cartmate.domain.repository.AccountRepository
 import com.cheesecomer.cartmate.domain.repository.HouseholdRepository
+import com.cheesecomer.cartmate.domain.repository.MemberDirectory
 import com.cheesecomer.cartmate.domain.repository.OnlineStatus
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -26,6 +27,9 @@ abstract class FirebaseModule {
 
     @Binds
     abstract fun bindHouseholdRepository(repository: FirestoreHouseholdRepository): HouseholdRepository
+
+    @Binds
+    abstract fun bindMemberDirectory(repository: FirestoreHouseholdRepository): MemberDirectory
 
     companion object {
         @Provides

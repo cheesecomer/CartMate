@@ -55,6 +55,7 @@ import com.cheesecomer.cartmate.domain.model.Account
 import com.cheesecomer.cartmate.domain.model.UserId
 import com.cheesecomer.cartmate.ui.components.Avatar
 import com.cheesecomer.cartmate.ui.components.AvatarSmall
+import com.cheesecomer.cartmate.domain.model.Member
 
 @Composable
 fun ListsScreen(
@@ -129,6 +130,7 @@ fun ListsContent(
                 } else {
                     ListGrid(
                         lists = state.lists,
+                        members = state.members,
                         onOpenList = onOpenList,
                         onMoveList = onMoveList,
                         contentPadding = contentPadding,
@@ -152,6 +154,7 @@ fun ListsContent(
 @Composable
 private fun ListGrid(
     lists: List<ListSummary>,
+    members: List<Member>,
     onOpenList: (ListId) -> Unit,
     onMoveList: (ListId, previous: ListId?, next: ListId?) -> Unit,
     contentPadding: PaddingValues,
@@ -188,6 +191,7 @@ private fun ListGrid(
             ReorderableItem(reorderState, key = list.id.value) { dragging ->
                 ListCard(
                     list = list,
+                    members = members,
                     onClick = { onOpenList(list.id) },
                     dragging = dragging,
                     modifier = Modifier.longPressDraggableHandle(

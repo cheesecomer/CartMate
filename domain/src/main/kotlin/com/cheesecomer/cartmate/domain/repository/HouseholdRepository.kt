@@ -9,12 +9,12 @@ import com.cheesecomer.cartmate.domain.model.UserId
 import kotlinx.coroutines.flow.Flow
 
 /** 家族の作成・参加・離脱と招待（docs/requirements.md §3.5、docs/design/security.md） */
-interface HouseholdRepository {
+interface HouseholdRepository : MemberDirectory {
     /** 自分の所属。ログインしていなければ流さない */
     fun observeMembership(): Flow<Membership>
 
     /** 今の家族のメンバー。家族に参加していなければ空 */
-    fun observeMembers(): Flow<List<Member>>
+    override fun observeMembers(): Flow<List<Member>>
 
     /** 今の家族の招待（期限切れ・使用済みも含む。表示するかどうかは呼び出し側で判定する） */
     fun observeInvites(): Flow<List<Invite>>

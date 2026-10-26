@@ -18,6 +18,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
 import java.time.Instant
+import kotlinx.coroutines.flow.flowOf
 
 class ItemEntryViewModelTest {
 
@@ -44,6 +45,7 @@ class ItemEntryViewModelTest {
         itemRepository = store,
         lastVisibility = lastVisibility,
         clock = clock,
+        memberDirectory = { flowOf(emptyList()) },
     )
 
     private suspend fun listItems(listId: ListId = this.listId) = store.observeListItems(listId, Instant.EPOCH).first()
