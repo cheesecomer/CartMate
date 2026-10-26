@@ -8,6 +8,7 @@ import com.cheesecomer.cartmate.domain.input.AddItemEvent
 import com.cheesecomer.cartmate.domain.input.AddItemState
 import com.cheesecomer.cartmate.domain.model.ItemStatus
 import com.cheesecomer.cartmate.domain.model.ListId
+import com.cheesecomer.cartmate.domain.model.NewList
 import com.cheesecomer.cartmate.domain.model.UserId
 import com.cheesecomer.cartmate.domain.model.Visibility
 import com.cheesecomer.cartmate.domain.repository.ShoppingListRepository
@@ -248,6 +249,53 @@ class ListDetailViewModelTest {
             val items = awaitUntil { state -> state.items.any { it.inputName == "パン" } }.items
             assertThat(items.map { it.inputName }).containsExactly("牛乳", "卵", "パン").inOrder()
             assertThat(items.first { it.inputName == "牛乳" }.status).isEqualTo(ItemStatus.COMPLETED)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `シートで自分のみに切り替えると、Enter で追加した項目がプライベートになる`() = runTest {
+        viewModel.uiState.test {
+            val initial = awaitUntil { !it.loading }
+            assertThat(initial.addVisibility).isEqualTo(Visibility.SHARED)
+            assertThat(initial.addVisibilitySelectable).isTrue()
+
+            viewModel.setAddVisibility(Visibility.PRIVATE)
+            assertThat(awaitUntil { it.addVisibility == Visibility.PRIVATE }.addVisibility).isEqualTo(Visibility.PRIVATE)
+
+            viewModel.onAddItemEvent(AddItemEvent.FieldFocused)
+            viewModel.onAddItemEvent(AddItemEvent.TextChanged("プレゼント"))
+            viewModel.onAddItemEvent(AddItemEvent.Submitted)
+
+            val added = awaitUntil { state -> state.items.any { it.inputName == "プレゼント" } }.items.single()
+            assertThat(added.visibility).isEqualTo(Visibility.PRIVATE)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `商品詳細入力画面で選んだ公開範囲が、シートの表示にも反映される`() = runTest {
+        viewModel.uiState.test {
+            awaitUntil { !it.loading }
+
+            lastVisibility.set(listId, Visibility.PRIVATE)
+
+            assertThat(awaitUntil { it.addVisibility == Visibility.PRIVATE }.addVisibility).isEqualTo(Visibility.PRIVATE)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `プライベートのリストでは公開範囲を選べず、常にプライベートで追加する`() = runTest {
+        val privateList = store.createList(NewList("自分用", memo = null, visibility = Visibility.PRIVATE))
+        val viewModel = viewModelFor(privateList)
+        viewModel.uiState.test {
+            val state = awaitUntil { !it.loading }
+            assertThat(state.addVisibility).isEqualTo(Visibility.PRIVATE)
+            assertThat(state.addVisibilitySelectable).isFalse()
+
+            viewModel.setAddVisibility(Visibility.SHARED)
+            assertThat(lastVisibility.get(privateList)).isNull()
             cancelAndIgnoreRemainingEvents()
         }
     }

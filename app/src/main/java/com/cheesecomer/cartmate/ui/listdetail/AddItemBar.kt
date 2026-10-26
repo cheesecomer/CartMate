@@ -48,6 +48,9 @@ import com.cheesecomer.cartmate.domain.input.AddItemState
 import com.cheesecomer.cartmate.domain.model.Item
 import com.cheesecomer.cartmate.ui.components.KeyboardSheet
 import com.cheesecomer.cartmate.ui.theme.CartMateSpacing
+import androidx.compose.material3.FilterChip
+import androidx.compose.foundation.layout.Arrangement
+import com.cheesecomer.cartmate.domain.model.Visibility
 
 object AddItemTags {
     const val FIELD = "add_item_field"
@@ -98,7 +101,13 @@ fun AddItemField(text: String, onClick: () -> Unit, modifier: Modifier = Modifie
  * 候補（時期が近い商品・補完）はフェーズ4で追加する
  */
 @Composable
-fun AddItemSheet(state: AddItemState.Open, onEvent: (AddItemEvent) -> Unit) {
+fun AddItemSheet(
+    state: AddItemState.Open,
+    onEvent: (AddItemEvent) -> Unit,
+    /** 追加するときの公開範囲。null なら表示しない（プライベートのリスト） */
+    visibility: Visibility? = null,
+    onVisibilityChange: (Visibility) -> Unit = {},
+) {
     val focusRequester = remember { FocusRequester() }
     // カーソル位置を保つため TextFieldValue で持ち、外から変わったとき（Enter で空にした など）だけ置き換える
     var value by remember { mutableStateOf(TextFieldValue(state.text, TextRange(state.text.length))) }
@@ -113,6 +122,8 @@ fun AddItemSheet(state: AddItemState.Open, onEvent: (AddItemEvent) -> Unit) {
             },
             onEvent = onEvent,
             focusRequester = focusRequester,
+            visibility = visibility,
+            onVisibilityChange = onVisibilityChange,
         )
     }
 }
@@ -125,6 +136,8 @@ internal fun AddItemSheetContent(
     onEvent: (AddItemEvent) -> Unit,
     /** 入力欄にフォーカスを移すためのもの（プレビューでは渡さない） */
     focusRequester: FocusRequester = remember { FocusRequester() },
+    visibility: Visibility? = null,
+    onVisibilityChange: (Visibility) -> Unit = {},
 ) {
     val colors = MaterialTheme.colorScheme
     Column(Modifier.fillMaxWidth().padding(bottom = CartMateSpacing.large)) {
@@ -159,6 +172,7 @@ internal fun AddItemSheetContent(
                 .focusRequester(focusRequester)
                 .testTag(AddItemTags.SHEET_INPUT),
         )
+        if (visibility != null) VisibilityChips(visibility, onVisibilityChange)
         Spacer(Modifier.size(CartMateSpacing.medium))
         if (value.text.isNotBlank()) {
             DetailRow(onClick = { onEvent(AddItemEvent.DetailRequested) })
@@ -170,6 +184,36 @@ internal fun AddItemSheetContent(
                 modifier = Modifier.padding(horizontal = CartMateSpacing.xLarge, vertical = CartMateSpacing.large),
             )
         }
+    }
+}
+
+/**
+ * Enter と「＋」で追加するときの公開範囲（docs/requirements.md §3.4）。直前の公開範囲を引き継ぐので、
+ * 時間がたっても今どちらで追加されるか分かるように表示し、ここでも切り替えられるようにする
+ */
+@Composable
+private fun VisibilityChips(visibility: Visibility, onChange: (Visibility) -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(CartMateSpacing.small),
+        modifier = Modifier.padding(start = CartMateSpacing.xLarge, end = CartMateSpacing.large, top = CartMateSpacing.small),
+    ) {
+        Text(
+            stringResource(R.string.entry_visibility),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        FilterChip(
+            selected = visibility == Visibility.SHARED,
+            onClick = { onChange(Visibility.SHARED) },
+            label = { Text(stringResource(R.string.entry_visibility_shared)) },
+        )
+        FilterChip(
+            selected = visibility == Visibility.PRIVATE,
+            onClick = { onChange(Visibility.PRIVATE) },
+            label = { Text(stringResource(R.string.entry_visibility_private)) },
+            leadingIcon = { Icon(painterResource(R.drawable.ic_lock), contentDescription = null, modifier = Modifier.size(16.dp)) },
+        )
     }
 }
 

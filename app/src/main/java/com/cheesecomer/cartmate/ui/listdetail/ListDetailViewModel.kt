@@ -53,7 +53,11 @@ data class ListDetailUiState(
     val loading: Boolean = true,
     /** 家族のメンバー。共有のリストでは上部バーにアバターを表示する */
     val members: List<Member> = emptyList(),
+    /** Enter と「＋」で追加するときの公開範囲。サジェストのシートに表示し、共有のリストでは切り替えられる（§3.4） */
+    val addVisibility: Visibility = Visibility.SHARED,
 ) {
+    val addVisibilitySelectable: Boolean get() = VisibilityDefaults.selectable(listVisibility)
+
     val openCount: Int get() = items.count { it.status == ItemStatus.OPEN }
     val completedCount: Int get() = items.count { it.status == ItemStatus.COMPLETED }
 }
@@ -117,7 +121,15 @@ class ListDetailViewModel @Inject constructor(
             loading = false,
         )
     }.combine(memberDirectory.observeMembers()) { state, members -> state.copy(members = members) }
+        .combine(lastVisibility.observe(listId)) { state, remembered ->
+            state.copy(addVisibility = VisibilityDefaults.initial(state.listVisibility, remembered))
+        }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), ListDetailUiState())
+
+    /** サジェストのシートで公開範囲を切り替える。そのリストの次の追加の初期値になる（docs/requirements.md §3.4） */
+    fun setAddVisibility(visibility: Visibility) {
+        if (uiState.value.addVisibilitySelectable) lastVisibility.set(listId, visibility)
+    }
 
     fun onAddItemEvent(event: AddItemEvent) {
         val transition = AddItemReducer.reduce(addItemState.value, event)

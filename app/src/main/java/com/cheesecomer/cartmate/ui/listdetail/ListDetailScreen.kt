@@ -151,6 +151,7 @@ fun ListDetailScreen(
         snackbarHostState = snackbarHostState,
         onBack = onBack,
         onAddItemEvent = viewModel::onAddItemEvent,
+        onAddVisibilityChange = viewModel::setAddVisibility,
         onCheck = viewModel::check,
         onUncheck = viewModel::uncheck,
         onEdit = { onEditItem(it.id) },
@@ -169,6 +170,7 @@ fun ListDetailContent(
     snackbarHostState: SnackbarHostState,
     onBack: () -> Unit,
     onAddItemEvent: (AddItemEvent) -> Unit,
+    onAddVisibilityChange: (Visibility) -> Unit,
     onCheck: (Item) -> Unit,
     onUncheck: (Item) -> Unit,
     onEdit: (Item) -> Unit,
@@ -236,7 +238,15 @@ fun ListDetailContent(
             )
         }
 
-        (state.addItem as? AddItemState.Open)?.let { AddItemSheet(it, onAddItemEvent) }
+        (state.addItem as? AddItemState.Open)?.let {
+            AddItemSheet(
+                state = it,
+                onEvent = onAddItemEvent,
+                // 今どちらの公開範囲で追加されるかを示す。プライベートのリストでは出さない
+                visibility = state.addVisibility.takeIf { state.addVisibilitySelectable },
+                onVisibilityChange = onAddVisibilityChange,
+            )
+        }
     }
 
     if (showEditDialog) {
@@ -511,6 +521,7 @@ private fun ListDetailContentPreviewBackground(addItemText: String = "") {
         snackbarHostState = remember { SnackbarHostState() },
         onBack = {},
         onAddItemEvent = {},
+        onAddVisibilityChange = {},
         onCheck = {},
         onUncheck = {},
         onEdit = {},
