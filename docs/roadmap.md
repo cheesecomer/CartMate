@@ -43,16 +43,17 @@ MVP は5つのフェーズに分けて実装します。各フェーズの終わ
 - 家族の作成、招待（リンクとコードの発行、共有シートでの送信、リンクからの参加、コード入力での参加、取り消し）、家族画面（メンバー一覧）、オーナーによるメンバー削除、家族からの離脱とオーナーの引き継ぎ、ほかの家族への合流（リスト・項目・商品を写す）、アカウントの削除。
 - App Links と Firebase Hosting（`cartmate.cheesecomer.com` の DNS 設定を含む。招待リンクとアカウント削除の案内ページ）。App Check（Play Integrity）。
 - Firestore Repository（lists, items, products の最小構成。公開範囲で分けた購読）、Snapshot Listener、オンライン判定とオフラインバナー。
+- `NameNormalizer` の機械的な正規化と決定的な productId（Firestore の項目に productId が必要なため、フェーズ3から前倒し）。
+- チェック・Undo のトランザクションと購入の記録（項目を Firestore に替えてもチェックできるよう、フェーズ3から前倒し。保留チェックはフェーズ3）。
 - メンバーのアバター（リスト一覧・リスト詳細）と、商品詳細入力画面の共有人数。
 - `firestore.rules` と `firestore.indexes.json`、rules-test（家族・招待・離脱と引き継ぎ・合流・アカウントの削除・リスト・項目作成・公開範囲の部分）。
 - **完了条件**: 2つのアカウントが同じ家族に参加し、追加した内容が相互に反映される。プライベートなリストと項目は、もう一方に表示されない。離脱・メンバーの削除・アカウントの削除のあと、それぞれの端末が要件どおりの画面になる。自分しかいない家族からほかの家族に合流すると、リストと項目が合流先に移る。rules-test が通る。
 
 ## フェーズ3: 購入履歴と商品
 
-- チェック・Undo のトランザクションと、対応するルール。
 - 合流で購入の記録も写す（ルールと rules-test を含む）。
 - 保留チェック（DataStore, PendingCheckSyncer, WorkManager）と、サーバーの状態に保留を重ねた表示。
-- `NameNormalizer`、決定的な productId、ProductGraph、表記ゆれのチップ（商品詳細入力画面）、商品の統合画面。
+- ProductGraph、表記ゆれのチップ（商品詳細入力画面）、商品の統合画面（`NameNormalizer` と決定的な productId はフェーズ2で作成済み）。
 - リスト削除の表示ルール。
 - 他のメンバーによるチェックの通知と、チェック済みの項目へのチェックした人・時刻の表示。
 - rules-test（チェック・Undo・購入履歴・product）、同時実行テスト（[testing.md](testing.md#同時実行) の 1〜4, 7〜10）。
