@@ -2,7 +2,7 @@
 
 ## 見た目の基準
 
-すべての画面がこの基準に従います。値は [design-tokens.md](../design-tokens.md)、画面ごとの仕様は [implementation-spec.md](../implementation-spec.md)、決定の経緯は [ui-design-decisions.md](../ui-design-decisions.md) にあります。見た目は [screens/](screens/) のモックを参考にします。資料どうしで値が食い違う場合は、implementation-spec.md → design-tokens.md → ui-design-decisions.md → モック → [DESIGN.md](DESIGN.md) の順に優先します。
+すべての画面がこの基準に従います。値は [design-tokens.md](../design-tokens.md)、画面ごとの仕様は [implementation-spec.md](../implementation-spec.md)、決定の経緯は [ui-design-decisions.md](../ui-design-decisions.md) にあります。見た目は [screens/](screens/) のモックを参考にします。資料どうしで値が食い違う場合は、implementation-spec.md（家族とアカウントの画面は family-screens-spec.md） → design-tokens.md → ui-design-decisions.md → モック → [DESIGN.md](DESIGN.md) の順に優先します。
 
 ### 配色
 - ブランドカラーはライラックパープル（`#6B4E8C`）です。完了・チェック・進捗・FAB を含め、緑は使いません（ライラックとの補色で浮いて見えるため）。
@@ -189,7 +189,7 @@ Navigation の独立した画面（`ui/itementry`）です。新規の追加と�
 
 ## 家族とアカウント
 
-振る舞いは [要件](../requirements.md) §3.5 のとおりです。見た目は Stitch で作るモック（フェーズ2の実装の前）に合わせます。
+振る舞いは [要件](../requirements.md) §3.5 のとおりです。見た目は [family-screens-spec.md](../family-screens-spec.md) と、[screens/](screens/) の `login`、`family-*`、`join-*` のモックに合わせます。
 
 ### 最初に表示する画面
 

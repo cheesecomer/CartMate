@@ -66,6 +66,8 @@ Material Design 3 の Dynamic Color / Lilac Purple パレットを基準とし�
 
 ## 2. 最終採用画面一覧（全6画面構成）
 
+> ログイン・家族・招待・合流の画面（フェーズ2）は [family-screens-spec.md](family-screens-spec.md) にあります。`list-overview` のモックは、上部バーの右端に自分のアバターを加えたものに差し替えました。
+
 | # | 画面識別名（Screen ID） | 対応ファイル名 | プレビュー / プレースホルダー | 役割・表示状態 |
 | :--- | :--- | :--- | :--- | :--- |
 | 1 | **`list-overview`** | `list-overview.html` | `SCREEN_79` | 買い物リスト一覧（通常・登録あり・2カラムグリッド） |

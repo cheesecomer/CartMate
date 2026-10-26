@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+
+<html class="h-full" lang="ja"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><meta content="mobile_blank" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Epilogue:wght@600;700&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{width:100vw;min-height:100vh;margin:0;padding:0;}body{overscroll-behavior-y:none;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { colors: { "on-error": "#ffffff", "on-secondary-fixed-variant": "#563a74", "on-surface": "#1f1925", "surface-container": "#f6eafb", "primary": "#523673", "surface-container-lowest": "#ffffff", "secondary": "#6e528d", "surface-container-low": "#fbf0ff", "primary-container": "#6b4e8c", "primary-fixed": "#efdbff", "on-tertiary": "#ffffff", "surface-container-high": "#f0e4f5", "tertiary-fixed": "#c3ebda", "tertiary-container": "#3e6255", "error": "#ba1a1a", "on-surface-variant": "#4a454f", "error-container": "#ffdad6", "on-tertiary-fixed-variant": "#294e41", "surface-variant": "#eadfef", "inverse-primary": "#dbb8ff", "surface-bright": "#fff7ff", "on-primary-fixed-variant": "#563976", "on-primary": "#ffffff", "secondary-container": "#dbb9fd", "tertiary-fixed-dim": "#a7cfbf", "on-background": "#1f1925", "inverse-on-surface": "#f9edfe", "surface-tint": "#6e518f", "on-primary-fixed": "#280a47", "surface": "#fff7ff", "primary-fixed-dim": "#dbb8ff", "inverse-surface": "#342e3a", "on-secondary-container": "#624681", "background": "#fff7ff", "on-primary-container": "#e4c9ff", "surface-container-highest": "#eadfef", "outline": "#7c7580", "surface-dim": "#e1d6e7", "on-error-container": "#93000a", "secondary-fixed-dim": "#dbb9fd", "on-tertiary-container": "#b4dccb", "on-secondary": "#ffffff", "outline-variant": "#ccc3d0", "on-secondary-fixed": "#280b45", "secondary-fixed": "#efdbff", "tertiary": "#264a3e", "on-tertiary-fixed": "#002117" }, fontFamily: { "body": ["Plus Jakarta Sans", "sans-serif"], "heading": ["Epilogue", "sans-serif"] } } } };</script></head><body class="bg-[#FFF7FF] font-body text-[#1D1B20] antialiased min-h-screen flex flex-col pt-safe pb-safe"><main class="flex-1 flex flex-col relative w-full bg-[#FFF7FF] px-4 py-4"><div class="flex flex-col w-full pb-10">
+<!-- 上部アカウントバー -->
+<div class="w-full flex items-center justify-between py-1 mb-4">
+<div class="flex items-center gap-3 min-w-0">
+<div class="w-[32px] h-[32px] rounded-full bg-[#F2E7FE] text-[#260E43] flex items-center justify-center font-bold text-[14px] shrink-0 select-none">
+        山
+      </div>
+<div class="flex flex-col min-w-0">
+<span class="text-[14px] leading-tight font-bold text-[#1D1B20] truncate">山田 太郎</span>
+<span class="text-[12px] leading-tight text-[#49454F] truncate mt-0.5">taro.yamada@gmail.com</span>
+</div>
+</div>
+<button class="min-h-[48px] px-2 flex items-center justify-center text-[14px] font-medium text-[#B3261E] shrink-0 active:opacity-70 transition-opacity" type="button">
+      ログアウト
+    </button>
+</div>
+<!-- 除外通知バナー（アカウントバー直下） -->
+<div class="w-full mb-[20px] rounded-[12px] p-[16px] bg-[#FBF0FF] border border-[#CAC4CF] flex items-start gap-3" role="status">
+<span class="material-symbols-outlined text-[#6B4E8C] text-[20px] select-none mt-0.5 shrink-0">info</span>
+<div class="flex-1">
+<p class="text-[14px] leading-5 font-bold text-[#1D1B20]">家族から外されました</p>
+<p class="text-[12px] leading-relaxed text-[#49454F] mt-1">新しく家族と共有するか、招待コードで参加してください</p>
+</div>
+</div>
+<!-- 見出しエリア -->
+<div class="flex flex-col mb-6 text-left">
+<h1 class="text-[22px] leading-tight font-semibold text-[#1D1B20]">家族の買い物リストを始めましょう</h1>
+</div>
+<!-- 選択肢カード（2枚、白背景 #FFFFFF、枠線 1dp #CAC4CF、角丸 16dp、パディング 16dp、影なし） -->
+<div class="flex flex-col gap-[16px] w-full">
+<!-- カード1 -->
+<button class="w-full text-left bg-[#FFFFFF] rounded-[16px] p-[16px] border border-[#CAC4CF] active:bg-[#FDF9FF] transition-colors min-h-[48px] flex items-center justify-between group" id="btn-create-family" type="button">
+<div class="flex-1 pr-3">
+<div class="text-[18px] leading-6 font-bold text-[#1D1B20]">家族と共有する</div>
+<p class="text-[14px] leading-relaxed text-[#49454F] mt-1">自分がオーナーになり、あとで家族を招待する</p>
+</div>
+<span class="material-symbols-outlined text-[20px] text-[#49454F] group-active:translate-x-0.5 transition-transform shrink-0">chevron_right</span>
+</button>
+<!-- カード2 -->
+<button class="w-full text-left bg-[#FFFFFF] rounded-[16px] p-[16px] border border-[#CAC4CF] active:bg-[#FDF9FF] transition-colors min-h-[48px] flex items-center justify-between group" id="btn-join-family" type="button">
+<div class="flex-1 pr-3">
+<div class="text-[18px] leading-6 font-bold text-[#1D1B20]">招待コードで参加する</div>
+<p class="text-[14px] leading-relaxed text-[#49454F] mt-1">家族から届いたコードを入力する</p>
+</div>
+<span class="material-symbols-outlined text-[20px] text-[#49454F] group-active:translate-x-0.5 transition-transform shrink-0">chevron_right</span>
+</button>
+</div>
+<!-- 招待モーダル -->
+<div class="fixed inset-0 bg-[#1D1B20]/40 backdrop-blur-sm z-50 flex flex-col justify-end transition-opacity opacity-0 pointer-events-none duration-200" id="join-modal">
+<div class="w-full bg-[#FFFFFF] rounded-t-[24px] p-6 flex flex-col max-h-[85vh] overflow-y-auto border-t border-[#CAC4CF]">
+<div class="w-12 h-1 rounded-full bg-[#CAC4CF] mx-auto mb-4"></div>
+<div class="flex items-center justify-between mb-2">
+<h3 class="text-[18px] font-bold text-[#1D1B20]">招待コードを入力</h3>
+<button class="w-10 h-10 rounded-full flex items-center justify-center text-[#49454F] active:bg-[#FBF0FF]" id="close-modal" type="button">
+<span class="material-symbols-outlined text-[20px]">close</span>
+</button>
+</div>
+<p class="text-[14px] text-[#49454F] mb-6">家族から共有された招待コードを入力してください。</p>
+<div class="w-full mb-6">
+<label class="block text-[12px] font-medium text-[#49454F] mb-1.5" for="invite-input">招待コード</label>
+<div class="relative">
+<input class="w-full h-12 px-4 rounded-[12px] bg-[#FBF0FF] border border-[#CAC4CF] text-[#1D1B20] text-[16px] font-semibold tracking-wider placeholder:text-[#7C7580] focus:outline-none focus:border-[#523673] focus:bg-[#FFFFFF] text-center uppercase" id="invite-input" maxlength="8" placeholder="例: CM-7821" type="text"/>
+</div>
+</div>
+<button class="w-full h-12 rounded-full bg-[#523673] text-[#FFFFFF] text-[14px] font-semibold active:opacity-90 transition-opacity flex items-center justify-center gap-2" type="button">
+<span>連携してリストを開く</span>
+<span class="material-symbols-outlined text-[18px]">check</span>
+</button>
+</div>
+</div>
+</div>
+<script>
+  (() => {
+    const joinBtn = document.getElementById('btn-join-family');
+    const modal = document.getElementById('join-modal');
+    const closeBtn = document.getElementById('close-modal');
+    const inviteInput = document.getElementById('invite-input');
+
+    const openSheet = () => {
+      modal.classList.remove('opacity-0', 'pointer-events-none');
+      modal.classList.add('opacity-100', 'pointer-events-auto');
+      setTimeout(() => inviteInput?.focus(), 150);
+    };
+
+    const closeSheet = () => {
+      modal.classList.remove('opacity-100', 'pointer-events-auto');
+      modal.classList.add('opacity-0', 'pointer-events-none');
+    };
+
+    joinBtn?.addEventListener('click', openSheet);
+    closeBtn?.addEventListener('click', closeSheet);
+    modal?.addEventListener('click', (e) => {
+      if (e.target === modal) closeSheet();
+    });
+  })();
+</script></main></body></html>

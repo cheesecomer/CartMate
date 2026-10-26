@@ -10,6 +10,7 @@
 | [design/ui.md](design/ui.md) | 見た目の基準、画面構成、入力の状態遷移、通知、スワイプ |
 | [design-tokens.md](design-tokens.md) | 配色・文字・余白・角丸の値（Compose への対応付け） |
 | [implementation-spec.md](implementation-spec.md) | 画面ごとのデザイン仕様（承認済みの最終版） |
+| [family-screens-spec.md](family-screens-spec.md) | ログイン・家族・招待・合流の画面のデザイン仕様（フェーズ2） |
 | [ui-design-decisions.md](ui-design-decisions.md) | デザインの決定事項と、変更の経緯 |
 | [design/screens/](design/screens/) | 画面のモック（HTML と画像）。見た目の参考 |
 | [design/DESIGN.md](design/DESIGN.md) | デザインシステムの元の定義（生成ツールの出力。値は design-tokens.md を優先） |
