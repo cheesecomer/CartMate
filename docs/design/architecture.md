@@ -18,6 +18,7 @@
 | 非同期 | Coroutines / Flow | Snapshot Listener を `callbackFlow` で包む |
 | 画面遷移 | Navigation Compose（型安全ルート） | |
 | 認証 | Firebase Auth + Credential Manager（`GetGoogleIdOption`） | 旧 GoogleSignIn API は非推奨 |
+| 画像の読み込み | Coil | メンバーのアバターに Google アカウントの写真を表示する |
 | DB | Cloud Firestore（永続キャッシュ有効） | 要件で確定。Room は使わない（ローカルキャッシュは Firestore に任せる） |
 | 保留チェック | DataStore（保存）+ WorkManager（接続時に確定） | オフライン中のチェックを、アプリを終了しても失わずに確定させる（[sync.md](sync.md#保留チェック)） |
 | 時刻 | `java.time` + `Clock` を注入 | 予測ロジックのテストを決定的にする |
@@ -26,6 +27,16 @@
 | ビルド | Gradle Kotlin DSL + Version Catalog | |
 
 自前のサーバーは持ちません。
+
+## Firebase の設定
+
+| 項目 | 値 |
+|---|---|
+| プロジェクトID | `cartmate-cheesecomer` |
+| Firestore のロケーション | `asia-northeast1`（東京） |
+| 認証のプロバイダ | Google |
+
+`app/google-services.json` はリポジトリに含めません。各自 Firebase コンソールか `firebase apps:sdkconfig ANDROID <App ID> --out app/google-services.json` で取得して置きます。ビルドにはこのファイルが必要です（google-services プラグイン）。Google ログインには、このファイルに含まれる Web クライアントID を使うため、Google ログインを有効にしたあとで取得したものを使います。デバッグ用の鍵で動かすには、その SHA-1 と SHA-256 を Firebase に登録します。
 
 ## モジュール構成
 
@@ -37,10 +48,11 @@
 │     ├─ data/auth/
 │     ├─ data/connectivity/  # オンライン判定
 │     ├─ data/pending/       # 保留チェック（DataStore, Syncer, Worker）
-│     └─ ui/{signin,onboarding,lists,listdetail,itementry,settings,theme}/
+│     └─ ui/{signin,onboarding,family,lists,listdetail,itementry,theme}/
 ├─ domain/                   # 純Kotlin（JVM）モジュール。Android/Firebase に依存しない
 │  ├─ model/                 # ShoppingList, Item, Product, Purchase, Member …
 │  ├─ repository/            # Repository インターフェース
+│  ├─ family/                # 招待コード、参加・合流の判定、オーナーの引き継ぎ、最初に表示する画面
 │  ├─ text/                  # NameNormalizer
 │  ├─ product/               # ProductGraph（統合の解決）
 │  ├─ prediction/            # CycleEstimator, EarlyPurchaseDetector

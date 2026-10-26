@@ -26,6 +26,25 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v6
 
+      # google-services プラグインがビルドに必要とする。CI では Firebase に接続しないので、パッケージ名だけ合わせたダミーを置く
+      - name: ダミーの google-services.json
+        run: |
+          cat > app/google-services.json <<'EOF'
+          {
+            "project_info": { "project_number": "0", "project_id": "ci-dummy", "storage_bucket": "ci-dummy.appspot.com" },
+            "client": [{
+              "client_info": {
+                "mobilesdk_app_id": "1:0:android:0000000000000000",
+                "android_client_info": { "package_name": "com.cheesecomer.cartmate" }
+              },
+              "oauth_client": [{ "client_id": "ci-dummy.apps.googleusercontent.com", "client_type": 3 }],
+              "api_key": [{ "current_key": "ci-dummy" }],
+              "services": { "appinvite_service": { "other_platform_oauth_client": [] } }
+            }],
+            "configuration_version": "1"
+          }
+          EOF
+
       # Compose UI テスト（androidTest）はエミュレータが必要なため、MVP ではローカルで実行する
       - name: 単体テストと lint
         run: ./gradlew :domain:test :app:testDebugUnitTest :app:lintDebug --console=plain
