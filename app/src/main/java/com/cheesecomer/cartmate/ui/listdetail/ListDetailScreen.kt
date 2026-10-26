@@ -1,5 +1,6 @@
 package com.cheesecomer.cartmate.ui.listdetail
 
+import android.content.res.Resources
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -112,8 +113,10 @@ fun ListDetailScreen(
                     is DetailMessage.Deleted ->
                         resources.getString(R.string.detail_deleted_message, message.item.inputName) to
                             { viewModel.undoDelete(message.item) }
-                    is DetailMessage.AlreadyCompleted ->
-                        resources.getString(R.string.detail_already_completed, message.item.inputName) to null
+                    is DetailMessage.AlreadyCompleted -> resources.alreadyCompletedText(message) to null
+                    is DetailMessage.OthersChecked -> resources.othersCheckedText(message) to null
+                    is DetailMessage.CheckNotApplied ->
+                        resources.getString(R.string.detail_check_not_applied, message.itemName) to null
                     DetailMessage.AlreadyOpen -> resources.getString(R.string.detail_already_open) to null
                     is DetailMessage.CannotDeleteCompleted ->
                         resources.getString(R.string.detail_cannot_delete_completed, message.item.inputName) to null
@@ -344,7 +347,13 @@ private fun ItemList(
                         drag = drag,
                     )
                     ItemStatus.COMPLETED ->
-                        CompletedItemCard(item = item, showLock = showLock, onUncheck = { onUncheck(item) }, drag = drag)
+                        CompletedItemCard(
+                            item = item,
+                            checkerName = state.checkerName(item) ?: stringResource(R.string.former_member),
+                            showLock = showLock,
+                            onUncheck = { onUncheck(item) },
+                            drag = drag,
+                        )
                 }
             }
         }
@@ -522,5 +531,21 @@ private fun AddItemSheetTypingPreview() {
         SheetPreviewFrame(background = { ListDetailContentPreviewBackground("たまご") }) {
             AddItemSheetContent(value = TextFieldValue("たまご"), onValueChange = {}, onEvent = {})
         }
+    }
+}
+
+/** 「牛乳は 花子さんが 10:02 にチェック済みです」 */
+private fun Resources.alreadyCompletedText(message: DetailMessage.AlreadyCompleted): String = when (message.checkerName) {
+    null -> getString(R.string.detail_already_completed_by_former, message.itemName, message.at.formatTime())
+    else -> getString(R.string.detail_already_completed, message.itemName, message.checkerName, message.at.formatTime())
+}
+
+/** 「花子さんが牛乳ほか2件をチェックしました」 */
+private fun Resources.othersCheckedText(message: DetailMessage.OthersChecked): String {
+    val checker = message.checkerName ?: getString(R.string.former_member)
+    return if (message.othersCount == 0) {
+        getString(R.string.detail_others_checked, checker, message.firstItemName)
+    } else {
+        getString(R.string.detail_others_checked_many, checker, message.firstItemName, message.othersCount)
     }
 }

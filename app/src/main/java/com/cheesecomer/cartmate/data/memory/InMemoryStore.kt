@@ -34,6 +34,8 @@ import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 import com.cheesecomer.cartmate.domain.list.ShoppingRound
+import com.cheesecomer.cartmate.domain.repository.RejectedCheck
+import kotlinx.coroutines.flow.emptyFlow
 
 /**
  * テスト用のインメモリ実装。プロセスが終了するとデータは消える。
@@ -268,6 +270,9 @@ class InMemoryStore @Inject constructor(
             d.copy(items = d.items + (id to reopened), purchases = purchases) to ReopenResult.Reopened
         }
     }
+
+    /** インメモリでは書き込みが拒否されることはない */
+    override fun observeRejectedChecks(): Flow<RejectedCheck> = emptyFlow()
 
     // PurchaseRepository
 

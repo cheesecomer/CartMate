@@ -54,7 +54,12 @@
     <string name="detail_uncheck_item">%1$sのチェックを外す</string>
     <string name="detail_checked_message">%1$s をチェックしました</string>
     <string name="detail_deleted_message">%1$s を削除しました</string>
-    <string name="detail_already_completed">%1$s はすでにチェック済みです</string>
+    <string name="detail_already_completed">%1$sは %2$sさんが %3$s にチェック済みです</string>
+    <string name="detail_already_completed_by_former">%1$sは 退会したメンバーが %2$s にチェック済みです</string>
+    <string name="detail_others_checked">%1$sさんが%2$sをチェックしました</string>
+    <string name="detail_others_checked_many">%1$sさんが%2$sほか%3$d件をチェックしました</string>
+    <string name="detail_check_not_applied">%1$sのチェックを反映できませんでした</string>
+    <string name="former_member">退会したメンバー</string>
     <string name="detail_already_open">すでにチェックが外されています</string>
     <string name="detail_cannot_delete_completed">%1$s はチェック済みのため削除できません</string>
     <string name="detail_cannot_edit_completed">編集していた商品はチェック済みのため変更できません</string>

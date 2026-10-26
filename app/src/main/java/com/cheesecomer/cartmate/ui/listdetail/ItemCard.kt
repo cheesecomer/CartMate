@@ -120,11 +120,13 @@ fun OpenItemCard(
 
 /**
  * チェック済みの項目のカード。背景を薄い色にし、商品名を打ち消し線と薄い文字で示す。
- * タップか ← か「元に戻す」でチェックを外す。チェックした人の名前はフェーズ2で追加する
+ * タップか ← か「元に戻す」でチェックを外す。2行目に、チェックした人と時刻（「✓ 花子 10:02」）を表示する
  */
 @Composable
 fun CompletedItemCard(
     item: Item,
+    /** チェックした人の名前（家族にいない人は「退会したメンバー」） */
+    checkerName: String,
     showLock: Boolean,
     onUncheck: () -> Unit,
     modifier: Modifier = Modifier,
@@ -165,7 +167,7 @@ fun CompletedItemCard(
                             modifier = Modifier.size(18.dp),
                         )
                         Text(
-                            completedAt.formatTime(),
+                            "$checkerName ${completedAt.formatTime()}",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(start = CartMateSpacing.small),
@@ -336,7 +338,7 @@ private fun deleteSwipeColors(): SwipeColors =
 private fun uncheckSwipeColors(): SwipeColors =
     SwipeColors(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.onPrimary)
 
-private fun Instant.formatTime(): String = CompletedTimeFormatter.format(atZone(ZoneId.systemDefault()))
+internal fun Instant.formatTime(): String = CompletedTimeFormatter.format(atZone(ZoneId.systemDefault()))
 
 /** 例: 2本、1.5kg、3（単位なし）、null（数量なし） */
 private fun Item.quantityText(): String? {

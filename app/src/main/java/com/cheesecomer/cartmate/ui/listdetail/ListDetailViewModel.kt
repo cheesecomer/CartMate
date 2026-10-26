@@ -41,6 +41,16 @@ import java.time.Duration
 import javax.inject.Inject
 import com.cheesecomer.cartmate.domain.list.ShoppingRound
 import com.cheesecomer.cartmate.domain.list.ListDisplay
+import com.cheesecomer.cartmate.domain.notice.MemberNames
+import com.cheesecomer.cartmate.domain.notice.OtherChecks
+import com.cheesecomer.cartmate.domain.repository.CurrentUserProvider
+import com.cheesecomer.cartmate.domain.repository.MemberDirectory
+import com.cheesecomer.cartmate.domain.repository.RejectedCheck
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import java.time.Instant
+import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.flow.merge
 
 data class ListDetailUiState(
     val listName: String = "",
@@ -52,7 +62,12 @@ data class ListDetailUiState(
     val loading: Boolean = true,
     /** Enter と「＋」で追加するときの公開範囲。サジェストのシートに表示し、共有のリストでは切り替えられる（§3.4） */
     val addVisibility: Visibility = Visibility.SHARED,
+    /** 家族のメンバーの名前。チェック済みの項目に、チェックした人を表示する */
+    val memberNames: MemberNames = MemberNames(emptyList()),
 ) {
+    /** [item] をチェックした人の名前。家族にいない人（退会したメンバー）は null */
+    fun checkerName(item: Item): String? = item.completedBy?.let(memberNames::of)
+
     val addVisibilitySelectable: Boolean get() = VisibilityDefaults.selectable(listVisibility)
 
     val openCount: Int get() = items.count { it.status == ItemStatus.OPEN }
@@ -65,7 +80,12 @@ sealed interface DetailMessage {
     data class Checked(val item: Item) : DetailMessage
     /** 削除した。元に戻せる */
     data class Deleted(val item: Item) : DetailMessage
-    data class AlreadyCompleted(val item: Item) : DetailMessage
+    /** すでにチェック済みだった。「牛乳は 花子さんが 10:02 にチェック済みです」。[checkerName] が null なら退会したメンバー */
+    data class AlreadyCompleted(val itemName: String, val checkerName: String?, val at: Instant) : DetailMessage
+    /** 開いている間に、ほかのメンバーがチェックした。「花子さんが牛乳ほか2件をチェックしました」 */
+    data class OthersChecked(val checkerName: String?, val firstItemName: String, val othersCount: Int) : DetailMessage
+    /** 送ったチェックを反映できなかった（オフラインのまま7日を過ぎた など） */
+    data class CheckNotApplied(val itemName: String) : DetailMessage
     data object AlreadyOpen : DetailMessage
     data class CannotDeleteCompleted(val item: Item) : DetailMessage
     /** 編集中に、ほかの操作でチェックされていた */
@@ -92,13 +112,18 @@ class ListDetailViewModel @Inject constructor(
     private val itemRepository: ItemRepository,
     private val lastVisibility: LastVisibilityStore,
     private val clock: Clock,
+    private val currentUser: CurrentUserProvider,
+    private val memberDirectory: MemberDirectory,
 ) : ViewModel() {
+
+    private val members: Flow<MemberNames> = memberDirectory.observeMembers().map(::MemberNames)
 
     private val listId = ListId(checkNotNull(savedStateHandle.get<String>(ListDetailRoute::listId.name)))
 
     private val addItemState = MutableStateFlow(AddItemState.Initial)
     private val _messages = Channel<DetailMessage>(Channel.BUFFERED)
-    val messages: Flow<DetailMessage> = _messages.receiveAsFlow()
+    /** 画面の操作の結果と、ほかのメンバーのチェック・拒否されたチェックの通知。受け取り始めたときに通知の購読を始める */
+    val messages: Flow<DetailMessage> = merge(_messages.receiveAsFlow(), notices())
     private val _navigation = Channel<DetailNavigation>(Channel.BUFFERED)
     val navigation: Flow<DetailNavigation> = _navigation.receiveAsFlow()
 
@@ -118,10 +143,47 @@ class ListDetailViewModel @Inject constructor(
             addItem = addItem,
             loading = false,
         )
-    }.combine(lastVisibility.observe(listId)) { state, remembered ->
+    }.combine(members) { state, names -> state.copy(memberNames = names) }
+        .combine(lastVisibility.observe(listId)) { state, remembered ->
             state.copy(addVisibility = VisibilityDefaults.initial(state.listVisibility, remembered))
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), ListDetailUiState())
+
+    /**
+     * 開いている間に、ほかのメンバーがチェックしたら、約3秒分をチェックした人ごとに1件にまとめて知らせる
+     * （docs/design/ui.md「他のメンバーによるチェックの通知」）。送ったチェックが拒否された場合も知らせる
+     */
+    private fun notices(): Flow<DetailMessage> = channelFlow {
+        var names = MemberNames(emptyList())
+        launch { members.collect { names = it } }
+        launch {
+            itemRepository.observeRejectedChecks().collect { rejected ->
+                send(
+                    when (rejected) {
+                        is RejectedCheck.AlreadyCompleted -> DetailMessage.AlreadyCompleted(rejected.itemName, names.of(rejected.by), rejected.at)
+                        is RejectedCheck.NotApplied -> DetailMessage.CheckNotApplied(rejected.itemName)
+                    },
+                )
+            }
+        }
+        val me = currentUser.currentUserId()
+        val pending = mutableListOf<Item>()
+        var flush: Job? = null
+        var previous: List<Item>? = null
+        itemRepository.observeListItems(listId, completedSince = clock.instant().minus(COMPLETED_WINDOW)).collect { items ->
+            val checked = OtherChecks.newlyChecked(previous, items, me)
+            previous = items
+            if (checked.isEmpty()) return@collect
+            pending += checked
+            if (flush?.isActive == true) return@collect
+            flush = launch {
+                delay(OTHERS_CHECKED_WINDOW_MILLIS)
+                val summaries = OtherChecks.summarize(pending.toList())
+                pending.clear()
+                summaries.forEach { send(DetailMessage.OthersChecked(names.of(it.checker), it.firstItemName, it.othersCount)) }
+            }
+        }
+    }
 
     /** サジェストのシートで公開範囲を切り替える。そのリストの次の追加の初期値になる（docs/requirements.md §3.4） */
     fun setAddVisibility(visibility: Visibility) {
@@ -156,9 +218,12 @@ class ListDetailViewModel @Inject constructor(
 
     fun check(item: Item) {
         viewModelScope.launch {
-            when (itemRepository.completeItem(item.id, checkedAt = clock.instant())) {
+            when (val result = itemRepository.completeItem(item.id, checkedAt = clock.instant())) {
                 CompleteResult.Completed -> _messages.send(DetailMessage.Checked(item))
-                is CompleteResult.AlreadyCompleted -> _messages.send(DetailMessage.AlreadyCompleted(item))
+                is CompleteResult.AlreadyCompleted -> {
+                    val names = MemberNames(memberDirectory.observeMembers().first())
+                    _messages.send(DetailMessage.AlreadyCompleted(item.inputName, names.of(result.by), result.at))
+                }
                 is CompleteResult.Retry, is CompleteResult.Rejected -> _messages.send(DetailMessage.Failed)
             }
         }
@@ -219,6 +284,7 @@ class ListDetailViewModel @Inject constructor(
     }
 
     private companion object {
+        const val OTHERS_CHECKED_WINDOW_MILLIS = 3_000L
         val COMPLETED_WINDOW: Duration = Duration.ofHours(24)
         const val STOP_TIMEOUT_MILLIS = 5_000L
     }

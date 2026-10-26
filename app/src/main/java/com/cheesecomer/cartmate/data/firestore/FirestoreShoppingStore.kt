@@ -43,6 +43,12 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import com.cheesecomer.cartmate.domain.list.ShoppingRound
 import java.time.Clock
+import com.cheesecomer.cartmate.domain.repository.RejectedCheck
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 /**
  * リスト・項目・購入の記録の Firestore 実装（docs/design/data-model.md、docs/design/sync.md）。
@@ -328,7 +334,10 @@ class FirestoreShoppingStore @Inject constructor(
                 F.REVOKED_AT to null,
                 F.REVOKED_BY to null,
             ))
-            .commit().logFailure("completeItem")
+            .commit().addOnFailureListener { error ->
+                Log.w(TAG, "completeItem failed", error)
+                if (error.isPermissionDenied) notifyRejectedCheck(itemRef, item.inputName, scope.uid)
+            }
         return CompleteResult.Completed
     }
 
@@ -346,6 +355,30 @@ class FirestoreShoppingStore @Inject constructor(
             )
             .commit().logFailure("reopenItem")
         return ReopenResult.Reopened
+    }
+
+    private val rejectedChecks = MutableSharedFlow<RejectedCheck>(extraBufferCapacity = 16)
+    private val background = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    override fun observeRejectedChecks(): Flow<RejectedCheck> = rejectedChecks
+
+    /**
+     * 拒否されたチェックを知らせる。サーバーの項目を読み、ほかの人がチェックしていれば、誰がいつチェックしたかを付ける。
+     * 端末のキャッシュは、サーバーの状態に戻るまで少しかかるので、サーバーから読む
+     */
+    private fun notifyRejectedCheck(itemRef: DocumentReference, itemName: String, me: String) {
+        background.launch {
+            val server = runCatching { itemRef.get(Source.SERVER).await().toItem() }.getOrNull()
+            val by = server?.completedBy
+            val at = server?.completedAt
+            rejectedChecks.emit(
+                if (server?.status == ItemStatus.COMPLETED && by != null && at != null && by.value != me) {
+                    RejectedCheck.AlreadyCompleted(itemName, by, at)
+                } else {
+                    RejectedCheck.NotApplied(itemName)
+                },
+            )
+        }
     }
 
     /** 端末のキャッシュにあるドキュメント。なければ null */

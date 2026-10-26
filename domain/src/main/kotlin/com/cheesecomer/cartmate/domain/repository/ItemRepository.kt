@@ -37,6 +37,22 @@ interface ItemRepository {
 
     /** チェックの取り消しと購入の無効化を1つの操作として行う */
     suspend fun reopenItem(id: ItemId): ReopenResult
+
+    /**
+     * 書き込みキューに積んだチェックが、送られたときに拒否された（docs/design/sync.md「チェック」）。
+     * アプリを開いている間に起きたものだけを流す
+     */
+    fun observeRejectedChecks(): Flow<RejectedCheck>
+}
+
+sealed interface RejectedCheck {
+    val itemName: String
+
+    /** ほかの端末が先にチェックしていた */
+    data class AlreadyCompleted(override val itemName: String, val by: UserId, val at: Instant) : RejectedCheck
+
+    /** それ以外（オフラインのまま7日を過ぎた、家族から外された など） */
+    data class NotApplied(override val itemName: String) : RejectedCheck
 }
 
 sealed interface CompleteResult {

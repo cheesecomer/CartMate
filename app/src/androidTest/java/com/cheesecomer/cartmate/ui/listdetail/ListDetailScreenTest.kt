@@ -69,6 +69,8 @@ class ListDetailScreenTest {
             itemRepository = store,
             lastVisibility = LastVisibilityStore(),
             clock = clock,
+            currentUser = { UserId("taro") },
+            memberDirectory = { flowOf(emptyList()) },
         )
         // アプリと同じく、キーボードの高さを画面側で受け取る（シートはキーボードが出てから表示する）
         composeRule.runOnUiThread {

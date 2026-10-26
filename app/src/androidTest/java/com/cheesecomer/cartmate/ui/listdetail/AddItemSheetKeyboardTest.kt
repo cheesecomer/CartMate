@@ -62,6 +62,8 @@ class AddItemSheetKeyboardTest {
             itemRepository = store,
             lastVisibility = LastVisibilityStore(),
             clock = clock,
+            currentUser = { UserId("taro") },
+            memberDirectory = { flowOf(emptyList()) },
         )
         composeRule.setContent {
             val bottom = WindowInsets.ime.getBottom(LocalDensity.current)

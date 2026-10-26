@@ -29,6 +29,15 @@ import org.junit.jupiter.api.extension.RegisterExtension
 import java.time.Duration
 import java.time.Instant
 import kotlinx.coroutines.flow.flowOf
+import com.cheesecomer.cartmate.domain.model.Member
+import com.cheesecomer.cartmate.domain.model.MemberRole
+import com.cheesecomer.cartmate.domain.repository.ItemRepository
+import com.cheesecomer.cartmate.domain.repository.RejectedCheck
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 
 class ListDetailViewModelTest {
 
@@ -37,7 +46,16 @@ class ListDetailViewModelTest {
     val mainDispatcher = MainDispatcherExtension()
 
     private val clock = MutableClock()
-    private val store = InMemoryStore(clock) { UserId("taro") }
+    /** store を操作している人。ほかのメンバーの操作を再現するときに切り替える */
+    private var actor = UserId("taro")
+    private val store = InMemoryStore(clock) { actor }
+    private val rejectedChecks = MutableSharedFlow<RejectedCheck>(extraBufferCapacity = 8)
+    private val members = MutableStateFlow(
+        listOf(
+            Member(UserId("taro"), MemberRole.OWNER, "山田 太郎", null, Instant.EPOCH),
+            Member(UserId("hanako"), MemberRole.MEMBER, "山田 花子", null, Instant.EPOCH),
+        ),
+    )
     private val listId: ListId = runBlocking { store.createList("スーパー") }
     private val otherListId: ListId = runBlocking { store.createList("薬局") }
 
@@ -47,9 +65,13 @@ class ListDetailViewModelTest {
     private fun viewModelFor(listId: ListId) = ListDetailViewModel(
         savedStateHandle = SavedStateHandle(mapOf("listId" to listId.value)),
         listRepository = store,
-        itemRepository = store,
+        itemRepository = object : ItemRepository by store {
+            override fun observeRejectedChecks(): Flow<RejectedCheck> = rejectedChecks
+        },
         lastVisibility = lastVisibility,
         clock = clock,
+        currentUser = { UserId("taro") },
+        memberDirectory = { members },
     )
 
     @Test
@@ -161,7 +183,7 @@ class ListDetailViewModelTest {
 
         viewModel.messages.test {
             viewModel.check(item)
-            assertThat(awaitItem()).isEqualTo(DetailMessage.AlreadyCompleted(item))
+            assertThat(awaitItem()).isEqualTo(DetailMessage.AlreadyCompleted("牛乳", "山田 太郎", clock.now))
         }
     }
 
@@ -314,6 +336,88 @@ class ListDetailViewModelTest {
     }
 
     @Test
+    fun `開いている間にほかのメンバーがチェックしたら、約3秒分をまとめて知らせる`() = runTest {
+        val milk = store.addItem(newItem(listId, "牛乳"))
+        val egg = store.addItem(newItem(listId, "卵"))
+        turbineScope {
+            val states = viewModel.uiState.testIn(backgroundScope)
+            val messages = viewModel.messages.testIn(backgroundScope)
+            states.awaitUntil { it.items.size == 2 }
+
+            actor = UserId("hanako")
+            store.completeItem(milk, clock.now)
+            store.completeItem(egg, clock.now)
+            actor = UserId("taro")
+
+            assertThat(messages.awaitItem()).isEqualTo(DetailMessage.OthersChecked("山田 花子", "牛乳", othersCount = 1))
+            states.cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun `画面を開いた時点ですでにチェック済みの項目は知らせない`() = runTest {
+        val milk = store.addItem(newItem(listId, "牛乳"))
+        actor = UserId("hanako")
+        store.completeItem(milk, clock.now)
+        actor = UserId("taro")
+        turbineScope {
+            val states = viewModel.uiState.testIn(backgroundScope)
+            val messages = viewModel.messages.testIn(backgroundScope)
+            states.awaitUntil { it.items.isNotEmpty() }
+            advanceTimeBy(5_000)
+            messages.expectNoEvents()
+        }
+    }
+
+    @Test
+    fun `すでにチェック済みなら、誰がいつチェックしたかを知らせる`() = runTest {
+        val milk = store.addItem(newItem(listId, "牛乳"))
+        turbineScope {
+            val states = viewModel.uiState.testIn(backgroundScope)
+            val messages = viewModel.messages.testIn(backgroundScope)
+            val item = states.awaitUntil { it.items.isNotEmpty() }.items.single()
+
+            actor = UserId("hanako")
+            store.completeItem(milk, clock.now)
+            actor = UserId("taro")
+            viewModel.check(item)
+
+            val notices = listOf(messages.awaitItem(), messages.awaitItem())
+            assertThat(notices).contains(DetailMessage.AlreadyCompleted("牛乳", "山田 花子", clock.now))
+            states.cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `送ったチェックが拒否されたら知らせる。家族にいない人は名前なし`() = runTest {
+        turbineScope {
+            val states = viewModel.uiState.testIn(backgroundScope)
+            val messages = viewModel.messages.testIn(backgroundScope)
+            states.awaitUntil { !it.loading }
+
+            rejectedChecks.emit(RejectedCheck.AlreadyCompleted("牛乳", UserId("kenta"), clock.now))
+            assertThat(messages.awaitItem()).isEqualTo(DetailMessage.AlreadyCompleted("牛乳", checkerName = null, at = clock.now))
+
+            rejectedChecks.emit(RejectedCheck.NotApplied("卵"))
+            assertThat(messages.awaitItem()).isEqualTo(DetailMessage.CheckNotApplied("卵"))
+        }
+    }
+
+    @Test
+    fun `チェック済みの項目に、チェックした人の名前を出す`() = runTest {
+        val milk = store.addItem(newItem(listId, "牛乳"))
+        actor = UserId("hanako")
+        store.completeItem(milk, clock.now)
+        actor = UserId("taro")
+        viewModel.uiState.test {
+            val state = awaitUntil { it.items.isNotEmpty() }
+            assertThat(state.checkerName(state.items.single())).isEqualTo("山田 花子")
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
     fun `のこりの商品がないリストは削除でき、一覧に戻る`() = runTest {
         turbineScope {
             val states = viewModel.uiState.testIn(backgroundScope)
@@ -348,9 +452,13 @@ class ListDetailViewModelTest {
         listRepository = object : ShoppingListRepository by store {
             override suspend fun deleteList(id: ListId): DeleteListResult = delete(id)
         },
-        itemRepository = store,
+        itemRepository = object : ItemRepository by store {
+            override fun observeRejectedChecks(): Flow<RejectedCheck> = rejectedChecks
+        },
         lastVisibility = lastVisibility,
         clock = clock,
+        currentUser = { UserId("taro") },
+        memberDirectory = { members },
     )
 
     @Test
