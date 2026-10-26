@@ -39,7 +39,7 @@ households/{hid}/products/{productId}        # productId = 正規化名から決
 households/{hid}/purchases/{purchaseId}      # purchaseId = itemId
   itemId, listId, listNameSnapshot, productId, inputName, quantity, unit, memo,
   visibility,                                # 項目と同じ。private は purchasedBy（＝項目を作った本人）だけが読める
-  checkedAt,                                 # 端末でチェックした時刻（保留チェックの場合は確定より前）
+  checkedAt,                                 # 端末でチェックした時刻（オフラインでチェックした場合は送られた時刻より前）
   purchasedAt, purchasedBy, active: bool, revokedAt: timestamp | null, revokedBy: string | null
 ```
 

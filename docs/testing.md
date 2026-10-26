@@ -2,7 +2,7 @@
 
 | 層 | ツール | 主な対象 |
 |---|---|---|
-| domain の単体テスト | JUnit5 + Truth（JVM） | 正規化、ProductGraph、周期推定、類似度、サジェスト、異常検知、保留キュー |
+| domain の単体テスト | JUnit5 + Truth（JVM） | 正規化、ProductGraph、周期推定、類似度、サジェスト、異常検知 |
 | 入力状態の reducer | JUnit5（JVM） | [ui.md](design/ui.md#商品追加欄とサジェストのシート) の全遷移、商品詳細入力の検証と初期値 |
 | ViewModel | coroutines-test + Turbine + フェイク Repository | チェック・Undo の結果に応じた UI、オフライン時の挙動 |
 | Security Rules | Firebase Emulator + `@firebase/rules-unit-testing`（TypeScript / Vitest） | 下記「Security Rules」 |
@@ -23,7 +23,6 @@
 - 商品詳細入力: 新規の初期値（候補からなら前回の数量・単位、それ以外は 1・「個」）／数量が空・0以下・数値でないと確定できない／単位と備考は空でもよい。
 - 一覧カードの状態: のこりあり・登録なし・買い終わったの判定と進捗の割合。自分に見えない項目は数えない。
 - 備考の候補: 新しい順・重複なし・最大3件・空は除く。
-- 保留キュー（純粋関数として切り出す）: [sync.md](design/sync.md#保留チェック) の表の全パターン。サーバーの状態に保留を重ねた表示用の状態。
 
 ## Security Rules
 

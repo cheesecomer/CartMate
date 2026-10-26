@@ -6,7 +6,7 @@
 | [design/architecture.md](design/architecture.md) | 技術スタックとモジュール構成 |
 | [design/data-model.md](design/data-model.md) | Firestore のデータ構造と購読の範囲 |
 | [design/security.md](design/security.md) | Security Rules、招待（コード・リンク）、App Check |
-| [design/sync.md](design/sync.md) | チェック/Undo の冪等性、保留チェック、オフラインの扱い |
+| [design/sync.md](design/sync.md) | チェック/Undo の冪等性、オフラインの書き込み、オンライン必須の操作とその理由 |
 | [design/ui.md](design/ui.md) | 見た目の基準、画面構成、入力の状態遷移、通知、スワイプ |
 | [design-tokens.md](design-tokens.md) | 配色・文字・余白・角丸の値（Compose への対応付け） |
 | [implementation-spec.md](implementation-spec.md) | 画面ごとのデザイン仕様（承認済みの最終版） |

@@ -66,7 +66,7 @@ fun estimateCycle(purchaseDates: List<LocalDate>, params: SuggestionParams): Cyc
 fun elapsedRatio(estimate: CycleEstimate, today: LocalDate): Double
 ```
 
-1. 入力は、統合先が同じ product の `active` な購入のうち自分に見えるもの（共有と、自分のプライベート）の `checkedAt` を、端末のタイムゾーンで `LocalDate` に変換したものです。`purchasedAt` ではなく `checkedAt` を使うのは、保留チェックの確定が日をまたいでも、実際にチェックした日を購入日にするためです。家族全体・全リストの履歴を合算します（場所によって周期を分断しない）。
+1. 入力は、統合先が同じ product の `active` な購入のうち自分に見えるもの（共有と、自分のプライベート）の `checkedAt` を、端末のタイムゾーンで `LocalDate` に変換したものです。`purchasedAt` ではなく `checkedAt` を使うのは、オフラインでチェックして送られるのが日をまたいでも、実際にチェックした日を購入日にするためです。家族全体・全リストの履歴を合算します（場所によって周期を分断しない）。
 2. **同じ日に複数回買った場合は、1回の購入として数えます。** 家族2人が同じ日に買った、まとめ買いを分けて登録した、などで間隔0が生じて中央値が歪むのを防ぐためです。要件の「購入3回以上」は「購入した日が3日以上」と解釈します。
 3. 購入日が `minEvents` 未満なら `null` を返します。
 4. 隣り合う購入日の間隔（日数）を求め、直近 `maxIntervals` 個の中央値を推定周期とします（個数が偶数なら中央2値の平均）。

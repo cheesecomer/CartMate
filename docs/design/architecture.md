@@ -20,7 +20,7 @@
 | 認証 | Firebase Auth + Credential Manager（`GetGoogleIdOption`） | 旧 GoogleSignIn API は非推奨 |
 | 画像の読み込み | Coil | メンバーのアバターに Google アカウントの写真を表示する |
 | DB | Cloud Firestore（永続キャッシュ有効） | 要件で確定。Room は使わない（ローカルキャッシュは Firestore に任せる） |
-| 保留チェック | DataStore（保存）+ WorkManager（接続時に確定） | オフライン中のチェックを、アプリを終了しても失わずに確定させる（[sync.md](sync.md#保留チェック)） |
+| オフラインの書き込み | Firestore の書き込みキュー（永続キャッシュ） | チェックと Undo もバッチ書き込みにし、オフラインでもアプリを閉じても失わずに、接続時に送る（[sync.md](sync.md#オフラインの書き込み)） |
 | 時刻 | `java.time` + `Clock` を注入 | 予測ロジックのテストを決定的にする |
 | ホスティング | Firebase Hosting | 招待リンクの `assetlinks.json` とフォールバックページ |
 | minSdk / targetSdk | 26 / 実装時点の最新安定版 | |
@@ -47,7 +47,6 @@
 │     ├─ data/firestore/     # Repository 実装, DTO↔Model 変換, パス定義
 │     ├─ data/auth/
 │     ├─ data/connectivity/  # オンライン判定
-│     ├─ data/pending/       # 保留チェック（DataStore, Syncer, Worker）
 │     └─ ui/{signin,onboarding,family,lists,listdetail,itementry,theme}/
 ├─ domain/                   # 純Kotlin（JVM）モジュール。Android/Firebase に依存しない
 │  ├─ model/                 # ShoppingList, Item, Product, Purchase, Member …
