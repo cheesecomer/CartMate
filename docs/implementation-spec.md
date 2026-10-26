@@ -80,7 +80,7 @@ Material Design 3 の Dynamic Color / Lilac Purple パレットを基準とし�
 ## 3. 各画面の詳細仕様と Jetpack Compose 実装手引き
 
 ### 3.1 買い物リスト一覧（`list-overview.html` / `SCREEN_79`）
-- **Top App Bar**: アプリ名「CartMate」のみ（プロフィール・設定アイコン等の導線は設けない。戻るボタンも置かない）。
+- **Top App Bar**: 左にアプリ名「CartMate」、右端に自分の Google アカウントのアバター（32dp の円。48dp のタップ領域）。アバターのタップで家族画面を開く。ほかの設定アイコンや戻るボタンは置かない。
 - **並び替え**: 上部案内テキスト「長押しで並び替えができます」（アイコンなし、テキストのみ）。カード面の長押しドラッグ（`detectDragGesturesAfterLongPress`）で並び替え。カード側にドラッグハンドルアイコンは置かない。
 - **カード構成（2カラムグリッド）**:
   - リスト名（`TitleLarge`, 18sp Bold）

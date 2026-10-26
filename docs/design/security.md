@@ -8,7 +8,7 @@
 - サーバー時刻を強制する（`createdAt/completedAt/purchasedAt == request.time`）。購入日時の改ざんや、端末の時計のずれを防ぐ。端末時刻の `checkedAt` だけは、許容範囲（未来5分〜過去7日）を検証して受け付ける（[sync.md](sync.md#保留チェック)）。
 - フィールドを `keys().hasOnly(...)` で制限し、型と長さを検証する。
 - 編集: 未購入の項目の商品名・数量・単位・備考と、リストの名前・備考だけを変更できる。チェック済みの項目は、購入の記録と食い違わないよう変更できない。
-- 削除: 家族・購入履歴・商品は削除できない。リストは論理削除のみ。物理削除できるのは未購入の項目だけ（誤って追加したものの取り消し。[ui.md](ui.md#スワイプ操作)）。
+- 削除: 家族・購入履歴・商品は削除できない。リストは論理削除のみ。物理削除できるのは未購入の項目だけ（誤って追加したものの取り消し。[ui.md](ui.md#スワイプ操作)）。例外として、アカウントの削除では本人のプライベートなリスト・項目・購入の記録を物理削除できる。
 - 招待コードは `get`（IDを指定した読み取り）だけを許可し、一覧の取得は同じ家族のメンバーに限る。参加処理は、「members の作成」と「invite の usedCount +1」が同じバッチに含まれる場合だけ成立させる。
 
 ## ルール（ドラフト）
@@ -40,6 +40,7 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(['householdId', 'updatedAt'])
         && (request.resource.data.householdId == null
             || existsAfter(memberPath(request.resource.data.householdId, uid)));
+      allow delete: if signedIn() && me() == uid;   // アカウントの削除
     }
 
     match /invites/{code} {
@@ -47,8 +48,9 @@ service cloud.firestore {
       allow list: if isMember(resource.data.householdId);
       allow create: if isMember(request.resource.data.householdId)
         && code.size() >= 10
-        && request.resource.data.keys().hasOnly(['householdId','createdBy','createdAt','expiresAt','maxUses','usedCount'])
+        && request.resource.data.keys().hasOnly(['householdId','createdBy','inviterName','createdAt','expiresAt','maxUses','usedCount'])
         && request.resource.data.createdBy == me()
+        && str(request.resource.data.inviterName, 60)
         && request.resource.data.createdAt == request.time
         && request.resource.data.expiresAt <= request.time + duration.value(24, 'h')
         && request.resource.data.maxUses == 1
@@ -94,8 +96,13 @@ service cloud.firestore {
           && request.resource.data.keys().hasOnly(['role','displayName','photoUrl','joinedAt','joinedVia'])
           && request.resource.data.joinedAt == request.time
           && (isFounding() || isJoiningByInvite());
-        allow update: if false;
-        allow delete: if isOwner(hid) && uid != me();   // オーナーによるメンバー削除
+        // オーナーの引き継ぎ。オーナーが自分の members を消すのと同じバッチでだけ成立する
+        allow update: if isOwner(hid) && uid != me()
+          && changed().hasOnly(['role'])
+          && resource.data.role == 'member' && request.resource.data.role == 'owner'
+          && !existsAfter(memberPath(hid, me()));
+        allow delete: if (isOwner(hid) && uid != me())   // オーナーによるメンバー削除
+          || (isMember(hid) && uid == me());             // 離脱・アカウントの削除
       }
 
       match /lists/{listId} {
@@ -122,9 +129,10 @@ service cloud.firestore {
           // 並び替え
           || (changed().hasOnly(['sortKey']) && request.resource.data.sortKey is number)
         );
-        allow delete: if false;
+        allow delete: if isMember(hid) && isOwnPrivate(resource.data, resource.data.createdBy);   // アカウントの削除
       }
 
+      function isOwnPrivate(d, owner) { return d.visibility == 'private' && owner == me(); }
       function purchasePath(id) { return /databases/$(db)/documents/households/$(hid)/purchases/$(id); }
       function itemPath(id) { return /databases/$(db)/documents/households/$(hid)/items/$(id); }
       function listPath(id) { return /databases/$(db)/documents/households/$(hid)/lists/$(id); }
@@ -152,7 +160,8 @@ service cloud.firestore {
         allow update: if isMember(hid) && canSee(resource.data, resource.data.createdBy)
           && (isCompleting() || isReopening() || isEditing() || isReordering());
         allow delete: if isMember(hid) && canSee(resource.data, resource.data.createdBy)
-          && resource.data.status == 'open';   // 誤って追加した項目の削除
+          && (resource.data.status == 'open'                              // 誤って追加した項目の削除
+              || isOwnPrivate(resource.data, resource.data.createdBy));  // アカウントの削除
 
         // 共有のリストには共有・プライベートのどちらも、プライベートのリストには本人がプライベートだけを追加できる
         function canAddToList(list, visibility) {
@@ -199,7 +208,7 @@ service cloud.firestore {
         allow create: if isMember(hid) && isRecording();
         allow update: if isMember(hid) && canSee(resource.data, resource.data.purchasedBy)
           && ((resource.data.active == false && isRecording()) || isRevoking());
-        allow delete: if false;
+        allow delete: if isMember(hid) && isOwnPrivate(resource.data, resource.data.purchasedBy);   // アカウントの削除
 
         // 購入完了時（初回、またはUndo後の再完了）。スナップショット値は item と list に一致させる
         function isRecording() {
@@ -266,6 +275,8 @@ service cloud.firestore {
 
 1回の書き込みで評価される `get/exists` は、購入完了のトランザクションで最大4件程度です（上限は20件）。
 
+オーナーの引き継ぎで「参加がいちばん早いメンバー」を選ぶことは、ルールでは検証できません（コレクションを数えたり並べたりできないため）。ルールが保証するのは「オーナーが抜けるバッチでだけ、ほかのメンバーをオーナーにできる」ことまでで、相手の選び方はクライアントに任せます。オーナーが残りのメンバーを引き継がずに抜けることもルールでは防げませんが、その場合もメンバー削除ができなくなるだけで、データは守られます。
+
 プライベートな項目は、作った本人しか読めない（＝チェックできない）ため、その購入履歴の `purchasedBy` は必ず項目を作った本人になります。そのため、購入履歴の公開範囲の判定には `purchasedBy` を使えます。
 
 ## 招待
@@ -275,6 +286,7 @@ service cloud.firestore {
 - 10文字、Crockford Base32（読み間違えやすい文字を含まない）。表示するときは `7KQ2-M9XP-HA` のように区切る。
 - 有効期限は24時間、使えるのは1回だけ。1人につき1つ発行する。
 - 招待を発行できるのは家族のメンバー全員。発行したコードは、同じ家族のメンバーなら取り消せる。
+- 招待には発行した人の表示名（`inviterName`）を写す。参加前のユーザーは `members` を読めないため、参加の確認画面の「○○さんの家族」はここから表示する。
 
 ### 招待リンク（App Links）
 
@@ -283,7 +295,7 @@ service cloud.firestore {
 - **URL**: `https://cartmate.cheesecomer.com/join/{code}`
 - 招待を発行すると、リンクとコードの両方を含む文面を共有シートで送ります。
   - 例: 「CartMate の家族に招待されました。https://cartmate.cheesecomer.com/join/7KQ2M9XPHA （コード: 7KQ2-M9XP-HA、24時間有効）」
-- **アプリがインストール済みの場合**: App Links（`autoVerify`）でアプリが直接開きます。参加確認の画面（「○○さんの家族に参加しますか？」）を表示し、承認すると参加処理を実行します。未ログインなら、ログインしてからこの画面に戻ります。
+- **アプリがインストール済みの場合**: App Links（`autoVerify`）でアプリが直接開きます。参加確認の画面（「○○さんの家族に参加しますか？」）を表示し、承認すると参加処理を実行します。未ログインなら、ログインしてからこの画面に戻ります。すでに家族に参加している場合は、参加せずにその旨を表示します。
 - **アプリが未インストールの場合**: Firebase Hosting の静的なフォールバックページを表示します。ストアへの案内と、「アプリを入れたらこのコードを入力してください」というコードを表示します。Play Install Referrer でコードを引き継ぐ方法は使いません（ストアで公開する前は機能しないため）。
 - **リンクの安全性**: リンクを開いただけでは参加しません（必ず確認画面を挟む）。LINE などのリンクプレビューが URL を読み込んでも、コードは消費されません。コードの安全性（推測しにくさ、期限、使用回数）は、コードを直接入力する場合と同じです。
 
@@ -293,11 +305,21 @@ service cloud.firestore {
 |---|---|
 | `firebase/hosting/.well-known/assetlinks.json` | パッケージ名と署名証明書の SHA-256 フィンガープリント（デバッグ用、アップロード鍵、Play App Signing の鍵） |
 | `firebase/hosting/join/index.html` | フォールバックページ（`/join/**` をこのページに rewrite する） |
+| `firebase/hosting/account-deletion/index.html` | アカウント削除の案内ページ（Play Console のデータ削除の URL に登録する） |
 
 ## メンバー管理
 
 - オーナーは、自分以外のメンバーを家族から削除できます。招待コードが意図しない人に渡った場合の、最低限の対処です。
-- 本人による脱退と、オーナーの引き継ぎは MVP の対象外です。
+- メンバーは自分で家族から抜けられます。オーナーが抜けるときは、`joinedAt` がいちばん早いメンバーにオーナーを引き継ぎます（同じバッチ）。引き継ぐ相手を選んでの譲渡は MVP の対象外です。
+
+## アカウントの削除
+
+Google Play は、アカウントを作るアプリに、アプリ内とアプリ外（Web）の両方から削除できる手段を求めます。
+
+- アプリ内: 家族画面の「アカウントを削除」。Firebase Auth の削除には直近のログインが必要なため、先に Google で再ログインしてもらいます。
+- 削除の順番: ①本人のプライベートなリスト・項目・購入の記録を削除 → ②離脱（オーナーなら引き継ぎ） → ③`users/{uid}` を削除 → ④Firebase Auth のユーザーを削除。途中で失敗した場合は、もう一度実行すれば続きから削除できるようにします（どの手順も、すでに消えていれば何もしない）。
+- Cloud Functions は使わず、アプリから削除します（専用サーバーの運用は対象外。[要件](../requirements.md) §8）。
+- アプリ外: Hosting の案内ページに、アプリからの削除手順と、アプリを使えない場合の連絡先を載せます。
 
 ## App Check
 
