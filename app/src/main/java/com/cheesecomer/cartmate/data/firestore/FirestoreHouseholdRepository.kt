@@ -12,14 +12,11 @@ import com.cheesecomer.cartmate.domain.repository.HouseholdRepository
 import com.cheesecomer.cartmate.domain.repository.JoinResult
 import com.cheesecomer.cartmate.domain.repository.Membership
 import com.google.firebase.Timestamp
-import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emptyFlow
@@ -38,27 +35,18 @@ import javax.inject.Singleton
 @OptIn(ExperimentalCoroutinesApi::class)
 @Singleton
 class FirestoreHouseholdRepository @Inject constructor(
-    private val auth: FirebaseAuth,
+    private val session: FirestoreSession,
     private val db: FirebaseFirestore,
     private val clock: Clock,
 ) : HouseholdRepository {
 
     private val random = SecureRandom()
 
-    private val uid: Flow<String?> = callbackFlow {
-        val listener = FirebaseAuth.AuthStateListener { trySend(it.currentUser?.uid) }
-        auth.addAuthStateListener(listener)
-        awaitClose { auth.removeAuthStateListener(listener) }
-    }.distinctUntilChanged()
+    private val householdId: Flow<HouseholdId?> get() = session.householdId
 
-    private fun requireUid(): String = checkNotNull(auth.currentUser?.uid) { "ログインしていません" }
+    private fun requireUid(): String = session.requireUid()
 
-    private val householdId: Flow<HouseholdId?> = uid.flatMapLatest { uid ->
-        if (uid == null) flowOf(null)
-        else Paths.user(db, uid).snapshotFlow().map { it.getString(F.HOUSEHOLD_ID)?.let(::HouseholdId) }
-    }.distinctUntilChanged()
-
-    override fun observeMembership(): Flow<Membership> = uid.flatMapLatest { uid ->
+    override fun observeMembership(): Flow<Membership> = session.uid.flatMapLatest { uid ->
         if (uid == null) return@flatMapLatest emptyFlow()
         Paths.user(db, uid).snapshotFlow()
             .map { it.getString(F.HOUSEHOLD_ID)?.let(::HouseholdId) }

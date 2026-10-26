@@ -196,3 +196,121 @@ describe("項目の追加", () => {
     await assertSucceeds(deleteDoc(doc(as("hanako"), `households/${HID}/items/i1`)));
   });
 });
+
+/** アプリの FirestoreShoppingStore.completeItem と同じ書き込み */
+function complete(db: Firestore, uid: string, itemId: string, purchase: Record<string, unknown> = {}) {
+  return writeBatch(db)
+    .update(doc(db, `households/${HID}/items/${itemId}`), {
+      status: "completed",
+      completedAt: serverTimestamp(),
+      completedBy: uid,
+    })
+    .set(doc(db, `households/${HID}/purchases/${itemId}`), {
+      itemId,
+      listId: "l1",
+      listNameSnapshot: "スーパー",
+      productId: PRODUCT,
+      inputName: "牛乳",
+      quantity: 1,
+      unit: "本",
+      memo: null,
+      visibility: "shared",
+      checkedAt: new Date(),
+      purchasedAt: serverTimestamp(),
+      purchasedBy: uid,
+      active: true,
+      revokedAt: null,
+      revokedBy: null,
+      ...purchase,
+    })
+    .commit();
+}
+
+/** アプリの FirestoreShoppingStore.reopenItem と同じ書き込み */
+function reopen(db: Firestore, uid: string, itemId: string) {
+  return writeBatch(db)
+    .update(doc(db, `households/${HID}/items/${itemId}`), { status: "open", completedAt: null, completedBy: null })
+    .update(doc(db, `households/${HID}/purchases/${itemId}`), {
+      active: false,
+      revokedAt: serverTimestamp(),
+      revokedBy: uid,
+    })
+    .commit();
+}
+
+describe("チェックと Undo", () => {
+  async function seedOpenItem(visibility: "shared" | "private" = "shared", createdBy = "taro") {
+    await seedHousehold(HID, "taro", "hanako");
+    await seedList("l1", "taro", "shared");
+    await seed(`households/${HID}/products/${PRODUCT}`, { ...product("taro"), createdAt: new Date() });
+    await seed(`households/${HID}/items/i1`, { ...item("l1", createdBy, visibility), createdAt: new Date() });
+  }
+
+  it("チェックと購入の記録を同時に書ける", async () => {
+    await seedOpenItem();
+    await assertSucceeds(complete(as("hanako"), "hanako", "i1"));
+  });
+
+  it("購入の記録なしではチェックできない", async () => {
+    await seedOpenItem();
+    await assertFails(
+      updateDoc(doc(as("hanako"), `households/${HID}/items/i1`), {
+        status: "completed",
+        completedAt: serverTimestamp(),
+        completedBy: "hanako",
+      }),
+    );
+  });
+
+  it("購入の記録の内容は項目とリストに一致しなければならない", async () => {
+    await seedOpenItem();
+    await assertFails(complete(as("hanako"), "hanako", "i1", { listNameSnapshot: "別の名前" }));
+    await assertFails(complete(as("hanako"), "hanako", "i1", { quantity: 3 }));
+  });
+
+  it("チェック済みの項目はもう一度チェックできない", async () => {
+    await seedOpenItem();
+    await complete(as("taro"), "taro", "i1");
+    await assertFails(complete(as("hanako"), "hanako", "i1"));
+  });
+
+  it("チェックを外すと購入の記録が無効になる", async () => {
+    await seedOpenItem();
+    await complete(as("taro"), "taro", "i1");
+    await assertSucceeds(reopen(as("hanako"), "hanako", "i1"));
+  });
+
+  it("購入の記録を無効にせずにチェックを外せない", async () => {
+    await seedOpenItem();
+    await complete(as("taro"), "taro", "i1");
+    await assertFails(
+      updateDoc(doc(as("taro"), `households/${HID}/items/i1`), { status: "open", completedAt: null, completedBy: null }),
+    );
+  });
+
+  it("Undo のあとにもう一度チェックできる", async () => {
+    await seedOpenItem();
+    await complete(as("taro"), "taro", "i1");
+    await reopen(as("taro"), "taro", "i1");
+    await assertSucceeds(complete(as("hanako"), "hanako", "i1"));
+  });
+
+  it("チェック済みの項目は削除できない", async () => {
+    await seedOpenItem();
+    await complete(as("taro"), "taro", "i1");
+    await assertFails(deleteDoc(doc(as("taro"), `households/${HID}/items/i1`)));
+  });
+
+  it("プライベートな項目の購入の記録は本人だけが読める", async () => {
+    await seedOpenItem("private", "taro");
+    await assertSucceeds(complete(as("taro"), "taro", "i1", { visibility: "private" }));
+    await assertSucceeds(getDoc(doc(as("taro"), `households/${HID}/purchases/i1`)));
+    await assertFails(getDoc(doc(as("hanako"), `households/${HID}/purchases/i1`)));
+  });
+
+  it("共有の購入の記録はメンバー全員が読める", async () => {
+    await seedOpenItem();
+    await complete(as("taro"), "taro", "i1");
+    await assertSucceeds(getDoc(doc(as("hanako"), `households/${HID}/purchases/i1`)));
+  });
+});

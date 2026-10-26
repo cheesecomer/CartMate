@@ -35,7 +35,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * フェーズ1用のインメモリ実装。プロセスが終了するとデータは消える。
+ * テスト用のインメモリ実装。プロセスが終了するとデータは消える。
  * チェックと Undo の意味論は Firestore 実装と同じにする（docs/design/sync.md）。
  * 他のメンバーのプライベートなリスト・項目・購入は、Firestore の購読と同じく読み取りの結果に含めない。
  */
