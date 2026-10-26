@@ -70,6 +70,8 @@ class FirestoreShoppingStore @Inject constructor(
         else combine(shared(scope).snapshotFlow(), private(scope).snapshotFlow()) { a, b ->
             (a.documents + b.documents).mapNotNull(map)
         }
+            // 家族を作成・参加した直後は、自分の書き込みがサーバーに届く前に購読が始まって拒否されることがある
+            .retryAfterPendingWrites({ db.waitForPendingWrites().await() })
             // 家族から外されると読めなくなる。表示する画面は CartMateApp が切り替える
             .catch { if (it.isPermissionDenied) emit(emptyList()) else throw it }
     }

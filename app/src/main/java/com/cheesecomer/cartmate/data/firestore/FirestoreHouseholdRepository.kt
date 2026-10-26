@@ -47,6 +47,10 @@ class FirestoreHouseholdRepository @Inject constructor(
 
     private fun requireUid(): String = session.requireUid()
 
+    private suspend fun awaitPendingWrites() {
+        db.waitForPendingWrites().await()
+    }
+
     override fun observeMembership(): Flow<Membership> = session.uid.flatMapLatest { uid ->
         if (uid == null) return@flatMapLatest emptyFlow()
         Paths.user(db, uid).snapshotFlow()
@@ -54,10 +58,10 @@ class FirestoreHouseholdRepository @Inject constructor(
             .distinctUntilChanged()
             .flatMapLatest { householdId ->
                 if (householdId == null) flowOf(Membership(null, null))
-                else Paths.member(db, householdId, uid).snapshotFlow()
-                    .map { Membership(householdId, it.exists()) }
-                    // 外されると自分の members を読めなくなる（ルールの isMember）
-                    .catch { if (it.isPermissionDenied) emit(Membership(householdId, false)) else throw it }
+                else memberPresence(
+                    listen = { Paths.member(db, householdId, uid).snapshotFlow().map { it.exists() } },
+                    awaitPendingWrites = ::awaitPendingWrites,
+                ).map { Membership(householdId, it) }
             }
     }
 
@@ -65,6 +69,7 @@ class FirestoreHouseholdRepository @Inject constructor(
         if (householdId == null) flowOf(emptyList())
         else Paths.members(db, householdId).snapshotFlow()
             .map { snapshot -> snapshot.documents.mapNotNull { it.toMember() }.sortedBy { it.joinedAt } }
+            .retryAfterPendingWrites(::awaitPendingWrites)
             .catch { if (it.isPermissionDenied) emit(emptyList()) else throw it }
     }
 
@@ -72,6 +77,7 @@ class FirestoreHouseholdRepository @Inject constructor(
         if (householdId == null) flowOf(emptyList())
         else Paths.invites(db).whereEqualTo(F.HOUSEHOLD_ID, householdId.value).snapshotFlow()
             .map { snapshot -> snapshot.documents.mapNotNull { it.toInvite() }.sortedBy { it.createdAt } }
+            .retryAfterPendingWrites(::awaitPendingWrites)
             .catch { if (it.isPermissionDenied) emit(emptyList()) else throw it }
     }
 

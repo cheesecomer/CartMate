@@ -99,12 +99,12 @@
 
     <!-- 家族の作成・参加 -->
     <string name="onboarding_title">家族の買い物リストを始めましょう</string>
-    <string name="onboarding_create">家族を作成する</string>
+    <string name="onboarding_create">家族と共有する</string>
     <string name="onboarding_create_description">自分がオーナーになり、あとで家族を招待する</string>
     <string name="onboarding_join">招待コードで参加する</string>
     <string name="onboarding_join_description">家族から届いたコードを入力する</string>
-    <string name="onboarding_removed_title">家族から外されました</string>
-    <string name="onboarding_removed_message">新しく家族を作成するか、招待コードで参加してください</string>
+    <string name="onboarding_removed_title">共有が取り消されました</string>
+    <string name="onboarding_removed_message">新しく家族と共有するか、招待コードで参加してください</string>
     <string name="onboarding_create_failed">家族を作成できませんでした。通信状態を確かめて、もう一度お試しください</string>
     <string name="action_sign_out">ログアウト</string>
     <string name="offline_unavailable">オフラインのため、この操作はできません</string>

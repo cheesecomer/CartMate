@@ -46,7 +46,7 @@ import com.cheesecomer.cartmate.ui.theme.CartMateSpacing
 import com.cheesecomer.cartmate.ui.theme.CartMateTheme
 import kotlinx.coroutines.launch
 
-/** 家族の作成・参加。[removed] なら「家族から外されました」を表示する */
+/** 家族の作成・参加。[removed] なら「共有が取り消されました」を表示する */
 @Composable
 fun OnboardingScreen(
     removed: Boolean,
