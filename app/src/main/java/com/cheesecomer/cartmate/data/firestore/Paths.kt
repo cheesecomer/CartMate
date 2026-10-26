@@ -73,6 +73,9 @@ object F {
     const val REVOKED_BY = "revokedBy"
     const val IMPORTED_FROM = "importedFrom"
     const val CLEARED_AT = "clearedAt"
+    const val MERGED_AT = "mergedAt"
+    const val MERGED_BY = "mergedBy"
+    const val DICTIONARY_OPT_OUT = "dictionaryOptOut"
 }
 
 /** フィールドの値 */

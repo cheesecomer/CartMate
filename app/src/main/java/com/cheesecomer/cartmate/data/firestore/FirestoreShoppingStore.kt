@@ -49,6 +49,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import com.cheesecomer.cartmate.domain.model.ProductId
 
 /**
  * リスト・項目・購入の記録の Firestore 実装（docs/design/data-model.md、docs/design/sync.md）。
@@ -202,7 +203,7 @@ class FirestoreShoppingStore @Inject constructor(
             if (list != null && ShoppingRound.clearsOnAdd(shown)) {
                 update(Paths.lists(db, scope.householdId).document(list.id.value), F.CLEARED_AT, now.toTimestamp())
             }
-            val productId = putProduct(scope, newItem.inputName)
+            val productId = putProduct(scope, newItem.inputName, newItem.mergeInto)
             set(ref, mapOf(
                 F.LIST_ID to newItem.listId.value,
                 F.PRODUCT_ID to productId,
@@ -225,9 +226,13 @@ class FirestoreShoppingStore @Inject constructor(
 
     /**
      * 商品（決定的ID）を書き込みに加え、その ID を返す。端末にない商品だけを作る。
-     * 統合の扱い（mergedInto）はフェーズ3で加える
+     * [mergeInto] があれば、新しい商品を最初からその商品に統合する（表記ゆれのチップを選んだ場合）
      */
-    private suspend fun WriteBatch.putProduct(scope: FirestoreSession.Scope, inputName: String): String {
+    private suspend fun WriteBatch.putProduct(
+        scope: FirestoreSession.Scope,
+        inputName: String,
+        mergeInto: ProductId? = null,
+    ): String {
         val productId = NameNormalizer.productId(inputName)
         val ref = Paths.products(db, scope.householdId).document(productId)
         val cached = runCatching { ref.get(Source.CACHE).await().exists() }.getOrDefault(false)
@@ -238,8 +243,11 @@ class FirestoreShoppingStore @Inject constructor(
                 F.SEARCH_KEY to NameNormalizer.searchKey(inputName),
                 F.CREATED_BY to scope.uid,
                 F.CREATED_AT to FieldValue.serverTimestamp(),
-                F.MERGED_INTO to null,
-            ))
+            ) + if (mergeInto != null) {
+                mapOf(F.MERGED_INTO to mergeInto.value, F.MERGED_AT to FieldValue.serverTimestamp(), F.MERGED_BY to scope.uid)
+            } else {
+                mapOf(F.MERGED_INTO to null)
+            })
         }
         return productId
     }

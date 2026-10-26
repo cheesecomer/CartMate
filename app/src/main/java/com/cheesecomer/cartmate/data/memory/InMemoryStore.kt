@@ -36,6 +36,10 @@ import javax.inject.Singleton
 import com.cheesecomer.cartmate.domain.list.ShoppingRound
 import com.cheesecomer.cartmate.domain.repository.RejectedCheck
 import kotlinx.coroutines.flow.emptyFlow
+import com.cheesecomer.cartmate.domain.model.ProductId
+import com.cheesecomer.cartmate.domain.text.NameNormalizer
+import com.cheesecomer.cartmate.domain.model.Product
+import com.cheesecomer.cartmate.domain.repository.ProductRepository
 
 /**
  * テスト用のインメモリ実装。プロセスが終了するとデータは消える。
@@ -46,12 +50,13 @@ import kotlinx.coroutines.flow.emptyFlow
 class InMemoryStore @Inject constructor(
     private val clock: Clock,
     private val currentUser: CurrentUserProvider,
-) : ShoppingListRepository, ItemRepository, PurchaseRepository {
+) : ShoppingListRepository, ItemRepository, PurchaseRepository, ProductRepository {
 
     private data class Data(
         val lists: Map<ListId, ShoppingList> = emptyMap(),
         val items: Map<ItemId, Item> = emptyMap(),
         val purchases: Map<ItemId, Purchase> = emptyMap(),
+        val products: Map<ProductId, Product> = emptyMap(),
     )
 
     private val data = MutableStateFlow(Data())
@@ -165,6 +170,7 @@ class InMemoryStore @Inject constructor(
                 createdBy = me,
                 completedAt = null,
                 completedBy = null,
+                productId = ProductId(NameNormalizer.productId(newItem.inputName)),
             )
             // 買い終わったリストに追加したら、前回の買い物のチェック済みを片付ける
             val list = d.lists[newItem.listId]
@@ -174,7 +180,17 @@ class InMemoryStore @Inject constructor(
                 clearedAt = list?.clearedAt,
             )
             val lists = if (list != null && ShoppingRound.clearsOnAdd(shown)) d.lists + (list.id to list.copy(clearedAt = now)) else d.lists
-            d.copy(items = d.items + (id to item), lists = lists)
+            // 商品（決定的ID）。新しい商品なら作り、表記ゆれのチップを選んでいれば最初から統合する
+            val productId = item.productId!!
+            val products = if (productId in d.products) d.products else d.products + (productId to Product(
+                id = productId,
+                displayName = NameNormalizer.displayName(newItem.inputName),
+                normalizedName = NameNormalizer.normalizedName(newItem.inputName),
+                searchKey = NameNormalizer.searchKey(newItem.inputName),
+                createdAt = now,
+                mergedInto = newItem.mergeInto,
+            ))
+            d.copy(items = d.items + (id to item), lists = lists, products = products)
         }
         return id
     }
@@ -251,6 +267,7 @@ class InMemoryStore @Inject constructor(
                 active = true,
                 revokedAt = null,
                 revokedBy = null,
+                productId = item.productId,
             )
             d.copy(items = d.items + (id to completed), purchases = d.purchases + (id to purchase)) to
                 CompleteResult.Completed
@@ -269,6 +286,20 @@ class InMemoryStore @Inject constructor(
                 ?: d.purchases
             d.copy(items = d.items + (id to reopened), purchases = purchases) to ReopenResult.Reopened
         }
+    }
+
+    // ProductRepository
+
+    override fun observeProducts(): Flow<List<Product>> = data.map { it.products.values.toList() }.distinctUntilChanged()
+
+    override suspend fun merge(from: ProductId, into: ProductId) = updateProduct(from) { it.copy(mergedInto = into) }
+
+    override suspend fun unmerge(id: ProductId) = updateProduct(id) { it.copy(mergedInto = null) }
+
+    override suspend fun setDictionaryOptOut(id: ProductId, optOut: Boolean) = updateProduct(id) { it.copy(dictionaryOptOut = optOut) }
+
+    private fun updateProduct(id: ProductId, change: (Product) -> Product) {
+        data.update { d -> d.products[id]?.let { d.copy(products = d.products + (id to change(it))) } ?: d }
     }
 
     /** インメモリでは書き込みが拒否されることはない */

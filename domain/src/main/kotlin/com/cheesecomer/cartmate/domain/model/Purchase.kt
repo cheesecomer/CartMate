@@ -22,4 +22,6 @@ data class Purchase(
     val active: Boolean,
     val revokedAt: Instant?,
     val revokedBy: UserId?,
+    /** 元の項目と同じ商品（統合元） */
+    val productId: ProductId? = null,
 )

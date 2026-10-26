@@ -5,6 +5,8 @@ import com.cheesecomer.cartmate.domain.model.ItemId
 import com.cheesecomer.cartmate.domain.model.ItemStatus
 import com.cheesecomer.cartmate.domain.model.ListId
 import com.cheesecomer.cartmate.domain.model.ListStatus
+import com.cheesecomer.cartmate.domain.model.Product
+import com.cheesecomer.cartmate.domain.model.ProductId
 import com.cheesecomer.cartmate.domain.model.Purchase
 import com.cheesecomer.cartmate.domain.model.ShoppingList
 import com.cheesecomer.cartmate.domain.model.UserId
@@ -50,6 +52,17 @@ fun DocumentSnapshot.toItem(): Item? = Item(
     createdBy = UserId(getString(F.CREATED_BY) ?: return null),
     completedAt = instant(F.COMPLETED_AT),
     completedBy = getString(F.COMPLETED_BY)?.let(::UserId),
+    productId = getString(F.PRODUCT_ID)?.let(::ProductId),
+)
+
+fun DocumentSnapshot.toProduct(): Product? = Product(
+    id = ProductId(id),
+    displayName = getString(F.DISPLAY_NAME) ?: return null,
+    normalizedName = getString(F.NORMALIZED_NAME) ?: return null,
+    searchKey = getString(F.SEARCH_KEY) ?: return null,
+    createdAt = instant(F.CREATED_AT) ?: return null,
+    mergedInto = getString(F.MERGED_INTO)?.let(::ProductId),
+    dictionaryOptOut = getBoolean(F.DICTIONARY_OPT_OUT) ?: false,
 )
 
 fun DocumentSnapshot.toPurchase(): Purchase? = Purchase(
@@ -67,4 +80,5 @@ fun DocumentSnapshot.toPurchase(): Purchase? = Purchase(
     active = getBoolean(F.ACTIVE) ?: return null,
     revokedAt = instant(F.REVOKED_AT),
     revokedBy = getString(F.REVOKED_BY)?.let(::UserId),
+    productId = getString(F.PRODUCT_ID)?.let(::ProductId),
 )

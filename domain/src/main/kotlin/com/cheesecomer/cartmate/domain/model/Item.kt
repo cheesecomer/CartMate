@@ -2,7 +2,6 @@ package com.cheesecomer.cartmate.domain.model
 
 import java.time.Instant
 
-// productId はフェーズ3（商品の同一性）で追加する
 data class Item(
     val id: ItemId,
     val listId: ListId,
@@ -19,6 +18,8 @@ data class Item(
     val createdBy: UserId,
     val completedAt: Instant?,
     val completedBy: UserId?,
+    /** 入力した名前に対応する商品（統合元）。統合先への置き換えは読むときに行う（docs/design/suggestions.md） */
+    val productId: ProductId? = null,
 ) {
     companion object {
         const val MAX_NAME_LENGTH = 60
@@ -37,4 +38,9 @@ data class NewItem(
     val unit: String?,
     val memo: String?,
     val visibility: Visibility,
+    /**
+     * 入力した名前が新しい商品のとき、その商品を最初からこの商品に統合する（表記ゆれのチップを選んだ場合）。
+     * 統合先までたどった商品を渡す
+     */
+    val mergeInto: ProductId? = null,
 )

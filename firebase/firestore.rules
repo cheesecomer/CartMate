@@ -244,12 +244,13 @@ service cloud.firestore {
         allow read: if isMember(hid);
         allow create: if isImport('products', pid, me(), []);   // 合流
         allow create: if isMember(hid)
-          && request.resource.data.keys().hasOnly(['displayName','normalizedName','searchKey','createdBy','createdAt','mergedInto'])
+          && request.resource.data.keys().hasOnly(['displayName','normalizedName','searchKey','createdBy','createdAt',
+                'mergedInto','mergedAt','mergedBy'])
           && str(request.resource.data.displayName, 60)
           && str(request.resource.data.normalizedName, 60)
           && str(request.resource.data.searchKey, 60)
-          && request.resource.data.mergedInto == null;
-        allow update: if isMember(hid) && (isRecreate() || isMerge() || isUnmerge());
+          && (request.resource.data.mergedInto == null || isCreatedMerged());
+        allow update: if isMember(hid) && (isRecreate() || isMerge() || isUnmerge() || isDictionaryOptOut());
         allow delete: if false;
 
         // 2端末が同じ決定的IDで同時に作成した場合の上書きを許す（正規化名は不変）
@@ -268,6 +269,18 @@ service cloud.firestore {
         function isUnmerge() {
           return changed().hasOnly(['mergedInto','mergedAt','mergedBy'])
             && request.resource.data.mergedInto == null;
+        }
+        // 表記ゆれのチップを選んで、新しい商品を最初から統合して作る。統合先は未統合でなければならない
+        function isCreatedMerged() {
+          let target = request.resource.data.mergedInto;
+          return target is string && target != pid
+            && get(/databases/$(db)/documents/households/$(hid)/products/$(target)).data.mergedInto == null
+            && request.resource.data.mergedBy == me()
+            && request.resource.data.mergedAt == request.time;
+        }
+        // 名寄せ辞書でまとめない（「別の商品として扱う」）とその取り消し
+        function isDictionaryOptOut() {
+          return changed().hasOnly(['dictionaryOptOut']) && request.resource.data.dictionaryOptOut is bool;
         }
       }
     }
