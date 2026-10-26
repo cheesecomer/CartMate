@@ -4,16 +4,18 @@ import com.cheesecomer.cartmate.domain.model.ItemId
 import com.cheesecomer.cartmate.domain.model.ItemStatus
 import com.cheesecomer.cartmate.domain.model.ListId
 import com.cheesecomer.cartmate.domain.model.ListStatus
-import com.cheesecomer.cartmate.domain.model.NewItem
 import com.cheesecomer.cartmate.domain.model.UserId
+import com.cheesecomer.cartmate.domain.model.Visibility
 import com.cheesecomer.cartmate.domain.repository.CompleteResult
 import com.cheesecomer.cartmate.domain.repository.DeleteItemResult
 import com.cheesecomer.cartmate.domain.repository.DeleteListResult
 import com.cheesecomer.cartmate.domain.repository.ItemUpdate
-import com.cheesecomer.cartmate.domain.repository.RenameListResult
 import com.cheesecomer.cartmate.domain.repository.ReopenResult
 import com.cheesecomer.cartmate.domain.repository.UpdateItemResult
+import com.cheesecomer.cartmate.domain.repository.UpdateListResult
 import com.cheesecomer.cartmate.testing.MutableClock
+import com.cheesecomer.cartmate.testing.createList
+import com.cheesecomer.cartmate.testing.newItem
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -29,7 +31,7 @@ class InMemoryStoreTest {
 
     private suspend fun createListWithItem(): Pair<ListId, ItemId> {
         val listId = store.createList("スーパー")
-        val itemId = store.addItem(NewItem(listId, "牛乳", 2.0, "本"))
+        val itemId = store.addItem(newItem(listId, "牛乳", 2.0, "本"))
         return listId to itemId
     }
 
@@ -128,9 +130,9 @@ class InMemoryStoreTest {
     @Test
     fun `削除した項目を元に戻すと、削除する前の位置に戻る`() = runTest {
         val listId = store.createList("スーパー")
-        store.addItem(NewItem(listId, "牛乳", null, null))
-        val egg = store.addItem(NewItem(listId, "卵", null, null))
-        store.addItem(NewItem(listId, "パン", null, null))
+        store.addItem(newItem(listId, "牛乳"))
+        val egg = store.addItem(newItem(listId, "卵"))
+        store.addItem(newItem(listId, "パン"))
         val eggItem = store.observeOpenItems().first().single { it.id == egg }
 
         store.deleteItem(egg)
@@ -159,9 +161,9 @@ class InMemoryStoreTest {
     @Test
     fun `項目は追加した順に並び、動かすと前後の間に入る。チェック済みの項目も動かせる`() = runTest {
         val listId = store.createList("スーパー")
-        val milk = store.addItem(NewItem(listId, "牛乳", null, null))
-        val egg = store.addItem(NewItem(listId, "卵", null, null))
-        val bread = store.addItem(NewItem(listId, "パン", null, null))
+        val milk = store.addItem(newItem(listId, "牛乳"))
+        val egg = store.addItem(newItem(listId, "卵"))
+        val bread = store.addItem(newItem(listId, "パン"))
         store.completeItem(egg, clock.now)
 
         store.moveItem(bread, previous = null, next = milk)
@@ -174,11 +176,11 @@ class InMemoryStoreTest {
     @Test
     fun `新しい項目は、並び替えたあとでも末尾に追加する`() = runTest {
         val listId = store.createList("スーパー")
-        val milk = store.addItem(NewItem(listId, "牛乳", null, null))
-        val egg = store.addItem(NewItem(listId, "卵", null, null))
+        val milk = store.addItem(newItem(listId, "牛乳"))
+        val egg = store.addItem(newItem(listId, "卵"))
         store.moveItem(milk, previous = egg, next = null)
 
-        store.addItem(NewItem(listId, "パン", null, null))
+        store.addItem(newItem(listId, "パン"))
 
         assertThat(listItemNames(listId)).containsExactly("卵", "牛乳", "パン").inOrder()
     }
@@ -216,14 +218,14 @@ class InMemoryStoreTest {
     fun `リストの項目は、未購入と指定時刻以降のチェック済みを追加した順に返す`() = runTest {
         val listId = store.createList("スーパー")
         val otherListId = store.createList("薬局")
-        val old = store.addItem(NewItem(listId, "古いチェック済み", null, null))
+        val old = store.addItem(newItem(listId, "古いチェック済み"))
         clock.advance(Duration.ofSeconds(1))
-        store.addItem(NewItem(listId, "牛乳", null, null))
+        store.addItem(newItem(listId, "牛乳"))
         clock.advance(Duration.ofSeconds(1))
-        val checked = store.addItem(NewItem(listId, "卵", null, null))
+        val checked = store.addItem(newItem(listId, "卵"))
         clock.advance(Duration.ofSeconds(1))
-        store.addItem(NewItem(listId, "パン", null, null))
-        store.addItem(NewItem(otherListId, "目薬", null, null))
+        store.addItem(newItem(listId, "パン"))
+        store.addItem(newItem(otherListId, "目薬"))
         store.completeItem(old, clock.now)
         clock.advance(Duration.ofHours(25))
         val since = clock.now.minus(Duration.ofHours(24))
@@ -234,15 +236,16 @@ class InMemoryStoreTest {
     }
 
     @Test
-    fun `未購入の項目は商品名・数量・単位を変更できる`() = runTest {
+    fun `未購入の項目は商品名・数量・単位・備考を変更できる`() = runTest {
         val (_, itemId) = createListWithItem()
 
-        assertThat(store.updateItem(itemId, ItemUpdate("低脂肪乳", null, null))).isEqualTo(UpdateItemResult.Updated)
+        assertThat(store.updateItem(itemId, ItemUpdate("低脂肪乳", null, null, "Lサイズ"))).isEqualTo(UpdateItemResult.Updated)
 
         val item = store.observeOpenItems().first().single()
         assertThat(item.inputName).isEqualTo("低脂肪乳")
         assertThat(item.quantity).isNull()
         assertThat(item.unit).isNull()
+        assertThat(item.memo).isEqualTo("Lサイズ")
     }
 
     @Test
@@ -250,20 +253,22 @@ class InMemoryStoreTest {
         val (_, itemId) = createListWithItem()
         store.completeItem(itemId, clock.now)
 
-        assertThat(store.updateItem(itemId, ItemUpdate("低脂肪乳", 1.0, null)))
+        assertThat(store.updateItem(itemId, ItemUpdate("低脂肪乳", 1.0, null, null)))
             .isEqualTo(UpdateItemResult.AlreadyCompleted)
-        assertThat(store.updateItem(ItemId("none"), ItemUpdate("低脂肪乳", 1.0, null)))
+        assertThat(store.updateItem(ItemId("none"), ItemUpdate("低脂肪乳", 1.0, null, null)))
             .isEqualTo(UpdateItemResult.NotFound)
     }
 
     @Test
-    fun `リスト名を変更しても、購入の記録に残したリスト名は変わらない`() = runTest {
+    fun `リスト名と備考を変更しても、購入の記録に残したリスト名は変わらない`() = runTest {
         val (listId, itemId) = createListWithItem()
         store.completeItem(itemId, clock.now)
 
-        assertThat(store.renameList(listId, "イオン")).isEqualTo(RenameListResult.Renamed)
+        assertThat(store.updateList(listId, "イオン", "火曜市")).isEqualTo(UpdateListResult.Updated)
 
-        assertThat(store.observeLists().first().single().name).isEqualTo("イオン")
+        val list = store.observeLists().first().single()
+        assertThat(list.name).isEqualTo("イオン")
+        assertThat(list.memo).isEqualTo("火曜市")
         assertThat(store.observePurchases(Instant.EPOCH).first().single().listNameSnapshot).isEqualTo("スーパー")
     }
 
@@ -272,7 +277,50 @@ class InMemoryStoreTest {
         val listId = store.createList("薬局")
         store.deleteList(listId)
 
-        assertThat(store.renameList(listId, "ドラッグストア")).isEqualTo(RenameListResult.NotFound)
-        assertThat(store.renameList(ListId("none"), "ドラッグストア")).isEqualTo(RenameListResult.NotFound)
+        assertThat(store.updateList(listId, "ドラッグストア", null)).isEqualTo(UpdateListResult.NotFound)
+        assertThat(store.updateList(ListId("none"), "ドラッグストア", null)).isEqualTo(UpdateListResult.NotFound)
+    }
+
+    @Test
+    fun `他のメンバーのプライベートなリストは見えず、変更も削除もできない`() = runTest {
+        val shared = store.createList("スーパー")
+        val private = store.createList("サプライズ", Visibility.PRIVATE)
+        assertThat(listNames()).containsExactly("スーパー", "サプライズ").inOrder()
+
+        user = UserId("hanako")
+
+        assertThat(listNames()).containsExactly("スーパー")
+        assertThat(store.observeLists().first().single().id).isEqualTo(shared)
+        assertThat(store.updateList(private, "見えない", null)).isEqualTo(UpdateListResult.NotFound)
+        assertThat(store.deleteList(private)).isEqualTo(DeleteListResult.NotFound)
+    }
+
+    @Test
+    fun `共有のリストにあるプライベートな項目と、その購入の記録は、登録した本人にだけ見える`() = runTest {
+        val listId = store.createList("スーパー")
+        store.addItem(newItem(listId, "牛乳"))
+        val gift = store.addItem(newItem(listId, "プレゼント", memo = "誕生日", visibility = Visibility.PRIVATE))
+        store.completeItem(gift, clock.now)
+
+        val purchase = store.observePurchases(Instant.EPOCH).first().single()
+        assertThat(purchase.visibility).isEqualTo(Visibility.PRIVATE)
+        assertThat(purchase.memo).isEqualTo("誕生日")
+        assertThat(listItemNames(listId)).containsExactly("牛乳", "プレゼント").inOrder()
+
+        user = UserId("hanako")
+
+        assertThat(listItemNames(listId)).containsExactly("牛乳")
+        assertThat(store.observeOpenItems().first().map { it.inputName }).containsExactly("牛乳")
+        assertThat(store.observePurchases(Instant.EPOCH).first()).isEmpty()
+    }
+
+    @Test
+    fun `リストを削除できるかは自分に見える項目で判断する`() = runTest {
+        val listId = store.createList("スーパー")
+        store.addItem(newItem(listId, "プレゼント", visibility = Visibility.PRIVATE))
+
+        user = UserId("hanako")
+
+        assertThat(store.deleteList(listId)).isEqualTo(DeleteListResult.Deleted)
     }
 }

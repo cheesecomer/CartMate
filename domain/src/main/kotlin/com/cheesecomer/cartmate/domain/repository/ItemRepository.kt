@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.Flow
 import java.time.Instant
 
 interface ItemRepository {
-    /** 家族のすべてのリストの未購入項目 */
+    /** 家族のすべてのリストの未購入項目。他のメンバーのプライベートな項目は含まない（以下の Flow も同じ） */
     fun observeOpenItems(): Flow<List<Item>>
 
     /**
@@ -20,7 +20,7 @@ interface ItemRepository {
 
     suspend fun addItem(newItem: NewItem): ItemId
 
-    /** 未購入の項目の商品名・数量・単位を変更する。チェック済みの項目は変更できない */
+    /** 未購入の項目の商品名・数量・単位・備考を変更する。チェック済みの項目は変更できない。公開範囲は変えられない */
     suspend fun updateItem(id: ItemId, update: ItemUpdate): UpdateItemResult
 
     /** 未購入の項目だけを削除できる */
@@ -57,7 +57,7 @@ sealed interface ReopenResult {
     data class Rejected(val cause: Throwable?) : ReopenResult
 }
 
-data class ItemUpdate(val inputName: String, val quantity: Double?, val unit: String?)
+data class ItemUpdate(val inputName: String, val quantity: Double?, val unit: String?, val memo: String?)
 
 sealed interface UpdateItemResult {
     data object Updated : UpdateItemResult

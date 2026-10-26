@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- ui/theme/Color.kt の background と同じ色 -->
-    <color name="window_background">#FFFFFFFF</color>
+    <!-- ui/theme/Color.kt の background と同じ色。アプリアイコンとスプラッシュ画面の背景もこの色にそろえる -->
+    <color name="window_background">#FFFFF7FF</color>
     <!-- アプリアイコンの背景 -->
-    <color name="ic_launcher_background">#FFFFFFFF</color>
+    <color name="ic_launcher_background">#FFFFF7FF</color>
 </resources>

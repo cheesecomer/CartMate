@@ -9,16 +9,21 @@ import com.cheesecomer.cartmate.domain.input.AddItemReducer
 import com.cheesecomer.cartmate.domain.input.AddItemState
 import com.cheesecomer.cartmate.domain.model.Item
 import com.cheesecomer.cartmate.domain.model.ItemId
+import com.cheesecomer.cartmate.domain.model.ItemStatus
 import com.cheesecomer.cartmate.domain.model.ListId
 import com.cheesecomer.cartmate.domain.model.ListStatus
 import com.cheesecomer.cartmate.domain.model.NewItem
+import com.cheesecomer.cartmate.domain.model.ShoppingList
+import com.cheesecomer.cartmate.domain.model.Visibility
 import com.cheesecomer.cartmate.domain.repository.CompleteResult
 import com.cheesecomer.cartmate.domain.repository.DeleteItemResult
+import com.cheesecomer.cartmate.domain.repository.DeleteListResult
 import com.cheesecomer.cartmate.domain.repository.ItemRepository
-import com.cheesecomer.cartmate.domain.repository.ItemUpdate
 import com.cheesecomer.cartmate.domain.repository.ReopenResult
 import com.cheesecomer.cartmate.domain.repository.ShoppingListRepository
-import com.cheesecomer.cartmate.domain.repository.UpdateItemResult
+import com.cheesecomer.cartmate.domain.visibility.VisibilityDefaults
+import com.cheesecomer.cartmate.ui.itementry.ItemEntryResult
+import com.cheesecomer.cartmate.ui.itementry.LastVisibilityStore
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -26,6 +31,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
@@ -36,11 +42,16 @@ import javax.inject.Inject
 
 data class ListDetailUiState(
     val listName: String = "",
-    /** 未購入の項目と、直近24時間にチェックした項目（追加した順。チェック済みも元の位置に表示する） */
+    val listMemo: String? = null,
+    val listVisibility: Visibility = Visibility.SHARED,
+    /** 未購入の項目と、直近24時間にチェックした項目（並び順。チェック済みも元の位置に表示する） */
     val items: List<Item> = emptyList(),
     val addItem: AddItemState = AddItemState.Initial,
     val loading: Boolean = true,
-)
+) {
+    val openCount: Int get() = items.count { it.status == ItemStatus.OPEN }
+    val completedCount: Int get() = items.count { it.status == ItemStatus.COMPLETED }
+}
 
 /** Snackbar で一度だけ表示するメッセージ */
 sealed interface DetailMessage {
@@ -52,17 +63,28 @@ sealed interface DetailMessage {
     data object AlreadyOpen : DetailMessage
     data class CannotDeleteCompleted(val item: Item) : DetailMessage
     /** 編集中に、ほかの操作でチェックされていた */
-    data class CannotEditCompleted(val name: String) : DetailMessage
+    data object CannotEditCompleted : DetailMessage
     /** 編集中に、ほかの操作で削除されていた */
     data object EditedItemNotFound : DetailMessage
+    /** のこりの商品があるため、リストを削除できない */
+    data object CannotDeleteList : DetailMessage
     data object Failed : DetailMessage
+}
+
+/** 画面の移動 */
+sealed interface DetailNavigation {
+    /** 新しい商品の商品詳細入力画面を開く */
+    data class OpenEntry(val name: String, val quantity: Double?, val unit: String?) : DetailNavigation
+    /** リストを削除したので一覧に戻る */
+    data object ListDeleted : DetailNavigation
 }
 
 @HiltViewModel
 class ListDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
-    listRepository: ShoppingListRepository,
+    private val listRepository: ShoppingListRepository,
     private val itemRepository: ItemRepository,
+    private val lastVisibility: LastVisibilityStore,
     private val clock: Clock,
 ) : ViewModel() {
 
@@ -71,16 +93,18 @@ class ListDetailViewModel @Inject constructor(
     private val addItemState = MutableStateFlow(AddItemState.Initial)
     private val _messages = Channel<DetailMessage>(Channel.BUFFERED)
     val messages: Flow<DetailMessage> = _messages.receiveAsFlow()
+    private val _navigation = Channel<DetailNavigation>(Channel.BUFFERED)
+    val navigation: Flow<DetailNavigation> = _navigation.receiveAsFlow()
 
     val uiState: StateFlow<ListDetailUiState> = combine(
-        listRepository.observeLists().map { lists ->
-            lists.firstOrNull { it.id == listId && it.status == ListStatus.ACTIVE }?.name.orEmpty()
-        },
+        listRepository.observeLists().map { lists -> lists.firstOrNull { it.id == listId && it.status == ListStatus.ACTIVE } },
         itemRepository.observeListItems(listId, completedSince = clock.instant().minus(COMPLETED_WINDOW)),
         addItemState,
-    ) { listName, items, addItem ->
+    ) { list, items, addItem ->
         ListDetailUiState(
-            listName = listName,
+            listName = list?.name.orEmpty(),
+            listMemo = list?.memo,
+            listVisibility = list?.visibility ?: Visibility.SHARED,
             items = items,
             addItem = addItem,
             loading = false,
@@ -91,24 +115,31 @@ class ListDetailViewModel @Inject constructor(
         val transition = AddItemReducer.reduce(addItemState.value, event)
         addItemState.value = transition.state
         when (val effect = transition.effect) {
+            // Enter と候補の「＋」は、そのリストの直前の公開範囲で追加する（直前の公開範囲は変えない）
             is AddItemEffect.AddItem -> viewModelScope.launch {
-                itemRepository.addItem(NewItem(listId, effect.name, effect.quantity, effect.unit))
+                val list = listRepository.observeLists().first().firstOrNull { it.id == listId } ?: return@launch
+                val visibility = VisibilityDefaults.initial(list.visibility, lastVisibility.get(listId))
+                itemRepository.addItem(NewItem(listId, effect.name, effect.quantity, effect.unit, memo = null, visibility))
             }
-            is AddItemEffect.UpdateItem -> viewModelScope.launch {
-                val update = ItemUpdate(effect.name, effect.quantity, effect.unit)
-                when (itemRepository.updateItem(effect.itemId, update)) {
-                    UpdateItemResult.Updated -> Unit
-                    UpdateItemResult.AlreadyCompleted -> _messages.send(DetailMessage.CannotEditCompleted(effect.name))
-                    UpdateItemResult.NotFound -> _messages.send(DetailMessage.EditedItemNotFound)
-                }
-            }
+            is AddItemEffect.OpenEntry -> _navigation.trySend(DetailNavigation.OpenEntry(effect.name, effect.quantity, effect.unit))
             null -> Unit
+        }
+    }
+
+    /** 商品詳細入力画面から戻った */
+    fun onEntryResult(result: ItemEntryResult) {
+        when (result) {
+            ItemEntryResult.ADDED -> onAddItemEvent(AddItemEvent.EntryClosed(added = true))
+            ItemEntryResult.CANCELLED -> onAddItemEvent(AddItemEvent.EntryClosed(added = false))
+            ItemEntryResult.UPDATED -> Unit
+            ItemEntryResult.EDIT_REJECTED_COMPLETED -> _messages.trySend(DetailMessage.CannotEditCompleted)
+            ItemEntryResult.EDIT_REJECTED_NOT_FOUND -> _messages.trySend(DetailMessage.EditedItemNotFound)
         }
     }
 
     fun check(item: Item) {
         viewModelScope.launch {
-            when (val result = itemRepository.completeItem(item.id, checkedAt = clock.instant())) {
+            when (itemRepository.completeItem(item.id, checkedAt = clock.instant())) {
                 CompleteResult.Completed -> _messages.send(DetailMessage.Checked(item))
                 is CompleteResult.AlreadyCompleted -> _messages.send(DetailMessage.AlreadyCompleted(item))
                 is CompleteResult.Retry, is CompleteResult.Rejected -> _messages.send(DetailMessage.Failed)
@@ -143,6 +174,29 @@ class ListDetailViewModel @Inject constructor(
 
     fun undoDelete(item: Item) {
         viewModelScope.launch { itemRepository.restoreItem(item) }
+    }
+
+    fun updateList(name: String, memo: String) {
+        val trimmed = name.trim()
+        if (trimmed.isEmpty() || trimmed.length > ShoppingList.MAX_NAME_LENGTH) return
+        val trimmedMemo = memo.trim().take(ShoppingList.MAX_MEMO_LENGTH).ifEmpty { null }
+        viewModelScope.launch { listRepository.updateList(listId, trimmed, trimmedMemo) }
+    }
+
+    /** 「リストを削除」を選んだ。のこりの商品があれば理由を伝え、なければ true を返して確認ダイアログを出させる */
+    fun canDeleteList(): Boolean {
+        if (uiState.value.openCount == 0) return true
+        _messages.trySend(DetailMessage.CannotDeleteList)
+        return false
+    }
+
+    fun deleteList() {
+        viewModelScope.launch {
+            when (listRepository.deleteList(listId)) {
+                DeleteListResult.Deleted, DeleteListResult.NotFound -> _navigation.send(DetailNavigation.ListDeleted)
+                DeleteListResult.NotEmpty -> _messages.send(DetailMessage.CannotDeleteList)
+            }
+        }
     }
 
     private companion object {

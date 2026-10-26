@@ -11,6 +11,9 @@ data class Item(
     val sortKey: Double,
     val quantity: Double?,
     val unit: String?,
+    val memo: String?,
+    /** プライベートのリストの項目は、常に PRIVATE */
+    val visibility: Visibility,
     val status: ItemStatus,
     val createdAt: Instant,
     val createdBy: UserId,
@@ -20,6 +23,7 @@ data class Item(
     companion object {
         const val MAX_NAME_LENGTH = 60
         const val MAX_UNIT_LENGTH = 10
+        const val MAX_MEMO_LENGTH = 100
         const val MAX_QUANTITY = 9999.0
     }
 }
@@ -31,4 +35,6 @@ data class NewItem(
     val inputName: String,
     val quantity: Double?,
     val unit: String?,
+    val memo: String?,
+    val visibility: Visibility,
 )

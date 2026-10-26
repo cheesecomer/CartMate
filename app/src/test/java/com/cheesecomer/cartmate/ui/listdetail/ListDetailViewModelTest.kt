@@ -8,11 +8,15 @@ import com.cheesecomer.cartmate.domain.input.AddItemEvent
 import com.cheesecomer.cartmate.domain.input.AddItemState
 import com.cheesecomer.cartmate.domain.model.ItemStatus
 import com.cheesecomer.cartmate.domain.model.ListId
-import com.cheesecomer.cartmate.domain.model.NewItem
 import com.cheesecomer.cartmate.domain.model.UserId
+import com.cheesecomer.cartmate.domain.model.Visibility
 import com.cheesecomer.cartmate.testing.MainDispatcherExtension
 import com.cheesecomer.cartmate.testing.MutableClock
 import com.cheesecomer.cartmate.testing.awaitUntil
+import com.cheesecomer.cartmate.testing.createList
+import com.cheesecomer.cartmate.testing.newItem
+import com.cheesecomer.cartmate.ui.itementry.ItemEntryResult
+import com.cheesecomer.cartmate.ui.itementry.LastVisibilityStore
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -33,39 +37,89 @@ class ListDetailViewModelTest {
     private val listId: ListId = runBlocking { store.createList("スーパー") }
     private val otherListId: ListId = runBlocking { store.createList("薬局") }
 
-    private val viewModel = ListDetailViewModel(
+    private val lastVisibility = LastVisibilityStore()
+    private val viewModel = viewModelFor(listId)
+
+    private fun viewModelFor(listId: ListId) = ListDetailViewModel(
         savedStateHandle = SavedStateHandle(mapOf("listId" to listId.value)),
         listRepository = store,
         itemRepository = store,
+        lastVisibility = lastVisibility,
         clock = clock,
     )
 
     @Test
-    fun `商品名、Enter、確定で項目が追加され、商品名の入力に戻る`() = runTest {
+    fun `シートで商品名を入れて Enter を押すと数量1・単位「個」で追加され、シートは開いたまま入力欄が空になる`() = runTest {
         viewModel.uiState.test {
             assertThat(awaitUntil { !it.loading }.listName).isEqualTo("スーパー")
 
-            viewModel.onAddItemEvent(AddItemEvent.NameFocusChanged(true))
-            viewModel.onAddItemEvent(AddItemEvent.NameChanged("牛乳"))
-            viewModel.onAddItemEvent(AddItemEvent.NameSubmitted)
-            awaitUntil { it.addItem is AddItemState.Detail }
-
-            viewModel.onAddItemEvent(AddItemEvent.UnitChanged("本"))
-            viewModel.onAddItemEvent(AddItemEvent.Confirmed)
+            viewModel.onAddItemEvent(AddItemEvent.FieldFocused)
+            viewModel.onAddItemEvent(AddItemEvent.TextChanged("牛乳"))
+            viewModel.onAddItemEvent(AddItemEvent.Submitted)
 
             val state = awaitUntil { it.items.isNotEmpty() }
-            assertThat(state.addItem).isEqualTo(AddItemState.FocusedEmpty)
+            assertThat(state.addItem).isEqualTo(AddItemState.Open(""))
             val item = state.items.single()
             assertThat(item.inputName).isEqualTo("牛乳")
             assertThat(item.quantity).isEqualTo(1.0)
-            assertThat(item.unit).isEqualTo("本")
+            assertThat(item.unit).isEqualTo("個")
+            assertThat(item.visibility).isEqualTo(Visibility.SHARED)
+        }
+    }
+
+    @Test
+    fun `Enter による追加は、そのリストで直前に選んだ公開範囲を使う`() = runTest {
+        lastVisibility.set(listId, Visibility.PRIVATE)
+        lastVisibility.set(otherListId, Visibility.SHARED)
+        viewModel.onAddItemEvent(AddItemEvent.FieldFocused)
+        viewModel.onAddItemEvent(AddItemEvent.TextChanged("プレゼント"))
+        viewModel.onAddItemEvent(AddItemEvent.Submitted)
+
+        viewModel.uiState.test {
+            assertThat(awaitUntil { it.items.isNotEmpty() }.items.single().visibility).isEqualTo(Visibility.PRIVATE)
+        }
+        assertThat(lastVisibility.get(listId)).isEqualTo(Visibility.PRIVATE)
+    }
+
+    @Test
+    fun `プライベートのリストでは、Enter による追加はプライベートになる`() = runTest {
+        val privateList = store.createList("自分用", Visibility.PRIVATE)
+        val viewModel = viewModelFor(privateList)
+        viewModel.onAddItemEvent(AddItemEvent.FieldFocused)
+        viewModel.onAddItemEvent(AddItemEvent.TextChanged("目薬"))
+        viewModel.onAddItemEvent(AddItemEvent.Submitted)
+
+        viewModel.uiState.test {
+            assertThat(awaitUntil { it.items.isNotEmpty() }.items.single().visibility).isEqualTo(Visibility.PRIVATE)
+        }
+    }
+
+    @Test
+    fun `「数量を設定して追加」で商品詳細入力画面を開き、やめて戻るとシートに戻る`() = runTest {
+        turbineScope {
+            val states = viewModel.uiState.testIn(backgroundScope)
+            val navigation = viewModel.navigation.testIn(backgroundScope)
+            viewModel.onAddItemEvent(AddItemEvent.FieldFocused)
+            viewModel.onAddItemEvent(AddItemEvent.TextChanged("豆乳"))
+            viewModel.onAddItemEvent(AddItemEvent.DetailRequested)
+
+            assertThat(navigation.awaitItem()).isEqualTo(DetailNavigation.OpenEntry("豆乳", 1.0, "個"))
+            states.awaitUntil { it.addItem == AddItemState.Entering("豆乳") }
+
+            viewModel.onEntryResult(ItemEntryResult.CANCELLED)
+            states.awaitUntil { it.addItem == AddItemState.Open("豆乳") }
+
+            viewModel.onAddItemEvent(AddItemEvent.DetailRequested)
+            navigation.awaitItem()
+            viewModel.onEntryResult(ItemEntryResult.ADDED)
+            states.awaitUntil { it.addItem == AddItemState.Idle("") }
         }
     }
 
     @Test
     fun `ほかのリストの項目は表示しない`() = runTest {
-        store.addItem(NewItem(otherListId, "目薬", null, null))
-        store.addItem(NewItem(listId, "牛乳", null, null))
+        store.addItem(newItem(otherListId, "目薬"))
+        store.addItem(newItem(listId, "牛乳"))
 
         viewModel.uiState.test {
             assertThat(awaitUntil { !it.loading }.items.map { it.inputName }).containsExactly("牛乳")
@@ -74,9 +128,9 @@ class ListDetailViewModelTest {
 
     @Test
     fun `チェックしても同じ位置に残り、元に戻せるメッセージが出る。元に戻すと購入が無効になる`() = runTest {
-        store.addItem(NewItem(listId, "牛乳", null, null))
+        store.addItem(newItem(listId, "牛乳"))
         clock.advance(Duration.ofSeconds(1))
-        store.addItem(NewItem(listId, "卵", null, null))
+        store.addItem(newItem(listId, "卵"))
         turbineScope {
             val states = viewModel.uiState.testIn(backgroundScope)
             val messages = viewModel.messages.testIn(backgroundScope)
@@ -97,7 +151,7 @@ class ListDetailViewModelTest {
 
     @Test
     fun `すでにチェック済みの項目をチェックすると、その旨のメッセージが出る`() = runTest {
-        val itemId = store.addItem(NewItem(listId, "牛乳", null, null))
+        val itemId = store.addItem(newItem(listId, "牛乳"))
         val item = store.observeOpenItems().first().single()
         store.completeItem(itemId, clock.now)
 
@@ -109,7 +163,7 @@ class ListDetailViewModelTest {
 
     @Test
     fun `削除すると元に戻せるメッセージが出る。元に戻すと項目が復活する`() = runTest {
-        store.addItem(NewItem(listId, "牛乳", null, null))
+        store.addItem(newItem(listId, "牛乳"))
         turbineScope {
             val states = viewModel.uiState.testIn(backgroundScope)
             val messages = viewModel.messages.testIn(backgroundScope)
@@ -128,41 +182,62 @@ class ListDetailViewModelTest {
 
 
     @Test
-    fun `項目をタップして編集し、確定すると内容が変わる`() = runTest {
-        store.addItem(NewItem(listId, "牛乳", 1.0, null))
-        viewModel.uiState.test {
-            val item = awaitUntil { it.items.isNotEmpty() }.items.single()
-
-            viewModel.onAddItemEvent(AddItemEvent.EditRequested(item))
-            awaitUntil { it.addItem is AddItemState.Editing }
-            viewModel.onAddItemEvent(AddItemEvent.QuantityChanged("2"))
-            viewModel.onAddItemEvent(AddItemEvent.UnitChanged("本"))
-            viewModel.onAddItemEvent(AddItemEvent.Confirmed)
-
-            val updated = awaitUntil { it.items.singleOrNull()?.unit == "本" }
-            assertThat(updated.items.single().quantity).isEqualTo(2.0)
-            assertThat(updated.addItem).isEqualTo(AddItemState.Idle(""))
+    fun `編集が拒否されて戻ると、その旨のメッセージが出る`() = runTest {
+        viewModel.messages.test {
+            viewModel.onEntryResult(ItemEntryResult.EDIT_REJECTED_COMPLETED)
+            assertThat(awaitItem()).isEqualTo(DetailMessage.CannotEditCompleted)
+            viewModel.onEntryResult(ItemEntryResult.EDIT_REJECTED_NOT_FOUND)
+            assertThat(awaitItem()).isEqualTo(DetailMessage.EditedItemNotFound)
         }
     }
 
     @Test
-    fun `編集中にチェックされた項目は更新せず、その旨のメッセージが出る`() = runTest {
-        val itemId = store.addItem(NewItem(listId, "牛乳", 1.0, null))
-        val item = store.observeOpenItems().first().single()
-        viewModel.messages.test {
-            viewModel.onAddItemEvent(AddItemEvent.EditRequested(item))
-            store.completeItem(itemId, clock.now)
-            viewModel.onAddItemEvent(AddItemEvent.NameChanged("低脂肪乳"))
-            viewModel.onAddItemEvent(AddItemEvent.Confirmed)
+    fun `リスト名と備考を変更できる。空白だけの名前には変更しない`() = runTest {
+        viewModel.uiState.test {
+            awaitUntil { !it.loading }
 
-            assertThat(awaitItem()).isEqualTo(DetailMessage.CannotEditCompleted("低脂肪乳"))
+            viewModel.updateList("   ", "")
+            viewModel.updateList(" イオン ", " 火曜市 ")
+
+            val state = awaitUntil { it.listName != "スーパー" }
+            assertThat(state.listName).isEqualTo("イオン")
+            assertThat(state.listMemo).isEqualTo("火曜市")
+        }
+    }
+
+    @Test
+    fun `のこりの商品があるリストは削除できず、理由のメッセージが出る`() = runTest {
+        store.addItem(newItem(listId, "牛乳"))
+        turbineScope {
+            val states = viewModel.uiState.testIn(backgroundScope)
+            val messages = viewModel.messages.testIn(backgroundScope)
+            states.awaitUntil { it.items.isNotEmpty() }
+
+            assertThat(viewModel.canDeleteList()).isFalse()
+            assertThat(messages.awaitItem()).isEqualTo(DetailMessage.CannotDeleteList)
+        }
+    }
+
+    @Test
+    fun `のこりの商品がないリストは削除でき、一覧に戻る`() = runTest {
+        turbineScope {
+            val states = viewModel.uiState.testIn(backgroundScope)
+            val navigation = viewModel.navigation.testIn(backgroundScope)
+            states.awaitUntil { !it.loading }
+
+            assertThat(viewModel.canDeleteList()).isTrue()
+            viewModel.deleteList()
+
+            assertThat(navigation.awaitItem()).isEqualTo(DetailNavigation.ListDeleted)
+            // 削除したリストは表示しなくなる
+            states.awaitUntil { it.listName.isEmpty() }
         }
     }
 
     @Test
     fun `項目を動かすと並び順が変わる`() = runTest {
-        val milk = store.addItem(NewItem(listId, "牛乳", null, null))
-        val egg = store.addItem(NewItem(listId, "卵", null, null))
+        val milk = store.addItem(newItem(listId, "牛乳"))
+        val egg = store.addItem(newItem(listId, "卵"))
         viewModel.uiState.test {
             awaitUntil { it.items.size == 2 }
 

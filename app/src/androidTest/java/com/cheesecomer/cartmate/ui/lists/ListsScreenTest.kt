@@ -1,20 +1,26 @@
 package com.cheesecomer.cartmate.ui.lists
 
+import android.view.WindowManager
+import androidx.activity.ComponentActivity
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
-import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performCustomAccessibilityActionWithLabel
 import androidx.compose.ui.test.performTextInput
-import androidx.compose.ui.test.performTextReplacement
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.cheesecomer.cartmate.data.memory.InMemoryStore
 import com.cheesecomer.cartmate.domain.model.NewItem
+import com.cheesecomer.cartmate.domain.model.NewList
 import com.cheesecomer.cartmate.domain.model.UserId
+import com.cheesecomer.cartmate.domain.model.Visibility
 import com.cheesecomer.cartmate.ui.theme.CartMateTheme
+import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Rule
@@ -26,69 +32,98 @@ import java.time.Clock
 class ListsScreenTest {
 
     @get:Rule
-    val composeRule = createComposeRule()
+    val composeRule = createAndroidComposeRule<ComponentActivity>()
 
     private val store = InMemoryStore(Clock.systemUTC()) { UserId("taro") }
 
+    private fun createList(name: String, visibility: Visibility = Visibility.SHARED) =
+        runBlocking { store.createList(NewList(name, null, visibility)) }
+
     private fun setContent() {
+        // アプリと同じく、キーボードの高さを画面側で受け取る（シートはキーボードと一緒にせり上がる）
+        composeRule.runOnUiThread {
+            composeRule.activity.enableEdgeToEdge()
+            composeRule.activity.window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+        }
         val viewModel = ListsViewModel(store, store, store, Clock.systemUTC())
         composeRule.setContent {
             CartMateTheme { ListsScreen(onOpenList = {}, viewModel = viewModel) }
         }
     }
 
-    @Test
-    fun リストを作成すると一覧に表示される() {
-        setContent()
-
-        composeRule.onNodeWithContentDescription("リストを作成").performClick()
-        composeRule.onNode(hasSetTextAction()).performTextInput("スーパー")
-        composeRule.onNodeWithText("作成").performClick()
-
-        composeRule.onNodeWithText("スーパー").assertIsDisplayed()
-        composeRule.onNodeWithText("まだ買うものを登録していません").assertIsDisplayed()
+    /** シートのリスト名の欄が表示されるまで待つ */
+    private fun waitForCreateSheet() {
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            runCatching { composeRule.onNode(hasText("リスト名") and hasSetTextAction()).assertIsDisplayed() }.isSuccess
+        }
     }
 
     @Test
-    fun 未購入が0件のリストだけ削除できる() {
+    fun リストがなければ空の状態を表示し_ボタンから作成できる() {
+        setContent()
+
+        composeRule.onNodeWithText("リストがありません").assertIsDisplayed()
+        composeRule.onNodeWithText("リストを作成する").performClick()
+        waitForCreateSheet()
+        composeRule.onNode(hasText("リスト名")).performTextInput("スーパー")
+        composeRule.onNodeWithText("作成する").performClick()
+
+        composeRule.waitUntil { runBlocking { store.observeLists().first() }.isNotEmpty() }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("スーパー").assertIsDisplayed()
+        composeRule.onNodeWithText("リストがありません").assertDoesNotExist()
+    }
+
+    @Test
+    fun リスト作成のシートで名前_公開範囲_メモを指定して作成すると_カードに表示される() {
+        createList("イオン")
+        setContent()
+
+        // FAB の文字は、ボタンの要素にはまとめられない
+        composeRule.onNodeWithText("リスト作成", useUnmergedTree = true).performClick()
+        waitForCreateSheet()
+        composeRule.onNode(hasText("リスト名")).performTextInput("薬局")
+        composeRule.onNodeWithText("プライベート").performClick()
+        composeRule.onNode(hasText("メモ（任意）")).performTextInput("日用品")
+        composeRule.onNodeWithText("作成する").performClick()
+
+        composeRule.waitUntil { runBlocking { store.observeLists().first() }.size == 2 }
+        val list = runBlocking { store.observeLists().first() }.last()
+        assertThat(list.name).isEqualTo("薬局")
+        assertThat(list.memo).isEqualTo("日用品")
+        assertThat(list.visibility).isEqualTo(Visibility.PRIVATE)
+        // シートが閉じて落ち着いたあとのカードの表示
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("作成する").assertDoesNotExist()
+        composeRule.onNodeWithText("日用品").assertIsDisplayed()
+        composeRule.onNode(hasText("薬局") and hasContentDescription("プライベート"), useUnmergedTree = false).assertIsDisplayed()
+    }
+
+    @Test
+    fun 件数の状態ごとに_のこり_登録なし_買い終わったを表示する() {
+        val open = createList("スーパー")
+        createList("ホームセンター")
+        val done = createList("イオン")
         runBlocking {
-            val supermarket = store.createList("スーパー")
-            store.addItem(NewItem(supermarket, "牛乳", null, null))
-            store.createList("薬局")
+            store.addItem(NewItem(open, "牛乳", 1.0, "本", null, Visibility.SHARED))
+            val item = store.addItem(NewItem(done, "卵", 1.0, "パック", null, Visibility.SHARED))
+            store.completeItem(item, java.time.Instant.now())
         }
         setContent()
 
-        composeRule.onNodeWithContentDescription("スーパー を削除").assertDoesNotExist()
-        composeRule.onNodeWithContentDescription("薬局 を削除").performClick()
-        composeRule.onNodeWithText("削除").performClick()
-
-        composeRule.waitUntil { runBlocking { store.observeLists().first().count { it.status.name == "ACTIVE" } } == 1 }
-        composeRule.onNodeWithText("薬局").assertDoesNotExist()
-    }
-
-    @Test
-    fun 編集ボタンからリスト名を変更できる() {
-        runBlocking { store.createList("スーパー") }
-        setContent()
-
-        composeRule.onNodeWithContentDescription("スーパーの名前を変更").performClick()
-        composeRule.onNode(hasSetTextAction()).performTextReplacement("イオン")
-        composeRule.onNodeWithText("変更").performClick()
-
-        composeRule.onNodeWithText("イオン").assertIsDisplayed()
-        composeRule.onNodeWithText("スーパー").assertDoesNotExist()
+        composeRule.onNodeWithText("件 のこり").assertIsDisplayed()
+        composeRule.onNodeWithText("件 登録なし").assertIsDisplayed()
+        composeRule.onNodeWithText("件 買い終わった！").assertIsDisplayed()
     }
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun TalkBackのカスタムアクションでリストを上下に移動できる() {
-        runBlocking {
-            store.createList("スーパー")
-            store.createList("薬局")
-        }
+    fun TalkBackのカスタムアクションでリストを前後に移動できる() {
+        createList("スーパー")
+        createList("薬局")
         setContent()
 
-        composeRule.onNodeWithText("薬局").performCustomAccessibilityActionWithLabel("上へ移動")
+        composeRule.onNodeWithText("薬局").performCustomAccessibilityActionWithLabel("前へ移動")
 
         composeRule.waitUntil { runBlocking { store.observeLists().first().map { it.name } } == listOf("薬局", "スーパー") }
     }

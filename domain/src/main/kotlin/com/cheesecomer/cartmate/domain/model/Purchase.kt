@@ -13,6 +13,9 @@ data class Purchase(
     val inputName: String,
     val quantity: Double?,
     val unit: String?,
+    val memo: String?,
+    /** 元の項目と同じ。PRIVATE なら [purchasedBy]（＝項目を作った本人）にだけ見える */
+    val visibility: Visibility,
     val checkedAt: Instant,
     val purchasedAt: Instant,
     val purchasedBy: UserId,

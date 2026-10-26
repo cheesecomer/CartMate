@@ -1,19 +1,19 @@
 package com.cheesecomer.cartmate.ui.listdetail
 
+import android.view.WindowManager
+import androidx.activity.ComponentActivity
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
-import androidx.compose.ui.test.assertIsOff
-import androidx.compose.ui.test.assertIsOn
-import androidx.activity.ComponentActivity
-import androidx.compose.material3.Text
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.ui.test.onAllNodesWithText
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.rememberNavController
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -30,8 +30,13 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.cheesecomer.cartmate.data.memory.InMemoryStore
+import com.cheesecomer.cartmate.domain.model.ItemId
+import com.cheesecomer.cartmate.domain.model.ListId
 import com.cheesecomer.cartmate.domain.model.NewItem
+import com.cheesecomer.cartmate.domain.model.NewList
 import com.cheesecomer.cartmate.domain.model.UserId
+import com.cheesecomer.cartmate.domain.model.Visibility
+import com.cheesecomer.cartmate.ui.itementry.LastVisibilityStore
 import com.cheesecomer.cartmate.ui.theme.CartMateTheme
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.flow.first
@@ -50,74 +55,163 @@ class ListDetailScreenTest {
 
     private val clock = Clock.systemUTC()
     private val store = InMemoryStore(clock) { UserId("taro") }
-    private val listId = runBlocking { store.createList("スーパー") }
+    private var listId = runBlocking { store.createList(NewList("スーパー", null, Visibility.SHARED)) }
+
+    private val openedEntries = mutableListOf<Triple<String, Double?, String?>>()
+    private val editedItems = mutableListOf<ItemId>()
+    private var backCount = 0
 
     private fun setContent() {
         val viewModel = ListDetailViewModel(
             savedStateHandle = SavedStateHandle(mapOf("listId" to listId.value)),
             listRepository = store,
             itemRepository = store,
+            lastVisibility = LastVisibilityStore(),
             clock = clock,
         )
+        // アプリと同じく、キーボードの高さを画面側で受け取る（シートはキーボードが出てから表示する）
+        composeRule.runOnUiThread {
+            composeRule.activity.enableEdgeToEdge()
+            composeRule.activity.window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+        }
         composeRule.setContent {
-            CartMateTheme { ListDetailScreen(onBack = {}, viewModel = viewModel) }
+            CartMateTheme {
+                ListDetailScreen(
+                    onBack = { backCount++ },
+                    onOpenEntry = { name, quantity, unit -> openedEntries += Triple(name, quantity, unit) },
+                    onEditItem = { editedItems += it },
+                    viewModel = viewModel,
+                )
+            }
+        }
+    }
+
+    private fun addItem(
+        name: String,
+        quantity: Double? = 1.0,
+        unit: String? = null,
+        memo: String? = null,
+        visibility: Visibility = Visibility.SHARED,
+        listId: ListId = this.listId,
+    ) = runBlocking { store.addItem(NewItem(listId, name, quantity, unit, memo, visibility)) }
+
+    /** 商品追加欄をタップし、サジェストのシートが表示されるまで待つ */
+    private fun openSheet() {
+        composeRule.onNodeWithTag(AddItemTags.FIELD).performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            runCatching { composeRule.onNodeWithTag(AddItemTags.SHEET_INPUT).assertIsDisplayed() }.isSuccess
         }
     }
 
     private fun openItemNames() = runBlocking { store.observeOpenItems().first().map { it.inputName } }
 
+    private fun listItemNames() =
+        runBlocking { store.observeListItems(listId, Instant.EPOCH).first().map { it.inputName } }
+
+    /** Snackbar の「元に戻す」。チェック済みのカードにも同じ文字のボタンがあるので、読み上げの名前で区別する */
+    private fun snackbarUndo() =
+        composeRule.onNode(hasText("元に戻す") and !hasContentDescription("のチェックを外す", substring = true))
+
     private fun activePurchaseCount() =
         runBlocking { store.observePurchases(Instant.EPOCH).first().count { it.active } }
 
     @Test
-    fun 商品名_Enter_Enterで数量1のまま追加され_商品名の欄にフォーカスが戻る() {
+    fun 商品追加欄をタップするとシートが開き_Enterで数量1単位個で追加され_シートは開いたまま入力欄が空になる() {
         setContent()
 
-        composeRule.onNodeWithTag(AddItemBarTags.NAME).performTextInput("牛乳")
-        composeRule.onNodeWithTag(AddItemBarTags.NAME).performImeAction()
-        composeRule.onNodeWithTag(AddItemBarTags.QUANTITY).assertIsFocused()
-        composeRule.onNodeWithTag(AddItemBarTags.QUANTITY).performImeAction()
+        openSheet()
+        composeRule.onNodeWithTag(AddItemTags.SHEET_INPUT).assertIsFocused()
+        composeRule.onNodeWithTag(AddItemTags.SHEET_INPUT).performTextInput("牛乳")
+        composeRule.onNodeWithTag(AddItemTags.SHEET_INPUT).performImeAction()
 
         composeRule.waitUntil { openItemNames() == listOf("牛乳") }
         val item = runBlocking { store.observeOpenItems().first().single() }
         assertThat(item.quantity).isEqualTo(1.0)
-        composeRule.onNodeWithTag(AddItemBarTags.NAME).assertIsFocused()
+        assertThat(item.unit).isEqualTo("個")
+        // 画面が落ち着いたあとも、シートは開いたまま、入力欄は空でフォーカスを保つ
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(AddItemTags.SHEET_INPUT).assertIsFocused()
+        // 空のときは placeholder が表示されるので、入力された文字だけを比べる
+        composeRule.onNodeWithTag(AddItemTags.SHEET_INPUT)
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.EditableText, AnnotatedString("")))
     }
 
     @Test
-    fun 続けて複数の商品を追加できる() {
+    fun シートを開いたまま続けて複数の商品を追加できる() {
         setContent()
 
-        listOf("牛乳", "卵").forEach { name ->
-            composeRule.onNodeWithTag(AddItemBarTags.NAME).performTextInput(name)
-            composeRule.onNodeWithTag(AddItemBarTags.NAME).performImeAction()
-            composeRule.onNodeWithTag(AddItemBarTags.QUANTITY).performImeAction()
+        openSheet()
+        listOf("牛乳", "卵", "パン").forEach { name ->
+            composeRule.onNodeWithTag(AddItemTags.SHEET_INPUT).performTextInput(name)
+            composeRule.onNodeWithTag(AddItemTags.SHEET_INPUT).performImeAction()
         }
 
-        composeRule.waitUntil { openItemNames() == listOf("牛乳", "卵") }
+        composeRule.waitUntil { openItemNames() == listOf("牛乳", "卵", "パン") }
+    }
+
+    @Test
+    fun 未入力ではシートに案内を表示し_入力すると数量を設定して追加が出る() {
+        setContent()
+
+        openSheet()
+        composeRule.onNodeWithText("商品名を入力すると候補が出ます").assertIsDisplayed()
+        composeRule.onNodeWithText("数量を設定して追加").assertDoesNotExist()
+
+        composeRule.onNodeWithTag(AddItemTags.SHEET_INPUT).performTextInput("豆乳")
+
+        composeRule.onNodeWithText("数量を設定して追加").assertIsDisplayed()
+    }
+
+    @Test
+    fun 数量を設定して追加で_入力した商品名で商品詳細入力画面を開く() {
+        setContent()
+
+        openSheet()
+        composeRule.onNodeWithTag(AddItemTags.SHEET_INPUT).performTextInput("豆乳")
+        composeRule.onNodeWithText("数量を設定して追加").performClick()
+
+        composeRule.waitUntil { openedEntries.isNotEmpty() }
+        assertThat(openedEntries).containsExactly(Triple("豆乳", 1.0, "個"))
+        assertThat(openItemNames()).isEmpty()
+    }
+
+    @Test
+    fun 戻るキーでシートを閉じても_入力途中の商品名は商品追加欄に残る() {
+        setContent()
+
+        openSheet()
+        composeRule.onNodeWithTag(AddItemTags.SHEET_INPUT).performTextInput("牛")
+        // キーボードが出ていれば1回目の戻るキーはキーボードを閉じるので、閉じてから戻るキーを押す
+        Espresso.closeSoftKeyboard()
+        Espresso.pressBack()
+
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(AddItemTags.SHEET_INPUT).assertDoesNotExist()
+        composeRule.onNodeWithTag(AddItemTags.FIELD).assert(hasText("牛"))
+        assertThat(backCount).isEqualTo(0)
+        assertThat(openItemNames()).isEmpty()
     }
 
     @Test
     fun 右スワイプでチェックすると購入が記録される() {
-        runBlocking { store.addItem(NewItem(listId, "牛乳", null, null)) }
+        addItem("牛乳")
         setContent()
 
         composeRule.onNodeWithText("牛乳").performTouchInput { swipeRight() }
 
         composeRule.waitUntil { openItemNames().isEmpty() }
-        val purchases = runBlocking { store.observePurchases(Instant.EPOCH).first() }
-        assertThat(purchases.single().active).isTrue()
+        assertThat(activePurchaseCount()).isEqualTo(1)
     }
 
     @Test
     fun 左スワイプで削除し_Snackbarの元に戻すで復元できる() {
-        runBlocking { store.addItem(NewItem(listId, "牛乳", null, null)) }
+        addItem("牛乳")
         setContent()
 
         composeRule.onNodeWithText("牛乳").performTouchInput { swipeLeft() }
         composeRule.waitUntil { openItemNames().isEmpty() }
 
-        composeRule.onNodeWithText("元に戻す").performClick()
+        snackbarUndo().performClick()
         composeRule.waitUntil { openItemNames() == listOf("牛乳") }
         // 元に戻した項目が、もう一度削除されないこと
         composeRule.waitForIdle()
@@ -127,13 +221,13 @@ class ListDetailScreenTest {
 
     @Test
     fun 右スワイプでチェックし_Snackbarの元に戻すで未購入に戻る() {
-        runBlocking { store.addItem(NewItem(listId, "牛乳", null, null)) }
+        addItem("牛乳")
         setContent()
 
         composeRule.onNodeWithText("牛乳").performTouchInput { swipeRight() }
         composeRule.waitUntil { openItemNames().isEmpty() }
 
-        composeRule.onNodeWithText("元に戻す").performClick()
+        snackbarUndo().performClick()
         composeRule.waitUntil { openItemNames() == listOf("牛乳") }
         // 元に戻した項目が、もう一度チェックされないこと
         composeRule.waitForIdle()
@@ -143,7 +237,7 @@ class ListDetailScreenTest {
 
     @Test
     fun チェック済みの項目を左スワイプで未購入に戻せる() {
-        runBlocking { store.addItem(NewItem(listId, "牛乳", null, null)) }
+        addItem("牛乳")
         setContent()
 
         composeRule.onNodeWithText("牛乳").performTouchInput { swipeRight() }
@@ -159,38 +253,20 @@ class ListDetailScreenTest {
     }
 
     @Test
-    fun 編集ボタンで編集し_更新できる() {
-        runBlocking { store.addItem(NewItem(listId, "牛乳", 1.0, null)) }
-        setContent()
-
-        composeRule.onNodeWithContentDescription("牛乳を編集").performClick()
-        composeRule.onNodeWithTag(AddItemBarTags.QUANTITY).assertIsFocused()
-        composeRule.onNodeWithTag(AddItemBarTags.QUANTITY).performTextInput("2")
-        composeRule.onNodeWithTag(AddItemBarTags.EDIT_NAME).performTextReplacement("低脂肪乳")
-        composeRule.onNodeWithText("更新").performClick()
-
-        composeRule.waitUntil { openItemNames() == listOf("低脂肪乳") }
-        val item = runBlocking { store.observeOpenItems().first().single() }
-        assertThat(item.quantity).isEqualTo(2.0)
-        // 編集が終わると商品名の入力欄に戻る
-        composeRule.onNodeWithTag(AddItemBarTags.NAME).assertIsDisplayed()
-    }
-
-    @Test
-    fun 未購入の項目をタップするとチェックされ_編集は始まらない() {
-        runBlocking { store.addItem(NewItem(listId, "牛乳", null, null)) }
+    fun 未購入の項目をタップするとチェックされる() {
+        addItem("牛乳")
         setContent()
 
         composeRule.onNodeWithText("牛乳").performClick()
 
         composeRule.waitUntil { openItemNames().isEmpty() }
         assertThat(activePurchaseCount()).isEqualTo(1)
-        composeRule.onNodeWithTag(AddItemBarTags.EDIT_NAME).assertDoesNotExist()
+        assertThat(editedItems).isEmpty()
     }
 
     @Test
     fun チェック済みの項目をタップするとチェックが外れる() {
-        val itemId = runBlocking { store.addItem(NewItem(listId, "牛乳", null, null)) }
+        val itemId = addItem("牛乳")
         runBlocking { store.completeItem(itemId, Instant.now()) }
         setContent()
 
@@ -203,8 +279,20 @@ class ListDetailScreenTest {
     }
 
     @Test
+    fun 編集ボタンで項目の商品詳細入力画面を開く() {
+        val itemId = addItem("牛乳")
+        setContent()
+
+        composeRule.onNodeWithContentDescription("牛乳を編集").performClick()
+
+        composeRule.waitUntil { editedItems.isNotEmpty() }
+        assertThat(editedItems).containsExactly(itemId)
+        assertThat(activePurchaseCount()).isEqualTo(0)
+    }
+
+    @Test
     fun 削除ボタンで削除できる() {
-        runBlocking { store.addItem(NewItem(listId, "牛乳", null, null)) }
+        addItem("牛乳")
         setContent()
 
         composeRule.onNodeWithContentDescription("牛乳を削除").performClick()
@@ -214,21 +302,12 @@ class ListDetailScreenTest {
     }
 
     @Test
-    fun 編集ボタンで編集を始められる() {
-        runBlocking { store.addItem(NewItem(listId, "牛乳", null, null)) }
-        setContent()
-
-        composeRule.onNodeWithContentDescription("牛乳を編集").performClick()
-
-        composeRule.onNodeWithTag(AddItemBarTags.EDIT_NAME).assertIsDisplayed()
-    }
-
-    @Test
-    fun チェック済みの項目はボタンでチェックを外せる() {
-        val itemId = runBlocking { store.addItem(NewItem(listId, "牛乳", null, null)) }
+    fun チェック済みの項目は元に戻すボタンでチェックを外せる() {
+        val itemId = addItem("牛乳")
         runBlocking { store.completeItem(itemId, Instant.now()) }
         setContent()
 
+        composeRule.onNodeWithContentDescription("牛乳のチェックを外す").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("牛乳のチェックを外す").performClick()
 
         composeRule.waitUntil { openItemNames() == listOf("牛乳") }
@@ -236,51 +315,53 @@ class ListDetailScreenTest {
     }
 
     @Test
-    fun 数量と単位は商品名の下の行に表示される() {
-        runBlocking { store.addItem(NewItem(listId, "牛乳", 2.0, "本")) }
+    fun 数量と単位は商品名の横に_備考は商品名の下の行に表示される() {
+        addItem("牛乳", 2.0, "本", memo = "無調整")
         setContent()
 
-        // 行全体が1つの要素にまとまるので、個々の文字の要素で位置を比べる
+        // カード全体が1つの要素にまとまるので、個々の文字の要素で位置を比べる
         val name = composeRule.onNodeWithText("牛乳", useUnmergedTree = true).getUnclippedBoundsInRoot()
         val quantity = composeRule.onNodeWithText("2本", useUnmergedTree = true).getUnclippedBoundsInRoot()
-        assertThat(quantity.top).isAtLeast(name.bottom)
+        val memo = composeRule.onNodeWithText("無調整", useUnmergedTree = true).getUnclippedBoundsInRoot()
+        assertThat(quantity.left).isAtLeast(name.right)
+        assertThat(memo.top).isAtLeast(name.bottom)
     }
 
     @Test
-    fun 編集中に戻るキーを押すと編集をやめる() {
-        runBlocking { store.addItem(NewItem(listId, "牛乳", 1.0, null)) }
+    fun 買い物進捗に_のこりと完了の件数を表示する() {
+        addItem("牛乳")
+        val egg = addItem("卵")
+        runBlocking { store.completeItem(egg, Instant.now()) }
         setContent()
 
-        composeRule.onNodeWithContentDescription("牛乳を編集").performClick()
-        composeRule.onNodeWithTag(AddItemBarTags.EDIT_NAME).assertIsDisplayed()
-
-        // キーボードが出ていれば1回目の戻るキーはキーボードを閉じるので、閉じてから戻るキーを押す
-        Espresso.closeSoftKeyboard()
-        Espresso.pressBack()
-
-        composeRule.onNodeWithTag(AddItemBarTags.EDIT_NAME).assertDoesNotExist()
-        composeRule.onNodeWithTag(AddItemBarTags.NAME).assertIsDisplayed()
+        composeRule.onNodeWithText("のこり 1件 / 1完了").assertIsDisplayed()
     }
 
     @Test
-    fun 編集中に閉じるボタンを押すと編集をやめる() {
-        runBlocking { store.addItem(NewItem(listId, "牛乳", 1.0, null)) }
+    fun 共有のリストのプライベートな項目にだけ鍵アイコンを付ける() {
+        addItem("牛乳")
+        addItem("プレゼント", visibility = Visibility.PRIVATE)
         setContent()
 
-        composeRule.onNodeWithContentDescription("牛乳を編集").performClick()
-        composeRule.onNodeWithContentDescription("編集をやめる").performClick()
+        composeRule.onNode(hasText("プレゼント") and hasContentDescription("プライベート")).assertIsDisplayed()
+        composeRule.onNode(hasText("牛乳") and hasContentDescription("プライベート")).assertDoesNotExist()
+    }
 
-        composeRule.onNodeWithTag(AddItemBarTags.EDIT_NAME).assertDoesNotExist()
-        composeRule.onNodeWithTag(AddItemBarTags.NAME).assertIsDisplayed()
+    @Test
+    fun プライベートのリストでは_項目ではなく上部のバーに鍵アイコンを付ける() {
+        listId = runBlocking { store.createList(NewList("自分用", null, Visibility.PRIVATE)) }
+        addItem("目薬", visibility = Visibility.PRIVATE)
+        setContent()
+
+        composeRule.onNode(hasText("目薬") and hasContentDescription("プライベート")).assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("プライベート").assertIsDisplayed()
     }
 
     @Test
     fun チェックした項目は位置を変えずに表示され続ける() {
-        runBlocking {
-            store.addItem(NewItem(listId, "牛乳", null, null))
-            store.addItem(NewItem(listId, "卵", null, null))
-            store.addItem(NewItem(listId, "パン", null, null))
-        }
+        addItem("牛乳")
+        addItem("卵")
+        addItem("パン")
         setContent()
         val before = composeRule.onNodeWithText("卵").getUnclippedBoundsInRoot().top
 
@@ -288,95 +369,56 @@ class ListDetailScreenTest {
         composeRule.waitUntil { "卵" !in openItemNames() }
         composeRule.waitForIdle()
 
-        // チェック済みセクションに移らず、同じ位置に残る
-        composeRule.onNodeWithText("チェック済み", substring = true).assertDoesNotExist()
         composeRule.onNodeWithText("卵").assertIsDisplayed()
         assertThat(composeRule.onNodeWithText("卵").getUnclippedBoundsInRoot().top).isEqualTo(before)
     }
 
-    /** 実際のアプリと同じく、NavHost の中でリスト詳細を表示する */
-    private fun setContentInNavHost() {
-        val viewModel = ListDetailViewModel(
-            savedStateHandle = SavedStateHandle(mapOf("listId" to listId.value)),
-            listRepository = store,
-            itemRepository = store,
-            clock = clock,
-        )
-        composeRule.setContent {
-            val navController = rememberNavController()
-            CartMateTheme {
-                NavHost(navController, startDestination = "lists") {
-                    composable("lists") { Text("リスト一覧") }
-                    composable("detail") { ListDetailScreen(onBack = { navController.popBackStack() }, viewModel = viewModel) }
-                }
-            }
-            LaunchedEffect(Unit) { navController.navigate("detail") }
-        }
-    }
-
     @Test
-    fun 画面遷移の中でも_編集中に戻るキーを押すと前の画面に戻らずに編集をやめる() {
-        runBlocking { store.addItem(NewItem(listId, "牛乳", 1.0, null)) }
-        setContentInNavHost()
-        composeRule.waitUntil { composeRule.onAllNodesWithText("牛乳").fetchSemanticsNodes().isNotEmpty() }
-
-        composeRule.onNodeWithContentDescription("牛乳を編集").performClick()
-        composeRule.onNodeWithTag(AddItemBarTags.EDIT_NAME).assertIsDisplayed()
-        Espresso.closeSoftKeyboard()
-        Espresso.pressBack()
-        composeRule.waitForIdle()
-
-        composeRule.onNodeWithText("リスト一覧").assertDoesNotExist()
-        composeRule.onNodeWithTag(AddItemBarTags.EDIT_NAME).assertDoesNotExist()
-        composeRule.onNodeWithTag(AddItemBarTags.NAME).assertIsDisplayed()
-    }
-
-    @Test
-    fun 編集中_キーボードを閉じたあとの2回目の戻るキーで編集をやめる() {
-        runBlocking { store.addItem(NewItem(listId, "牛乳", 1.0, null)) }
-        setContentInNavHost()
-        composeRule.waitUntil { composeRule.onAllNodesWithText("牛乳").fetchSemanticsNodes().isNotEmpty() }
-
-        composeRule.onNodeWithContentDescription("牛乳を編集").performClick()
-        composeRule.onNodeWithTag(AddItemBarTags.QUANTITY).assertIsFocused()
-
-        Espresso.pressBack()
-        composeRule.waitForIdle()
-        Espresso.pressBack()
-        composeRule.waitForIdle()
-
-        composeRule.onNodeWithText("リスト一覧").assertDoesNotExist()
-        composeRule.onNodeWithTag(AddItemBarTags.EDIT_NAME).assertDoesNotExist()
-        composeRule.onNodeWithTag(AddItemBarTags.NAME).assertIsDisplayed()
-    }
-
-    @Test
-    fun 編集中は編集ボタンが選択状態になり_もう一度押すと編集をやめる() {
-        runBlocking { store.addItem(NewItem(listId, "牛乳", null, null)) }
+    fun メニューからリスト名と備考を変更できる() {
         setContent()
-        val editButton = composeRule.onNodeWithContentDescription("牛乳を編集")
-        editButton.assertIsOff()
 
-        editButton.performClick()
-        editButton.assertIsOn()
-        composeRule.onNodeWithTag(AddItemBarTags.EDIT_NAME).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("リストのメニュー").performClick()
+        composeRule.onNodeWithText("リストを編集").performClick()
+        composeRule.onNode(hasText("リスト名")).performTextReplacement("イオン")
+        composeRule.onNode(hasText("メモ（任意）")).performTextInput("火曜市")
+        composeRule.onNodeWithText("変更").performClick()
 
-        editButton.performClick()
-        editButton.assertIsOff()
-        composeRule.onNodeWithTag(AddItemBarTags.EDIT_NAME).assertDoesNotExist()
+        composeRule.waitUntil { runBlocking { store.observeLists().first().single().name } == "イオン" }
+        assertThat(runBlocking { store.observeLists().first().single().memo }).isEqualTo("火曜市")
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("イオン").assertIsDisplayed()
     }
 
-    private fun listItemNames() =
-        runBlocking { store.observeListItems(listId, Instant.EPOCH).first().map { it.inputName } }
+    @Test
+    fun のこりの商品があるリストは削除できず_理由を表示する() {
+        addItem("牛乳")
+        setContent()
+
+        composeRule.onNodeWithContentDescription("リストのメニュー").performClick()
+        composeRule.onNodeWithText("リストを削除").performClick()
+
+        composeRule.onNodeWithText("のこりの商品があるリストは削除できません").assertIsDisplayed()
+        composeRule.onNodeWithText("リストを削除しますか？").assertDoesNotExist()
+    }
+
+    @Test
+    fun のこりの商品がないリストは確認してから削除し_一覧に戻る() {
+        setContent()
+
+        composeRule.onNodeWithContentDescription("リストのメニュー").performClick()
+        composeRule.onNodeWithText("リストを削除").performClick()
+        composeRule.onNodeWithText("削除").performClick()
+
+        composeRule.waitUntil { backCount == 1 }
+        assertThat(runBlocking { store.observeLists().first().single().status.name }).isEqualTo("DELETED")
+    }
 
     @OptIn(ExperimentalTestApi::class)
     @Test
     fun TalkBackのカスタムアクションで項目を上下に移動できる() {
-        runBlocking {
-            store.addItem(NewItem(listId, "牛乳", null, null))
-            store.addItem(NewItem(listId, "卵", null, null))
-            store.addItem(NewItem(listId, "パン", null, null))
-        }
+        addItem("牛乳")
+        addItem("卵")
+        addItem("パン")
         setContent()
 
         composeRule.onNodeWithText("パン").performCustomAccessibilityActionWithLabel("上へ移動")
@@ -388,11 +430,9 @@ class ListDetailScreenTest {
 
     @Test
     fun ロングタップしてドラッグすると項目を並び替えられる() {
-        runBlocking {
-            store.addItem(NewItem(listId, "牛乳", null, null))
-            store.addItem(NewItem(listId, "卵", null, null))
-            store.addItem(NewItem(listId, "パン", null, null))
-        }
+        addItem("牛乳")
+        addItem("卵")
+        addItem("パン")
         setContent()
         val rowHeight = composeRule.onNodeWithText("卵").getUnclippedBoundsInRoot().let { it.bottom - it.top }
 

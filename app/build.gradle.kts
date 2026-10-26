@@ -18,6 +18,14 @@ android {
         versionName = "0.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // キーボードの表示のタイミングに依存するテストは、通常の実行から外す。
+        // -PkeyboardTimingTests を付けたときは、そのテストだけを実行する（docs/testing.md）
+        val keyboardTimingTest = "com.cheesecomer.cartmate.testing.KeyboardTimingTest"
+        if (project.hasProperty("keyboardTimingTests")) {
+            testInstrumentationRunnerArguments["annotation"] = keyboardTimingTest
+        } else {
+            testInstrumentationRunnerArguments["notAnnotation"] = keyboardTimingTest
+        }
     }
 
     buildTypes {

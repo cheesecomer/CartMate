@@ -6,8 +6,11 @@ import com.cheesecomer.cartmate.domain.model.ItemStatus
 import com.cheesecomer.cartmate.domain.model.ListId
 import com.cheesecomer.cartmate.domain.model.ListStatus
 import com.cheesecomer.cartmate.domain.model.NewItem
+import com.cheesecomer.cartmate.domain.model.NewList
 import com.cheesecomer.cartmate.domain.model.Purchase
 import com.cheesecomer.cartmate.domain.model.ShoppingList
+import com.cheesecomer.cartmate.domain.model.UserId
+import com.cheesecomer.cartmate.domain.model.Visibility
 import com.cheesecomer.cartmate.domain.order.SortKeys
 import com.cheesecomer.cartmate.domain.repository.CompleteResult
 import com.cheesecomer.cartmate.domain.repository.CurrentUserProvider
@@ -16,10 +19,10 @@ import com.cheesecomer.cartmate.domain.repository.DeleteListResult
 import com.cheesecomer.cartmate.domain.repository.ItemRepository
 import com.cheesecomer.cartmate.domain.repository.ItemUpdate
 import com.cheesecomer.cartmate.domain.repository.PurchaseRepository
-import com.cheesecomer.cartmate.domain.repository.RenameListResult
 import com.cheesecomer.cartmate.domain.repository.ReopenResult
 import com.cheesecomer.cartmate.domain.repository.ShoppingListRepository
 import com.cheesecomer.cartmate.domain.repository.UpdateItemResult
+import com.cheesecomer.cartmate.domain.repository.UpdateListResult
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -34,6 +37,7 @@ import javax.inject.Singleton
 /**
  * フェーズ1用のインメモリ実装。プロセスが終了するとデータは消える。
  * チェックと Undo の意味論は Firestore 実装と同じにする（docs/design/sync.md）。
+ * 他のメンバーのプライベートなリスト・項目・購入は、Firestore の購読と同じく読み取りの結果に含めない。
  */
 @Singleton
 class InMemoryStore @Inject constructor(
@@ -58,19 +62,29 @@ class InMemoryStore @Inject constructor(
         }
     }
 
+    /** 公開範囲の判定。[owner] はリスト・項目なら作った人、購入ならチェックした人 */
+    private fun visible(visibility: Visibility, owner: UserId): Boolean =
+        visibility == Visibility.SHARED || owner == currentUser.currentUserId()
+
+    private val ShoppingList.visible get() = visible(visibility, createdBy)
+    private val Item.visible get() = visible(visibility, createdBy)
+    private val Purchase.visible get() = visible(visibility, purchasedBy)
+
     // ShoppingListRepository
 
     override fun observeLists(): Flow<List<ShoppingList>> =
-        data.map { it.lists.values.sortedBy(ShoppingList::sortKey) }.distinctUntilChanged()
+        data.map { d -> d.lists.values.filter { it.visible }.sortedBy(ShoppingList::sortKey) }.distinctUntilChanged()
 
-    override suspend fun createList(name: String): ListId {
+    override suspend fun createList(newList: NewList): ListId {
         val id = ListId(newId())
         val now = clock.instant()
         val me = currentUser.currentUserId()
         data.update { d ->
             val list = ShoppingList(
                 id = id,
-                name = name,
+                name = newList.name,
+                memo = newList.memo,
+                visibility = newList.visibility,
                 // 末尾に追加する
                 sortKey = SortKeys.after(d.lists.values.maxOfOrNull(ShoppingList::sortKey)),
                 createdAt = now,
@@ -94,20 +108,22 @@ class InMemoryStore @Inject constructor(
         }
     }
 
-    override suspend fun renameList(id: ListId, name: String): RenameListResult = transact { d ->
+    override suspend fun updateList(id: ListId, name: String, memo: String?): UpdateListResult = transact { d ->
         val list = d.lists[id]
-        if (list == null || list.status == ListStatus.DELETED) {
-            d to RenameListResult.NotFound
+        if (list == null || list.status == ListStatus.DELETED || !list.visible) {
+            d to UpdateListResult.NotFound
         } else {
-            d.copy(lists = d.lists + (id to list.copy(name = name))) to RenameListResult.Renamed
+            d.copy(lists = d.lists + (id to list.copy(name = name, memo = memo))) to UpdateListResult.Updated
         }
     }
 
     override suspend fun deleteList(id: ListId): DeleteListResult = transact { d ->
         val list = d.lists[id]
         when {
-            list == null || list.status == ListStatus.DELETED -> d to DeleteListResult.NotFound
-            d.items.values.any { it.listId == id && it.status == ItemStatus.OPEN } -> d to DeleteListResult.NotEmpty
+            list == null || list.status == ListStatus.DELETED || !list.visible -> d to DeleteListResult.NotFound
+            // 未購入の件数は自分に見える項目で数える。他のメンバーのプライベートな項目が残っていても削除できる
+            d.items.values.any { it.listId == id && it.status == ItemStatus.OPEN && it.visible } ->
+                d to DeleteListResult.NotEmpty
             else -> d.copy(lists = d.lists + (id to list.copy(status = ListStatus.DELETED))) to DeleteListResult.Deleted
         }
     }
@@ -115,13 +131,13 @@ class InMemoryStore @Inject constructor(
     // ItemRepository
 
     override fun observeOpenItems(): Flow<List<Item>> =
-        data.map { d -> d.items.values.filter { it.status == ItemStatus.OPEN }.sortedBy(Item::createdAt) }
+        data.map { d -> d.items.values.filter { it.status == ItemStatus.OPEN && it.visible }.sortedBy(Item::createdAt) }
             .distinctUntilChanged()
 
     override fun observeListItems(listId: ListId, completedSince: Instant): Flow<List<Item>> =
         data.map { d ->
             d.items.values
-                .filter { it.listId == listId }
+                .filter { it.listId == listId && it.visible }
                 .filter { it.status == ItemStatus.OPEN || it.completedAt!! >= completedSince }
                 .sortedBy(Item::sortKey)
         }.distinctUntilChanged()
@@ -139,6 +155,8 @@ class InMemoryStore @Inject constructor(
                 sortKey = SortKeys.after(d.items.values.filter { it.listId == newItem.listId }.maxOfOrNull(Item::sortKey)),
                 quantity = newItem.quantity,
                 unit = newItem.unit,
+                memo = newItem.memo,
+                visibility = newItem.visibility,
                 status = ItemStatus.OPEN,
                 createdAt = now,
                 createdBy = me,
@@ -168,7 +186,12 @@ class InMemoryStore @Inject constructor(
             item == null -> d to UpdateItemResult.NotFound
             item.status == ItemStatus.COMPLETED -> d to UpdateItemResult.AlreadyCompleted
             else -> {
-                val updated = item.copy(inputName = update.inputName, quantity = update.quantity, unit = update.unit)
+                val updated = item.copy(
+                    inputName = update.inputName,
+                    quantity = update.quantity,
+                    unit = update.unit,
+                    memo = update.memo,
+                )
                 d.copy(items = d.items + (id to updated)) to UpdateItemResult.Updated
             }
         }
@@ -209,6 +232,8 @@ class InMemoryStore @Inject constructor(
                 inputName = item.inputName,
                 quantity = item.quantity,
                 unit = item.unit,
+                memo = item.memo,
+                visibility = item.visibility,
                 checkedAt = checkedAt,
                 purchasedAt = now,
                 purchasedBy = me,
@@ -238,7 +263,9 @@ class InMemoryStore @Inject constructor(
     // PurchaseRepository
 
     override fun observePurchases(since: Instant): Flow<List<Purchase>> =
-        data.map { d -> d.purchases.values.filter { it.purchasedAt >= since }.sortedBy(Purchase::purchasedAt) }
+        data.map { d ->
+            d.purchases.values.filter { it.purchasedAt >= since && it.visible }.sortedBy(Purchase::purchasedAt)
+        }
             .distinctUntilChanged()
 
     private fun newId(): String = UUID.randomUUID().toString()

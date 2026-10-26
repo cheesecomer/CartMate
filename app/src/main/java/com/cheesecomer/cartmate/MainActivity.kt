@@ -14,7 +14,7 @@ import dagger.hilt.android.AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // 背景は常に白なので、端末がダークモードでもステータスバー・ナビゲーションバーのアイコンは濃い色にする
+        // 背景は常に明るい色なので、端末がダークモードでもステータスバー・ナビゲーションバーのアイコンは濃い色にする
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),

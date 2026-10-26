@@ -2,9 +2,12 @@ package com.cheesecomer.cartmate.ui.lists
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.cheesecomer.cartmate.domain.list.ListProgress
 import com.cheesecomer.cartmate.domain.model.ListId
 import com.cheesecomer.cartmate.domain.model.ListStatus
+import com.cheesecomer.cartmate.domain.model.NewList
 import com.cheesecomer.cartmate.domain.model.ShoppingList
+import com.cheesecomer.cartmate.domain.model.Visibility
 import com.cheesecomer.cartmate.domain.repository.ItemRepository
 import com.cheesecomer.cartmate.domain.repository.PurchaseRepository
 import com.cheesecomer.cartmate.domain.repository.ShoppingListRepository
@@ -21,19 +24,16 @@ import javax.inject.Inject
 data class ListSummary(
     val id: ListId,
     val name: String,
-    val openCount: Int,
-    /** このリストで購入（チェック）した有効な記録があるか */
-    val hasPurchases: Boolean,
-) {
-    val canDelete: Boolean get() = openCount == 0
-
-    /** まだ何も買っていない新しいリスト。未購入が0件でも、買い終わったリストとは区別する */
-    val isNew: Boolean get() = openCount == 0 && !hasPurchases
-}
+    val memo: String?,
+    val visibility: Visibility,
+    val progress: ListProgress,
+)
 
 data class ListsUiState(
     val lists: List<ListSummary> = emptyList(),
     val loading: Boolean = true,
+    /** オフラインならバナーを表示する。オンライン判定はフェーズ2で追加する */
+    val offline: Boolean = false,
 )
 
 @HiltViewModel
@@ -48,41 +48,48 @@ class ListsViewModel @Inject constructor(
         combine(
             listRepository.observeLists(),
             itemRepository.observeOpenItems(),
-            // 予測と同じ範囲（直近365日）の購入の記録で、新しいリストかどうかを判定する
+            // 予測と同じ範囲（直近365日）の購入の記録で、買い終わったリストかどうかを判定する
             purchaseRepository.observePurchases(since = clock.instant().minus(PURCHASE_WINDOW)),
         ) { lists, openItems, purchases ->
             val openCounts = openItems.groupingBy { it.listId }.eachCount()
-            val listsWithPurchases = purchases.filter { it.active }.mapTo(HashSet()) { it.listId }
+            val active = purchases.filter { it.active }
+            val listsWithPurchases = active.mapTo(HashSet()) { it.listId }
+            // 有効な購入はチェック済みの項目と1対1なので、直近24時間に完了した件数は購入の記録から数える
+            val completedSince = clock.instant().minus(COMPLETED_WINDOW)
+            val completedCounts = active.filter { it.purchasedAt >= completedSince }.groupingBy { it.listId }.eachCount()
             ListsUiState(
                 // 削除したリストの表示ルール（未購入が残っていれば表示）はフェーズ3で実装する
-                lists = lists.filter { it.status == ListStatus.ACTIVE }
-                    .map { ListSummary(it.id, it.name, openCounts[it.id] ?: 0, it.id in listsWithPurchases) },
+                lists = lists.filter { it.status == ListStatus.ACTIVE }.map {
+                    ListSummary(
+                        id = it.id,
+                        name = it.name,
+                        memo = it.memo,
+                        visibility = it.visibility,
+                        progress = ListProgress(
+                            openCount = openCounts[it.id] ?: 0,
+                            completedCount = completedCounts[it.id] ?: 0,
+                            hasPurchases = it.id in listsWithPurchases,
+                        ),
+                    )
+                },
                 loading = false,
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), ListsUiState())
 
-    fun createList(name: String) {
+    fun createList(name: String, memo: String, visibility: Visibility) {
         val trimmed = name.trim()
         if (trimmed.isEmpty() || trimmed.length > ShoppingList.MAX_NAME_LENGTH) return
-        viewModelScope.launch { listRepository.createList(trimmed) }
-    }
-
-    fun renameList(id: ListId, name: String) {
-        val trimmed = name.trim()
-        if (trimmed.isEmpty() || trimmed.length > ShoppingList.MAX_NAME_LENGTH) return
-        viewModelScope.launch { listRepository.renameList(id, trimmed) }
+        val trimmedMemo = memo.trim().take(ShoppingList.MAX_MEMO_LENGTH).ifEmpty { null }
+        viewModelScope.launch { listRepository.createList(NewList(trimmed, trimmedMemo, visibility)) }
     }
 
     fun moveList(id: ListId, previous: ListId?, next: ListId?) {
         viewModelScope.launch { listRepository.moveList(id, previous, next) }
     }
 
-    fun deleteList(id: ListId) {
-        viewModelScope.launch { listRepository.deleteList(id) }
-    }
-
     private companion object {
         const val STOP_TIMEOUT_MILLIS = 5_000L
         val PURCHASE_WINDOW: Duration = Duration.ofDays(365)
+        val COMPLETED_WINDOW: Duration = Duration.ofHours(24)
     }
 }

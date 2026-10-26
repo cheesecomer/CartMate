@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Compose の描画前（起動直後）に見える背景。端末がダークモードでも白にする -->
+    <!-- Compose の描画前（起動直後）に見える背景。端末がダークモードでも明るい色にする -->
     <style name="Theme.CartMate" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:windowBackground">@color/window_background</item>
     </style>
