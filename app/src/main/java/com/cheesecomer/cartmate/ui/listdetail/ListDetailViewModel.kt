@@ -39,8 +39,6 @@ import kotlinx.coroutines.launch
 import java.time.Clock
 import java.time.Duration
 import javax.inject.Inject
-import com.cheesecomer.cartmate.domain.model.Member
-import com.cheesecomer.cartmate.domain.repository.MemberDirectory
 import com.cheesecomer.cartmate.domain.list.ShoppingRound
 
 data class ListDetailUiState(
@@ -51,8 +49,6 @@ data class ListDetailUiState(
     val items: List<Item> = emptyList(),
     val addItem: AddItemState = AddItemState.Initial,
     val loading: Boolean = true,
-    /** 家族のメンバー。共有のリストでは上部バーにアバターを表示する */
-    val members: List<Member> = emptyList(),
     /** Enter と「＋」で追加するときの公開範囲。サジェストのシートに表示し、共有のリストでは切り替えられる（§3.4） */
     val addVisibility: Visibility = Visibility.SHARED,
 ) {
@@ -95,7 +91,6 @@ class ListDetailViewModel @Inject constructor(
     private val itemRepository: ItemRepository,
     private val lastVisibility: LastVisibilityStore,
     private val clock: Clock,
-    memberDirectory: MemberDirectory,
 ) : ViewModel() {
 
     private val listId = ListId(checkNotNull(savedStateHandle.get<String>(ListDetailRoute::listId.name)))
@@ -120,8 +115,7 @@ class ListDetailViewModel @Inject constructor(
             addItem = addItem,
             loading = false,
         )
-    }.combine(memberDirectory.observeMembers()) { state, members -> state.copy(members = members) }
-        .combine(lastVisibility.observe(listId)) { state, remembered ->
+    }.combine(lastVisibility.observe(listId)) { state, remembered ->
             state.copy(addVisibility = VisibilityDefaults.initial(state.listVisibility, remembered))
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), ListDetailUiState())

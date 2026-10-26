@@ -50,7 +50,6 @@ class ListDetailViewModelTest {
         itemRepository = store,
         lastVisibility = lastVisibility,
         clock = clock,
-        memberDirectory = { flowOf(emptyList()) },
     )
 
     @Test
@@ -338,7 +337,6 @@ class ListDetailViewModelTest {
         itemRepository = store,
         lastVisibility = lastVisibility,
         clock = clock,
-        memberDirectory = { flowOf(emptyList()) },
     )
 
     @Test

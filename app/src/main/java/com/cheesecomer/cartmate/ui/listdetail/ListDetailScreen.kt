@@ -83,7 +83,6 @@ import kotlinx.serialization.Serializable
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 import java.time.Instant
-import com.cheesecomer.cartmate.ui.components.MemberAvatars
 
 @Serializable
 data class ListDetailRoute(val listId: String)
@@ -199,8 +198,6 @@ fun ListDetailContent(
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.padding(start = CartMateSpacing.small).size(20.dp),
                                 )
-                            } else {
-                                MemberAvatars(state.members, size = 28.dp, modifier = Modifier.padding(start = CartMateSpacing.medium))
                             }
                         }
                     },

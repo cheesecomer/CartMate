@@ -47,7 +47,7 @@ class ListsScreenTest {
             composeRule.activity.enableEdgeToEdge()
             composeRule.activity.window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
         }
-        val viewModel = ListsViewModel(store, store, store, Clock.systemUTC(), FixedAccountRepository(null), { flowOf(true) }, { flowOf(emptyList()) })
+        val viewModel = ListsViewModel(store, store, store, Clock.systemUTC(), FixedAccountRepository(null), { flowOf(true) })
         composeRule.setContent {
             CartMateTheme { ListsScreen(onOpenList = {}, viewModel = viewModel) }
         }

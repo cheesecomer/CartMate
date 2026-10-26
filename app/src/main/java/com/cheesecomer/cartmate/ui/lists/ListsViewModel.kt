@@ -23,8 +23,6 @@ import kotlinx.coroutines.launch
 import java.time.Clock
 import java.time.Duration
 import javax.inject.Inject
-import com.cheesecomer.cartmate.domain.model.Member
-import com.cheesecomer.cartmate.domain.repository.MemberDirectory
 import com.cheesecomer.cartmate.domain.list.ShoppingRound
 
 data class ListSummary(
@@ -42,8 +40,6 @@ data class ListsUiState(
     val offline: Boolean = false,
     /** 上部バーのアバター。タップで家族画面を開く */
     val account: Account? = null,
-    /** 家族のメンバー。共有のリストのカードにアバターを表示する */
-    val members: List<Member> = emptyList(),
 )
 
 @HiltViewModel
@@ -54,7 +50,6 @@ class ListsViewModel @Inject constructor(
     clock: Clock,
     accountRepository: AccountRepository,
     onlineStatus: OnlineStatus,
-    memberDirectory: MemberDirectory,
 ) : ViewModel() {
 
     val uiState: StateFlow<ListsUiState> =
@@ -93,7 +88,6 @@ class ListsViewModel @Inject constructor(
             )
         }.combine(accountRepository.observeAccount()) { state, account -> state.copy(account = account) }
             .combine(onlineStatus.observeOnline()) { state, online -> state.copy(offline = !online) }
-            .combine(memberDirectory.observeMembers()) { state, members -> state.copy(members = members) }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), ListsUiState())
 
     fun createList(name: String, memo: String, visibility: Visibility) {

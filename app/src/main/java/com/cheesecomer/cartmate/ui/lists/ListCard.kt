@@ -33,17 +33,14 @@ import com.cheesecomer.cartmate.domain.model.Visibility
 import com.cheesecomer.cartmate.ui.components.DraggingElevation
 import com.cheesecomer.cartmate.ui.components.cardFrame
 import com.cheesecomer.cartmate.ui.theme.CartMateSpacing
-import com.cheesecomer.cartmate.domain.model.Member
-import com.cheesecomer.cartmate.ui.components.MemberAvatars
 
 /**
  * リスト一覧のカード（docs/design/ui.md「リスト一覧」）。リスト名、備考、件数、進捗バーを表示する。
- * 共有のリストには家族のメンバーのアバターを、プライベートのリストには鍵アイコンを表示する
+ * プライベートのリストには鍵アイコンを表示する。家族のメンバーはどのリストでも同じなので、カードにはアバターを出さない
  */
 @Composable
 fun ListCard(
     list: ListSummary,
-    members: List<Member>,
     onClick: () -> Unit,
     dragging: Boolean,
     actions: List<CustomAccessibilityAction>,
@@ -80,9 +77,6 @@ fun ListCard(
                         tint = colors.onSurfaceVariant,
                         modifier = Modifier.padding(start = CartMateSpacing.xSmall).size(16.dp),
                     )
-                } else {
-                    Spacer(Modifier.weight(1f))
-                    MemberAvatars(members, size = 24.dp, modifier = Modifier.padding(start = CartMateSpacing.small))
                 }
             }
             if (list.memo != null) {

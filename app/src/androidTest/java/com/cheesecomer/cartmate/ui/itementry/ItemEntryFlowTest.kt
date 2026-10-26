@@ -78,7 +78,7 @@ class ItemEntryFlowTest {
                 NavHost(navController, startDestination = ListDetailRoute(listId.value)) {
                     composable<ListDetailRoute> { backStackEntry ->
                         val viewModel = viewModel {
-                            ListDetailViewModel(createSavedStateHandle(), store, store, lastVisibility, clock, { flowOf(emptyList()) })
+                            ListDetailViewModel(createSavedStateHandle(), store, store, lastVisibility, clock)
                         }
                         ListDetailScreen(
                             onBack = {},
