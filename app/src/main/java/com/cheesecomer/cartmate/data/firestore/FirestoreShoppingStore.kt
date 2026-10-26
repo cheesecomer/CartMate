@@ -24,11 +24,11 @@ import com.cheesecomer.cartmate.domain.repository.UpdateItemResult
 import com.cheesecomer.cartmate.domain.repository.UpdateListResult
 import com.cheesecomer.cartmate.domain.text.NameNormalizer
 import com.google.android.gms.tasks.Task
+import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.Filter
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.Source
 import com.google.firebase.firestore.WriteBatch
@@ -48,9 +48,8 @@ import javax.inject.Singleton
  * 公開範囲で分けた2本の購読（共有と自分のプライベート）をまとめる。ルールはフィルタにならないため、
  * 他のメンバーのプライベートなドキュメントを含むクエリは拒否される。
  *
- * オフラインでもできる操作（リストの作成、項目の追加・削除・編集、並べ替え）は、書き込みの完了を待たない。
- * Firestore がオフラインの書き込みを端末に保存し、接続が戻ると送る。チェックと Undo はトランザクションで行うため、
- * オンラインのときだけ成功する（保留チェックはフェーズ3）
+ * すべての操作はオフラインでも行え、書き込みの完了を待たない（docs/design/sync.md「オフラインの書き込み」）。
+ * Firestore がオフラインの書き込みを端末に保存し、接続が戻ると送る。書き込む値は端末のキャッシュから作る
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @Singleton
@@ -137,24 +136,18 @@ class FirestoreShoppingStore @Inject constructor(
         }.commit().logFailure("moveList")
     }
 
-    /** オンラインのときだけ行える（docs/requirements.md §3.3）。未購入は自分に見える項目でサーバーに問い合わせて数える */
-    override suspend fun deleteList(id: ListId): DeleteListResult = try {
-        deleteListOnServer(id)
-    } catch (e: FirebaseFirestoreException) {
-        // オフラインではサーバーに問い合わせられない
-        if (e.code == FirebaseFirestoreException.Code.UNAVAILABLE) DeleteListResult.Offline else throw e
-    }
-
-    private suspend fun deleteListOnServer(id: ListId): DeleteListResult {
+    /**
+     * オフラインでも行える（docs/requirements.md §3.3）。未購入は、自分に見える項目を端末のキャッシュで数える。
+     * 古い判定で削除しても、未購入の項目があるリストは一覧に表示し続ける（docs/design/sync.md「リスト削除の競合」）
+     */
+    override suspend fun deleteList(id: ListId): DeleteListResult {
         val scope = session.requireScope()
-        val ref = Paths.lists(db, scope.householdId).document(id.value)
-        val list = ref.get(Source.SERVER).await().toShoppingList()
+        val list = cachedLists(scope).find { it.id == id }
         if (list == null || list.status == ListStatus.DELETED) return DeleteListResult.NotFound
-        val open = Paths.items(db, scope.householdId).whereEqualTo(F.LIST_ID, id.value).whereEqualTo(F.STATUS, V.OPEN)
-        val hasOpen = !open.visibleShared().limit(1).get(Source.SERVER).await().isEmpty ||
-            !open.visiblePrivate(scope.uid).limit(1).get(Source.SERVER).await().isEmpty
-        if (hasOpen) return DeleteListResult.NotEmpty
-        ref.update(F.STATUS, V.DELETED, F.DELETED_AT, FieldValue.serverTimestamp(), F.DELETED_BY, scope.uid).await()
+        if (cachedItems(scope, id).any { it.status == ItemStatus.OPEN }) return DeleteListResult.NotEmpty
+        Paths.lists(db, scope.householdId).document(id.value)
+            .update(F.STATUS, V.DELETED, F.DELETED_AT, FieldValue.serverTimestamp(), F.DELETED_BY, scope.uid)
+            .logFailure("deleteList")
         return DeleteListResult.Deleted
     }
 
@@ -294,61 +287,60 @@ class FirestoreShoppingStore @Inject constructor(
         }.commit().logFailure("restoreItem")
     }
 
-    /** チェックと購入の記録を1つのトランザクションで書く。ルールが、両方がそろっている書き込みだけを認める */
+    /**
+     * チェックと購入の記録を1つのバッチ書き込みで書く（docs/design/sync.md「チェック」）。オフラインでも書き込みキューに積まれ、
+     * 画面はすぐにチェック済みになる。ルールが、未購入の項目を購入の記録とそろえてチェックする書き込みだけを認めるので、
+     * ほかの端末が先にチェックしていれば、送られたときに拒否される
+     */
     override suspend fun completeItem(id: ItemId, checkedAt: Instant): CompleteResult {
         val scope = session.requireScope()
         val itemRef = Paths.items(db, scope.householdId).document(id.value)
-        val purchaseRef = Paths.purchases(db, scope.householdId).document(id.value)
-        return try {
-            db.runTransaction { tx ->
-                val snapshot = tx.get(itemRef)
-                val item = snapshot.toItem() ?: return@runTransaction CompleteResult.Rejected(null)
-                if (item.status == ItemStatus.COMPLETED) {
-                    return@runTransaction CompleteResult.AlreadyCompleted(item.completedBy!!, item.completedAt!!)
-                }
-                val listName = tx.get(Paths.lists(db, scope.householdId).document(item.listId.value)).getString(F.NAME).orEmpty()
-                tx.update(itemRef, F.STATUS, V.COMPLETED, F.COMPLETED_AT, FieldValue.serverTimestamp(), F.COMPLETED_BY, scope.uid)
-                tx.set(purchaseRef, mapOf(
-                    F.ITEM_ID to id.value,
-                    F.LIST_ID to item.listId.value,
-                    F.LIST_NAME_SNAPSHOT to listName,
-                    F.PRODUCT_ID to snapshot.getString(F.PRODUCT_ID),
-                    F.INPUT_NAME to item.inputName,
-                    F.QUANTITY to item.quantity,
-                    F.UNIT to item.unit,
-                    F.MEMO to item.memo,
-                    F.VISIBILITY to item.visibility.toField(),
-                    F.CHECKED_AT to checkedAt.toTimestamp(),
-                    F.PURCHASED_AT to FieldValue.serverTimestamp(),
-                    F.PURCHASED_BY to scope.uid,
-                    F.ACTIVE to true,
-                    F.REVOKED_AT to null,
-                    F.REVOKED_BY to null,
-                ))
-                CompleteResult.Completed
-            }.await()
-        } catch (e: Exception) {
-            if (e.isRejected) CompleteResult.Rejected(e) else CompleteResult.Retry(e)
-        }
+        val snapshot = cached(itemRef) ?: return CompleteResult.Rejected(null)
+        val item = snapshot.toItem() ?: return CompleteResult.Rejected(null)
+        if (item.status == ItemStatus.COMPLETED) return CompleteResult.AlreadyCompleted(item.completedBy!!, item.completedAt!!)
+        val listName = cached(Paths.lists(db, scope.householdId).document(item.listId.value))?.getString(F.NAME).orEmpty()
+        db.batch()
+            .update(itemRef, F.STATUS, V.COMPLETED, F.COMPLETED_AT, FieldValue.serverTimestamp(), F.COMPLETED_BY, scope.uid)
+            .set(Paths.purchases(db, scope.householdId).document(id.value), mapOf(
+                F.ITEM_ID to id.value,
+                F.LIST_ID to item.listId.value,
+                F.LIST_NAME_SNAPSHOT to listName,
+                F.PRODUCT_ID to snapshot.getString(F.PRODUCT_ID),
+                F.INPUT_NAME to item.inputName,
+                F.QUANTITY to item.quantity,
+                F.UNIT to item.unit,
+                F.MEMO to item.memo,
+                F.VISIBILITY to item.visibility.toField(),
+                F.CHECKED_AT to checkedAt.toTimestamp(),
+                F.PURCHASED_AT to FieldValue.serverTimestamp(),
+                F.PURCHASED_BY to scope.uid,
+                F.ACTIVE to true,
+                F.REVOKED_AT to null,
+                F.REVOKED_BY to null,
+            ))
+            .commit().logFailure("completeItem")
+        return CompleteResult.Completed
     }
 
-    /** チェックの取り消しと購入の無効化を1つのトランザクションで書く */
+    /** チェックの取り消しと購入の無効化を1つのバッチ書き込みで書く（docs/design/sync.md「Undo」） */
     override suspend fun reopenItem(id: ItemId): ReopenResult {
         val scope = session.requireScope()
         val itemRef = Paths.items(db, scope.householdId).document(id.value)
-        val purchaseRef = Paths.purchases(db, scope.householdId).document(id.value)
-        return try {
-            db.runTransaction { tx ->
-                val item = tx.get(itemRef).toItem() ?: return@runTransaction ReopenResult.Rejected(null)
-                if (item.status == ItemStatus.OPEN) return@runTransaction ReopenResult.AlreadyOpen
-                tx.update(itemRef, F.STATUS, V.OPEN, F.COMPLETED_AT, null, F.COMPLETED_BY, null)
-                tx.update(purchaseRef, F.ACTIVE, false, F.REVOKED_AT, FieldValue.serverTimestamp(), F.REVOKED_BY, scope.uid)
-                ReopenResult.Reopened
-            }.await()
-        } catch (e: Exception) {
-            if (e.isRejected) ReopenResult.Rejected(e) else ReopenResult.Retry(e)
-        }
+        val item = cached(itemRef)?.toItem() ?: return ReopenResult.Rejected(null)
+        if (item.status == ItemStatus.OPEN) return ReopenResult.AlreadyOpen
+        db.batch()
+            .update(itemRef, F.STATUS, V.OPEN, F.COMPLETED_AT, null, F.COMPLETED_BY, null)
+            .update(
+                Paths.purchases(db, scope.householdId).document(id.value),
+                F.ACTIVE, false, F.REVOKED_AT, FieldValue.serverTimestamp(), F.REVOKED_BY, scope.uid,
+            )
+            .commit().logFailure("reopenItem")
+        return ReopenResult.Reopened
     }
+
+    /** 端末のキャッシュにあるドキュメント。なければ null */
+    private suspend fun cached(ref: DocumentReference): DocumentSnapshot? =
+        runCatching { ref.get(Source.CACHE).await() }.getOrNull()?.takeIf { it.exists() }
 
     // PurchaseRepository
 
@@ -368,11 +360,6 @@ class FirestoreShoppingStore @Inject constructor(
         is SortKeys.Move.Single -> mapOf(moved to key)
         is SortKeys.Move.Rebalance -> keys
     }
-
-    /** 再試行しても成功しないもの（ルールで拒否された、ドキュメントがない） */
-    private val Exception.isRejected: Boolean
-        get() = this is FirebaseFirestoreException &&
-            (code == FirebaseFirestoreException.Code.PERMISSION_DENIED || code == FirebaseFirestoreException.Code.NOT_FOUND)
 
     /** 完了を待たない書き込み。ルールで拒否された場合などはログに残す */
     private fun Task<*>.logFailure(operation: String) {

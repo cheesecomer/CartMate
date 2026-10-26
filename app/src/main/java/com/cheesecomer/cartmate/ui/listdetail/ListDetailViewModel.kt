@@ -72,8 +72,6 @@ sealed interface DetailMessage {
     data object EditedItemNotFound : DetailMessage
     /** のこりの商品があるため、リストを削除できない */
     data object CannotDeleteList : DetailMessage
-    /** オフラインのため、この操作はできない */
-    data object Offline : DetailMessage
     data object Failed : DetailMessage
 }
 
@@ -203,7 +201,6 @@ class ListDetailViewModel @Inject constructor(
             when (runCatching { listRepository.deleteList(listId) }.getOrNull()) {
                 DeleteListResult.Deleted, DeleteListResult.NotFound -> _navigation.send(DetailNavigation.ListDeleted)
                 DeleteListResult.NotEmpty -> _messages.send(DetailMessage.CannotDeleteList)
-                DeleteListResult.Offline -> _messages.send(DetailMessage.Offline)
                 // 通信の問題など
                 null -> _messages.send(DetailMessage.Failed)
             }

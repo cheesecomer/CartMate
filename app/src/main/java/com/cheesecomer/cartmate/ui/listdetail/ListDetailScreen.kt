@@ -125,7 +125,6 @@ fun ListDetailScreen(
                     DetailMessage.CannotEditCompleted -> resources.getString(R.string.detail_cannot_edit_completed) to null
                     DetailMessage.EditedItemNotFound -> resources.getString(R.string.detail_edited_item_not_found) to null
                     DetailMessage.CannotDeleteList -> resources.getString(R.string.detail_cannot_delete_list) to null
-                    DetailMessage.Offline -> resources.getString(R.string.offline_unavailable) to null
                     DetailMessage.Failed -> resources.getString(R.string.detail_operation_failed) to null
                 }
                 val result = snackbarHostState.showSnackbar(

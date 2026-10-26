@@ -32,6 +32,4 @@ sealed interface DeleteListResult {
     data object Deleted : DeleteListResult
     data object NotEmpty : DeleteListResult
     data object NotFound : DeleteListResult
-    /** オフラインのため削除できない（リストの削除はオンラインのときだけ。docs/requirements.md §3.3） */
-    data object Offline : DeleteListResult
 }

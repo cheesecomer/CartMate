@@ -265,8 +265,8 @@ class ListDetailViewModelTest {
 
     @Test
     fun `リストの削除に失敗しても落ちずに失敗を知らせる`() = runTest {
-        // オフラインで「リストを削除」を押すと、サーバーへの問い合わせが例外で失敗する
-        val viewModel = viewModelDeleting { throw IllegalStateException("Failed to get document from server") }
+        // 書き込みの準備（キャッシュの読み取りなど）で例外が起きた
+        val viewModel = viewModelDeleting { throw IllegalStateException("cache unavailable") }
         turbineScope {
             val states = viewModel.uiState.testIn(backgroundScope)
             val messages = viewModel.messages.testIn(backgroundScope)
@@ -275,22 +275,6 @@ class ListDetailViewModelTest {
             viewModel.deleteList()
 
             assertThat(messages.awaitItem()).isEqualTo(DetailMessage.Failed)
-        }
-    }
-
-    @Test
-    fun `オフラインのときはリストを削除せず、理由を知らせる`() = runTest {
-        val viewModel = viewModelDeleting { DeleteListResult.Offline }
-        turbineScope {
-            val states = viewModel.uiState.testIn(backgroundScope)
-            val messages = viewModel.messages.testIn(backgroundScope)
-            val navigation = viewModel.navigation.testIn(backgroundScope)
-            states.awaitUntil { !it.loading }
-
-            viewModel.deleteList()
-
-            assertThat(messages.awaitItem()).isEqualTo(DetailMessage.Offline)
-            navigation.expectNoEvents()
         }
     }
 }

@@ -107,7 +107,8 @@ class FirestoreHouseholdRepository @Inject constructor(
             ))
             .set(Paths.member(db, householdId, uid), memberData(account, MemberRole.OWNER, joinedVia = null))
             .set(Paths.user(db, uid), userData(householdId))
-            .commit().await()
+            // オフラインでも作成できるよう、書き込みの完了を待たない（docs/requirements.md §3.3）
+            .commit().addOnFailureListener { Log.w(TAG, "createHousehold failed", it) }
         return householdId
     }
 
