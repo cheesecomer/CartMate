@@ -130,15 +130,26 @@ service cloud.firestore {
           || (changed().hasOnly(['sortKey']) && request.resource.data.sortKey is number)
         );
         allow delete: if isMember(hid) && isOwnPrivate(resource.data, resource.data.createdBy);   // アカウントの削除
+        allow create: if isImport('lists', listId, request.resource.data.createdBy, ['sortKey']);   // 合流
       }
 
       function isOwnPrivate(d, owner) { return d.visibility == 'private' && owner == me(); }
+      // 合流: コピー元の家族にある同じIDのドキュメントと、extra 以外が同じ内容なら作成できる
+      function isImport(coll, id, owner, extra) {
+        let d = request.resource.data;
+        let src = d.importedFrom;
+        return isMember(hid) && src is string && src != hid && isMember(src)
+          && canSee(d, owner)
+          && d.diff(get(/databases/$(db)/documents/households/$(src)/$(coll)/$(id)).data)
+               .affectedKeys().hasOnly(['importedFrom'].concat(extra));
+      }
       function purchasePath(id) { return /databases/$(db)/documents/households/$(hid)/purchases/$(id); }
       function itemPath(id) { return /databases/$(db)/documents/households/$(hid)/items/$(id); }
       function listPath(id) { return /databases/$(db)/documents/households/$(hid)/lists/$(id); }
 
       match /items/{itemId} {
         allow read: if isMember(hid) && canSee(resource.data, resource.data.createdBy);
+        allow create: if isImport('items', itemId, request.resource.data.createdBy, []);   // 合流
         allow create: if isMember(hid)
           && request.resource.data.keys().hasOnly(['listId','productId','inputName','sortKey','quantity','unit','memo',
                 'visibility','status','createdBy','createdAt','completedAt','completedBy'])
@@ -205,6 +216,7 @@ service cloud.firestore {
 
       match /purchases/{pid} {
         allow read: if isMember(hid) && canSee(resource.data, resource.data.purchasedBy);
+        allow create: if isImport('purchases', pid, request.resource.data.purchasedBy, []);   // 合流（フェーズ3）
         allow create: if isMember(hid) && isRecording();
         allow update: if isMember(hid) && canSee(resource.data, resource.data.purchasedBy)
           && ((resource.data.active == false && isRecording()) || isRevoking());
@@ -241,6 +253,7 @@ service cloud.firestore {
 
       match /products/{pid} {
         allow read: if isMember(hid);
+        allow create: if isImport('products', pid, me(), []);   // 合流
         allow create: if isMember(hid)
           && request.resource.data.keys().hasOnly(['displayName','normalizedName','searchKey','createdBy','createdAt','mergedInto'])
           && str(request.resource.data.displayName, 60)
@@ -311,6 +324,16 @@ service cloud.firestore {
 
 - オーナーは、自分以外のメンバーを家族から削除できます。招待コードが意図しない人に渡った場合の、最低限の対処です。
 - メンバーは自分で家族から抜けられます。オーナーが抜けるときは、`joinedAt` がいちばん早いメンバーにオーナーを引き継ぎます（同じバッチ）。引き継ぐ相手を選んでの譲渡は MVP の対象外です。
+
+## ほかの家族への合流
+
+家族に自分しかいない人が、ほかの家族に移る機能です（[要件](../requirements.md) §3.5）。
+
+- 手順: ①招待コードで合流先に参加する（通常の参加と同じバッチ。`users/{uid}.householdId` も合流先にする） → ②コピー元の products → lists → items → purchases の順に、同じIDで合流先に写す（`importedFrom` を付ける） → ③元の家族の自分の `members` を削除する。
+- 「自分しかいない」ことはルールでは確かめられないため、クライアントで `members` の件数を見て判定します。ほかのメンバーがいる家族から写しても、写せるのは本人がもともと読めるデータだけなので、データは漏れません。
+- ①のあとで中断した場合、`users.householdId` はすでに合流先なので、起動時に元の家族の `members` が残っていれば②から再開します。すでに写したドキュメントは飛ばします。
+- ルールの `get` は1回の書き込み（バッチ）で20件までです。合流では、2つの家族のメンバー確認（2件）とコピー元の読み取り（1件ずつ）を使うので、1つのバッチで写せるのは18件までです。購入の記録が多いと書き込みの回数が増えるため、進み具合を表示します。
+- 購入の記録を写す処理は、Firestore に購入の記録を書くフェーズ3で加えます。
 
 ## アカウントの削除
 

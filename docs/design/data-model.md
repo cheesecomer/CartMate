@@ -20,6 +20,7 @@ households/{hid}/members/{uid}
 
 households/{hid}/lists/{listId}
   name, memo: string | null, visibility: "shared" | "private",
+  importedFrom?: string,                     # 合流で写したときだけ。コピー元の家族のID（lists・items・products・purchases に共通）
   sortKey: number, createdBy, createdAt,
   status: "active" | "deleted", deletedAt?, deletedBy?
 
@@ -60,6 +61,7 @@ households/{hid}/purchases/{purchaseId}      # purchaseId = itemId
 | **`users/{uid}` と `invites/{code}` を追加する** | 起動時に自分の所属家族を引くため。また、まだ家族に参加していないユーザーが招待コードを検証するため（家族の領域はメンバーしか読めない）。 |
 | **招待に `inviterName` を持つ** | 参加の確認画面の「○○さんの家族」を表示するため。参加前のユーザーは `members` を読めないので、発行した人の表示名を招待に写しておく。 |
 | **オーナーは `members.role` で表し、離脱時に引き継ぐ** | オーナーが抜けるときは、自分の `members` の削除と同じバッチで、`joinedAt` がいちばん早いメンバーの `role` を `owner` にする。 |
+| **合流では同じIDで写し、`importedFrom` を付ける** | 自分しかいない家族からほかの家族に合流するとき、lists・items・products・purchases を同じドキュメントIDのまま合流先に写し、コピー元の家族のID（`importedFrom`）を加える。ルールはコピー元と同じ内容であることを確かめて書き込みを認めるので、作成日時や購入日時を写しても偽装にならない。同じIDなので、中断してもやり直せば続きから写せる（すでにあるものは飛ばす）。products は決定的IDなので、同じ商品名はそのまま同じ商品になる。lists の `sortKey` だけは、合流先の末尾に並ぶよう付け直す。 |
 | **抜けたメンバーのデータは消さない** | 共有のデータは家族のもの。プライベートのデータは、同じ家族にもう一度参加したときに戻るよう残す。作った人の `members` がないときは「退会したメンバー」と表示する。アカウントの削除だけは、本人のプライベートなリスト・項目・購入の記録と `users/{uid}` を消す。 |
 
 ## 購読とクエリ
