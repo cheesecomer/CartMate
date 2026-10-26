@@ -5,7 +5,6 @@ import androidx.lifecycle.viewModelScope
 import com.cheesecomer.cartmate.domain.list.ListProgress
 import com.cheesecomer.cartmate.domain.model.Account
 import com.cheesecomer.cartmate.domain.model.ListId
-import com.cheesecomer.cartmate.domain.model.ListStatus
 import com.cheesecomer.cartmate.domain.model.NewList
 import com.cheesecomer.cartmate.domain.model.ShoppingList
 import com.cheesecomer.cartmate.domain.model.Visibility
@@ -24,6 +23,7 @@ import java.time.Clock
 import java.time.Duration
 import javax.inject.Inject
 import com.cheesecomer.cartmate.domain.list.ShoppingRound
+import com.cheesecomer.cartmate.domain.list.ListDisplay
 
 data class ListSummary(
     val id: ListId,
@@ -70,8 +70,8 @@ class ListsViewModel @Inject constructor(
                 .filter { ShoppingRound.isShown(it.purchasedAt, windowStart, clearedAt[it.listId]) }
                 .groupingBy { it.listId }.eachCount()
             ListsUiState(
-                // 削除したリストの表示ルール（未購入が残っていれば表示）はフェーズ3で実装する
-                lists = lists.filter { it.status == ListStatus.ACTIVE }.map {
+                // 削除したリストでも、未購入が残っていれば表示する
+                lists = ListDisplay.shown(lists, openCounts).map {
                     ListSummary(
                         id = it.id,
                         name = it.name,

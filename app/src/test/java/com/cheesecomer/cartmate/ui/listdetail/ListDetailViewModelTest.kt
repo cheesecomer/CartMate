@@ -231,7 +231,8 @@ class ListDetailViewModelTest {
 
             store.addItem(newItem(listId, "卵"))
 
-            val items = awaitUntil { state -> state.items.any { it.inputName == "卵" } }.items
+            // リストと項目は別の購読なので、項目だけが先に反映された途中の状態を経ることがある。片付いた状態になるまで待つ
+            val items = awaitUntil { state -> state.items.map { it.inputName } == listOf("卵") }.items
             assertThat(items.map { it.inputName }).containsExactly("卵")
             cancelAndIgnoreRemainingEvents()
         }
@@ -295,6 +296,19 @@ class ListDetailViewModelTest {
 
             viewModel.setAddVisibility(Visibility.SHARED)
             assertThat(lastVisibility.get(privateList)).isNull()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `削除したリストでも、未購入の項目が残っていれば開いて項目を表示する`() = runTest {
+        store.deleteList(listId)
+        store.addItem(newItem(listId, "牛乳"))
+
+        viewModel.uiState.test {
+            val state = awaitUntil { !it.loading }
+            assertThat(state.listName).isEqualTo("スーパー")
+            assertThat(state.items.map { it.inputName }).containsExactly("牛乳")
             cancelAndIgnoreRemainingEvents()
         }
     }

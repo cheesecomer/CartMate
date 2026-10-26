@@ -81,6 +81,22 @@ class ListsViewModelTest {
     }
 
     @Test
+    fun `削除したリストでも、未購入の項目が残っている間は一覧に表示する`() = runTest {
+        // 削除と同時に、ほかの端末で項目が追加された
+        val listId = store.createList("スーパー")
+        store.deleteList(listId)
+        val itemId = store.addItem(newItem(listId, "牛乳"))
+
+        viewModel.uiState.test {
+            assertThat(awaitUntil { !it.loading }.lists.map { it.name }).containsExactly("スーパー")
+
+            // 項目が片付くと、再び表示しなくなる
+            store.completeItem(itemId, clock.now)
+            assertThat(awaitUntil { it.lists.isEmpty() }.lists).isEmpty()
+        }
+    }
+
+    @Test
     fun `24時間より前の完了は件数に数えないが、買い終わったリストのまま`() = runTest {
         val listId = store.createList("スーパー")
         val itemId = store.addItem(newItem(listId, "牛乳"))

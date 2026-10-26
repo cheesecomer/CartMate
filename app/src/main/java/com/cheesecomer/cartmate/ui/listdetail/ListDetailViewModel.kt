@@ -40,6 +40,7 @@ import java.time.Clock
 import java.time.Duration
 import javax.inject.Inject
 import com.cheesecomer.cartmate.domain.list.ShoppingRound
+import com.cheesecomer.cartmate.domain.list.ListDisplay
 
 data class ListDetailUiState(
     val listName: String = "",
@@ -102,10 +103,12 @@ class ListDetailViewModel @Inject constructor(
     val navigation: Flow<DetailNavigation> = _navigation.receiveAsFlow()
 
     val uiState: StateFlow<ListDetailUiState> = combine(
-        listRepository.observeLists().map { lists -> lists.firstOrNull { it.id == listId && it.status == ListStatus.ACTIVE } },
+        listRepository.observeLists().map { lists -> lists.firstOrNull { it.id == listId } },
         itemRepository.observeListItems(listId, completedSince = clock.instant().minus(COMPLETED_WINDOW)),
         addItemState,
-    ) { list, items, addItem ->
+    ) { listOrDeleted, items, addItem ->
+        // 削除したリストでも、未購入の項目が残っている間は開ける（docs/design/sync.md「リスト削除の競合」）
+        val list = listOrDeleted?.takeIf { ListDisplay.isShown(it, items.count { item -> item.status == ItemStatus.OPEN }) }
         ListDetailUiState(
             listName = list?.name.orEmpty(),
             listMemo = list?.memo,
