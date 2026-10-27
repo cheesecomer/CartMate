@@ -19,6 +19,8 @@ data class Product(
     val mergedInto: ProductId? = null,
     /** 名寄せ辞書でまとめない（手動の分離） */
     val dictionaryOptOut: Boolean = false,
+    /** 時期が近い商品の提案に出さない（補完には出す） */
+    val suggestionExcluded: Boolean = false,
     /** 非表示にした時刻。非表示にしていなければ null。非表示かどうかは [com.cheesecomer.cartmate.domain.product.ProductHiding] で決める */
     val hiddenAt: Instant? = null,
 )
