@@ -32,8 +32,8 @@ object DictionaryValidator {
         for (row in source.aliasRows()) {
             if (row.alias.isBlank() || row.source.isBlank()) problems += "別名の列が足りない: $row"
             if (row.id !in known) problems += "別名の品目がない: ${row.alias} → ${row.id}"
-            if (row.match != DictionarySource.MATCH_EXACT && row.match != DictionarySource.MATCH_PREFIX) {
-                problems += "照合の条件が exact でも prefix でもない: ${row.alias} (${row.match})"
+            if (row.match !in MATCHES) {
+                problems += "照合の条件が exact・prefix・default のどれでもない: ${row.alias} (${row.match})"
             }
             val key = NameNormalizer.normalizedName(row.alias)
             if (row.match == DictionarySource.MATCH_PREFIX && key.length <= SHORT_KANA_LENGTH && key.all(::isKana)) {
@@ -52,8 +52,18 @@ object DictionaryValidator {
             if (row.left == row.right) problems += "統合禁止の組が同じ品目: ${row.left}"
             if (row.reason.isBlank()) problems += "統合禁止の理由がない: ${row.left} / ${row.right}"
         }
+        val attributeTerms = mutableSetOf<String>()
+        for (row in source.attributeRows()) {
+            if (row.term.isBlank() || row.value.isBlank() || row.source.isBlank()) problems += "属性の列が足りない: $row"
+            val kind = DictionarySource.ATTRIBUTE_KINDS[row.kind]
+            if (kind == null) problems += "属性の種類が不正: ${row.term} (${row.kind})"
+            if (kind == NormalizationDictionary.AttributeKind.ITEM && row.value !in known) problems += "属性の品目がない: ${row.term} → ${row.value}"
+            if (!attributeTerms.add(NameNormalizer.normalizedName(row.term))) problems += "属性の語が重複: ${row.term}"
+        }
         return problems
     }
+
+    private val MATCHES = setOf(DictionarySource.MATCH_EXACT, DictionarySource.MATCH_PREFIX, DictionarySource.MATCH_DEFAULT)
 
     private fun isKana(c: Char): Boolean = c in 'ぁ'..'ゖ' || c in 'ァ'..'ヺ' || c == 'ー'
 }

@@ -18,17 +18,21 @@ data class DictionarySource(
     val neverMerge: String,
     /** canonical_id,retired_in,reason（使わなくなった ID。再利用しない） */
     val retiredIds: String,
+    /** term,kind,value,source（kind は item・form・use・variant・ignore） */
+    val attributes: String = "term,kind,value,source",
 ) {
     data class ItemRow(val id: String, val name: String, val source: String)
     data class AliasRow(val alias: String, val id: String, val match: String, val source: String)
     data class CycleRow(val groupId: String, val id: String)
     data class NeverMergeRow(val left: String, val right: String, val reason: String)
+    data class AttributeRow(val term: String, val kind: String, val value: String, val source: String)
 
     fun itemRows(): List<ItemRow> = rows(items, 3).map { ItemRow(it[0], it[1], it[2]) }
     fun aliasRows(): List<AliasRow> = rows(aliases, 4).map { AliasRow(it[0], it[1], it[2], it[3]) }
     fun cycleRows(): List<CycleRow> = rows(cycleGroups, 2).map { CycleRow(it[0], it[1]) }
     fun neverMergeRows(): List<NeverMergeRow> = rows(neverMerge, 3).map { NeverMergeRow(it[0], it[1], it[2]) }
     fun retiredIdList(): List<String> = rows(retiredIds, 3).map { it[0] }
+    fun attributeRows(): List<AttributeRow> = rows(attributes, 4).map { AttributeRow(it[0], it[1], it[2], it[3]) }
 
     /**
      * 辞書を作る。品目の名前は、それ自体も別名（前方一致にも使う）として登録する。別名は NameNormalizer.normalizedName で正規化して照合する。
@@ -41,7 +45,11 @@ data class DictionarySource(
             aliases[NameNormalizer.normalizedName(item.name)] = NormalizationDictionary.Alias(CanonicalId(item.id), NormalizationDictionary.Match.PREFIX)
         }
         for (row in aliasRows()) {
-            val match = if (row.match == MATCH_EXACT) NormalizationDictionary.Match.EXACT else NormalizationDictionary.Match.PREFIX
+            val match = when (row.match) {
+                MATCH_EXACT -> NormalizationDictionary.Match.EXACT
+                MATCH_DEFAULT -> NormalizationDictionary.Match.DEFAULT
+                else -> NormalizationDictionary.Match.PREFIX
+            }
             aliases[NameNormalizer.normalizedName(row.alias)] = NormalizationDictionary.Alias(CanonicalId(row.id), match)
         }
         return NormalizationDictionary(
@@ -50,12 +58,25 @@ data class DictionarySource(
             aliases = aliases,
             cycleGroups = cycleRows().associate { CanonicalId(it.id) to CycleGroupId(it.groupId) },
             neverMerge = neverMergeRows().mapTo(HashSet()) { setOf(CanonicalId(it.left), CanonicalId(it.right)) },
+            attributes = attributeRows().mapNotNull { row ->
+                val kind = ATTRIBUTE_KINDS[row.kind] ?: return@mapNotNull null
+                NameNormalizer.normalizedName(row.term) to NormalizationDictionary.Attribute(kind, row.value)
+            }.toMap(),
         )
     }
 
     companion object {
         const val MATCH_EXACT = "exact"
         const val MATCH_PREFIX = "prefix"
+        const val MATCH_DEFAULT = "default"
+
+        val ATTRIBUTE_KINDS = mapOf(
+            "item" to NormalizationDictionary.AttributeKind.ITEM,
+            "form" to NormalizationDictionary.AttributeKind.FORM,
+            "use" to NormalizationDictionary.AttributeKind.USE,
+            "variant" to NormalizationDictionary.AttributeKind.VARIANT,
+            "ignore" to NormalizationDictionary.AttributeKind.IGNORE,
+        )
 
         /** 見出しを除いた行。空行は飛ばし、列の数が違う行もそのまま返す（検証で見つける） */
         internal fun rows(csv: String, columns: Int): List<List<String>> =

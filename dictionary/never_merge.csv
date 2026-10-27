@@ -1,2 +1,17 @@
 left_id,right_id,reason
 bread_6,bread_8,枚数が違うので購入候補は区別する
+garbage_bag_30l,garbage_bag_45l,容量が違うので購入候補は区別する
+milk,soymilk,原料が違う
+milk,low_fat_milk,種類が違うので購入候補は区別する
+soymilk_adjusted,soymilk_plain,種類が違うので購入候補は区別する
+laundry_detergent,fabric_softener,用途が違う
+dish_detergent,laundry_detergent,用途が違う
+shampoo,conditioner,用途が違う
+body_soap,soap,形態が違う
+green_tea,barley_tea,品目が違う
+green_tea,hojicha,品目が違う
+garbage_bag_burnable,garbage_bag_recyclable,ごみの種類が違う
+salmon,salted_salmon,加工が違う
+salmon,sake,読みが同じ別の品目
+tissue,wet_tissue,用途が違う
+tissue,toilet_paper,用途が違う

@@ -54,6 +54,7 @@ class AssetDictionaryProvider @Inject constructor(
                 cycleGroups = read("cycle_groups.csv"),
                 neverMerge = read("never_merge.csv"),
                 retiredIds = read("retired_ids.csv"),
+                attributes = read("attributes.csv"),
             ).toDictionary()
         }
     }

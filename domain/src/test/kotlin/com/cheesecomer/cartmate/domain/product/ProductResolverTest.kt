@@ -115,4 +115,19 @@ class ProductResolverTest {
         assertThat(dictionary.mayMerge(egg, bread6)).isTrue()
         assertThat(dictionary.mayMerge(egg, egg)).isTrue()
     }
+
+    @Test
+    fun `既定の同義語（お茶 → 緑茶）は、備考を使う判定ができるまで自動でまとめない`() {
+        val greenTea = CanonicalId("green_tea")
+        val withDefault = dictionary.copy(
+            canonicalNames = dictionary.canonicalNames + (greenTea to "緑茶"),
+            aliases = dictionary.aliases + ("お茶" to Alias(greenTea, Match.DEFAULT)) + ("緑茶" to Alias(greenTea, Match.PREFIX)),
+        )
+        val tea = product("お茶")
+        val green = product("緑茶")
+        val resolver = ProductResolver(listOf(tea, green), withDefault)
+
+        assertThat(resolver.resolve(tea.id)).isEqualTo(ProductResolver.Resolution(ResolvedKey.OfProduct(tea.id), Reason.Self))
+        assertThat(resolver.resolve(tea.id).key).isNotEqualTo(resolver.resolve(green.id).key)
+    }
 }

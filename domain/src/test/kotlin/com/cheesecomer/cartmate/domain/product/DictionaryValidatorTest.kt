@@ -12,7 +12,8 @@ class DictionaryValidatorTest {
         neverMerge: String = "left_id,right_id,reason",
         retiredIds: String = "canonical_id,retired_in,reason",
         version: String = "1",
-    ) = DictionarySource(version, items, aliases, cycleGroups, neverMerge, retiredIds)
+        attributes: String = "term,kind,value,source",
+    ) = DictionarySource(version, items, aliases, cycleGroups, neverMerge, retiredIds, attributes)
 
     @Test
     fun `正しい元データには問題がない`() {
@@ -66,5 +67,28 @@ class DictionaryValidatorTest {
         assertThat(dictionary.lookup("卵")?.canonicalId).isEqualTo(CanonicalId("egg"))
         assertThat(dictionary.lookup("たまご")?.canonicalId).isEqualTo(CanonicalId("egg"))
         assertThat(dictionary.canonicalNames[CanonicalId("milk")]).isEqualTo("牛乳")
+    }
+
+    @Test
+    fun `既定の同義語（default）を使える`() {
+        val problems = DictionaryValidator.validate(source(aliases = "alias,canonical_id,match,source\nたまご,egg,prefix,m\nぎゅうにゅう,milk,default,m"))
+        assertThat(problems).isEmpty()
+        assertThat(source(aliases = "alias,canonical_id,match,source\nお茶,milk,default,m").toDictionary().lookup("お茶")?.match)
+            .isEqualTo(NormalizationDictionary.Match.DEFAULT)
+    }
+
+    @Test
+    fun `属性の語を読み、種類と品目を検証する`() {
+        val ok = source(attributes = "term,kind,value,source\n茶葉,form,茶葉,m\n特売なら,ignore,-,m\n卵焼き用,item,egg,m")
+        assertThat(DictionaryValidator.validate(ok)).isEmpty()
+        assertThat(ok.toDictionary().attributes["茶葉"]).isEqualTo(
+            NormalizationDictionary.Attribute(NormalizationDictionary.AttributeKind.FORM, "茶葉"),
+        )
+
+        val bad = source(attributes = "term,kind,value,source\n茶葉,shape,茶葉,m\n麦茶,item,barley,m\n茶葉,form,茶葉,m")
+        val problems = DictionaryValidator.validate(bad).joinToString()
+        assertThat(problems).contains("属性の種類が不正")
+        assertThat(problems).contains("属性の品目がない")
+        assertThat(problems).contains("属性の語が重複")
     }
 }

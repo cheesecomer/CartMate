@@ -63,7 +63,7 @@ MVP は5つのフェーズに分けて実装します。各フェーズの終わ
 
 ## フェーズ4: 予測とサジェスト
 
-- CycleEstimator、ListSimilarity、SuggestionEngine、EarlyPurchaseDetector と、その単体テスト。周期のグループ、補完の一致の理由、`suggestionExcluded` と除外の解除。商品ごとの購入履歴と、購入の記録の「予測に使わない」（`excludedFromPrediction`、ルールと rules-test を含む）。
+- CycleEstimator、ListSimilarity、SuggestionEngine、EarlyPurchaseDetector と、その単体テスト。周期のグループ、補完の一致の理由、`suggestionExcluded` と除外の解除。商品名と備考からの属性の取り出しと、属性を使った名寄せ（`attributes.csv`、`default` の同義語。[suggestions.md](design/suggestions.md#商品名と備考による判定フェーズ4)）と、その正例・負例。商品ごとの購入履歴と、購入の記録の「予測に使わない」（`excludedFromPrediction`、ルールと rules-test を含む）。
 - サジェストのシートの中身（時期が近い商品・補完・「追加済み」・前回の数量と単位）、補完候補と商品詳細入力画面の注意表示と前回の購入、備考の候補、補足テキスト。
 - 購入履歴の購読（365日分）。
 - テストデータの投入スクリプト。

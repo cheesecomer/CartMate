@@ -34,3 +34,6 @@ docs/stitch-prompt-*.md
 firebase/rules-test/node_modules/
 firebase-debug.log
 firestore-debug.log
+
+# 名寄せ辞書の生成で取得したソース（tools/dictionary/fetch_sources.py が取得する）
+tools/dictionary/.cache/
