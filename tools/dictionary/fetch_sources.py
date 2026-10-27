@@ -18,7 +18,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 CACHE = ROOT / "tools" / "dictionary" / ".cache"
 MANIFEST = ROOT / "dictionary" / "sources" / "manifest.csv"
 
-# 取得するソース。名前は build.py が使う
+# 取得するソース。名前は review.py が使う
 SOURCES = {
     # 日本食品標準成分表（八訂）増補2023年 本表 第2章（文部科学省）
     "mext_foods.xlsx": "https://www.mext.go.jp/content/20260327-mxt_kagsei-mext-000029402_02.xlsx",
