@@ -93,10 +93,13 @@ fun ItemEntryScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val memberCount by viewModel.memberCount.collectAsStateWithLifecycle()
+    val mergeChip by viewModel.mergeChip.collectAsStateWithLifecycle()
     LaunchedEffect(viewModel) { viewModel.results.collect(onClose) }
     ItemEntryContent(
         state = state,
         memberCount = memberCount,
+        mergeChip = mergeChip,
+        onToggleMerge = viewModel::toggleMerge,
         onClose = { onClose(ItemEntryResult.CANCELLED) },
         onNameChange = viewModel::onNameChange,
         onQuantityChange = viewModel::onQuantityChange,
@@ -124,6 +127,9 @@ fun ItemEntryContent(
     onConfirm: () -> Unit,
     /** 家族の人数。「追加先: スーパー（共有リスト 3人）」に表示する（読めるまでは 0） */
     memberCount: Int = 0,
+    /** 表記ゆれのチップ。候補がなければ null */
+    mergeChip: MergeChip? = null,
+    onToggleMerge: () -> Unit = {},
 ) {
     val entry = state.entry
     val editing = entry?.editing != null
@@ -185,6 +191,20 @@ fun ItemEntryContent(
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                     modifier = Modifier.fillMaxWidth().testTag(ItemEntryTags.NAME),
                 )
+                // 似た名前の商品があれば「『牛乳』と同じ商品として記録する」。初期は未選択（docs/design/suggestions.md）
+                mergeChip?.let { chip ->
+                    FilterChip(
+                        selected = chip.selected,
+                        onClick = onToggleMerge,
+                        label = { Text(stringResource(R.string.entry_merge_chip, chip.candidateName)) },
+                        leadingIcon = if (chip.selected) {
+                            { Icon(painterResource(R.drawable.ic_check), contentDescription = null, modifier = Modifier.size(18.dp)) }
+                        } else {
+                            null
+                        },
+                        modifier = Modifier.padding(top = CartMateSpacing.small),
+                    )
+                }
             }
             QuantitySection(entry, onQuantityChange, onIncrement, onDecrement)
             UnitSection(entry, onUnitChange)

@@ -19,6 +19,8 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
 import java.time.Instant
 import kotlinx.coroutines.flow.flowOf
+import com.cheesecomer.cartmate.domain.product.NormalizationDictionary
+import com.cheesecomer.cartmate.testing.awaitUntil
 
 class ItemEntryViewModelTest {
 
@@ -46,6 +48,9 @@ class ItemEntryViewModelTest {
         lastVisibility = lastVisibility,
         clock = clock,
         memberDirectory = { flowOf(emptyList()) },
+        productRepository = store,
+        purchaseRepository = store,
+        dictionary = NormalizationDictionary.EMPTY,
     )
 
     private suspend fun listItems(listId: ListId = this.listId) = store.observeListItems(listId, Instant.EPOCH).first()
@@ -100,6 +105,87 @@ class ItemEntryViewModelTest {
 
         assertThat(listItems(privateList).single().visibility).isEqualTo(Visibility.PRIVATE)
         assertThat(lastVisibility.get(privateList)).isNull()
+    }
+
+    @Test
+    fun `新しい商品名で、似た名前の商品があれば表記ゆれのチップを未選択で出す`() = runTest {
+        store.addItem(newItem(listId, "牛乳"))
+        val viewModel = viewModel(name = "牛乳 1L")
+        viewModel.mergeChip.test {
+            val chip = awaitUntil { it != null }!!
+            assertThat(chip.candidateName).isEqualTo("牛乳")
+            assertThat(chip.selected).isFalse()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `チップを選んで追加すると、新しい商品を似た名前の商品に統合して記録する`() = runTest {
+        store.addItem(newItem(listId, "牛乳"))
+        val viewModel = viewModel(name = "牛乳 1L")
+        viewModel.mergeChip.test {
+            awaitUntil { it != null }
+            viewModel.toggleMerge()
+            assertThat(awaitUntil { it?.selected == true }!!.selected).isTrue()
+            cancelAndIgnoreRemainingEvents()
+        }
+        viewModel.confirm()
+
+        val products = store.observeProducts().first().associateBy { it.displayName }
+        assertThat(products.getValue("牛乳 1L").mergedInto).isEqualTo(products.getValue("牛乳").id)
+    }
+
+    @Test
+    fun `チップを選ばずに追加すると、統合しない`() = runTest {
+        store.addItem(newItem(listId, "牛乳"))
+        val viewModel = viewModel(name = "牛乳 1L")
+        viewModel.mergeChip.test {
+            awaitUntil { it != null }
+            cancelAndIgnoreRemainingEvents()
+        }
+        viewModel.confirm()
+
+        val products = store.observeProducts().first().associateBy { it.displayName }
+        assertThat(products.getValue("牛乳 1L").mergedInto).isNull()
+    }
+
+    @Test
+    fun `すでにある商品名ではチップを出さない`() = runTest {
+        store.addItem(newItem(listId, "牛乳"))
+        val viewModel = viewModel(name = "牛乳")
+        viewModel.mergeChip.test {
+            assertThat(awaitItem()).isNull()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `商品名を変えて候補が変わったら、選択を外す`() = runTest {
+        store.addItem(newItem(listId, "牛乳"))
+        store.addItem(newItem(listId, "豆腐"))
+        val viewModel = viewModel(name = "牛乳 1L")
+        viewModel.mergeChip.test {
+            awaitUntil { it != null }
+            viewModel.toggleMerge()
+            awaitUntil { it?.selected == true }
+
+            viewModel.onNameChange("豆腐 絹ごし")
+            val chip = awaitUntil { it?.candidateName == "豆腐" }!!
+            assertThat(chip.selected).isFalse()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `編集ではチップを出さない`() = runTest {
+        store.addItem(newItem(listId, "牛乳"))
+        val itemId = store.addItem(newItem(listId, "牛乳 1L"))
+        store.unmerge(store.observeProducts().first().first { it.displayName == "牛乳 1L" }.id)
+        val viewModel = viewModel(itemId = itemId)
+        viewModel.mergeChip.test {
+            assertThat(awaitItem()).isNull()
+            cancelAndIgnoreRemainingEvents()
+        }
     }
 
     @Test

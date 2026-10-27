@@ -32,6 +32,12 @@ import com.cheesecomer.cartmate.domain.repository.MemberDirectory
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import com.cheesecomer.cartmate.domain.model.ProductId
+import com.cheesecomer.cartmate.domain.product.MergeCandidates
+import com.cheesecomer.cartmate.domain.product.NormalizationDictionary
+import com.cheesecomer.cartmate.domain.repository.ProductRepository
+import com.cheesecomer.cartmate.domain.repository.PurchaseRepository
+import kotlinx.coroutines.flow.combine
 
 /**
  * 商品詳細入力画面。[itemId] があれば編集、なければ [name]・[quantity]・[unit] を初期値にした新規。
@@ -45,6 +51,9 @@ data class ItemEntryRoute(
     val quantity: String? = null,
     val unit: String? = null,
 )
+
+/** 表記ゆれのチップ「『[candidateName]』と同じ商品として記録する」 */
+data class MergeChip(val candidateId: ProductId, val candidateName: String, val selected: Boolean)
 
 data class ItemEntryUiState(
     val listName: String = "",
@@ -61,18 +70,51 @@ class ItemEntryViewModel @Inject constructor(
     private val lastVisibility: LastVisibilityStore,
     private val clock: Clock,
     memberDirectory: MemberDirectory,
+    productRepository: ProductRepository,
+    purchaseRepository: PurchaseRepository,
+    dictionary: NormalizationDictionary,
 ) : ViewModel() {
 
     /** 「追加先: スーパー（共有リスト 3人）」の人数 */
     val memberCount: StateFlow<Int> = memberDirectory.observeMembers().map { it.size }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), 0)
 
-
     private val listId = ListId(checkNotNull(savedStateHandle.get<String>(ItemEntryRoute::listId.name)))
     private val itemId = savedStateHandle.get<String>(ItemEntryRoute::itemId.name)?.let(::ItemId)
 
     private val _uiState = MutableStateFlow(ItemEntryUiState())
     val uiState: StateFlow<ItemEntryUiState> = _uiState.asStateFlow()
+
+    /** チップで選んだ候補。候補が変わったら選択を外すため、候補の ID で持つ */
+    private val selectedCandidate = MutableStateFlow<ProductId?>(null)
+
+    /** 自分に見える項目か購入の記録がある商品の ID（他のメンバーがプライベートでだけ使った名前を出さない） */
+    private val visibleProductIds: Flow<Set<ProductId>> = combine(
+        itemRepository.observeOpenItems(),
+        purchaseRepository.observePurchases(since = clock.instant().minus(PURCHASE_WINDOW)),
+    ) { items, purchases -> (items.mapNotNull { it.productId } + purchases.mapNotNull { it.productId }).toSet() }
+
+    /**
+     * 表記ゆれのチップ（docs/design/suggestions.md「表記ゆれの紐付け」）。新しい商品の追加で、入力した名前が新しい商品のときだけ出す。
+     * 初期状態は未選択
+     */
+    val mergeChip: StateFlow<MergeChip?> = combine(
+        _uiState,
+        productRepository.observeProducts(),
+        visibleProductIds,
+        selectedCandidate,
+    ) { state, products, visibleIds, selected ->
+        val entry = state.entry?.takeIf { it.editing == null } ?: return@combine null
+        val candidate = MergeCandidates.find(entry.name, products.filter { it.id in visibleIds }, products, dictionary)
+            ?: return@combine null
+        MergeChip(candidate.id, candidate.displayName, selected = selected == candidate.id)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), null)
+
+    /** チップの選択を切り替える */
+    fun toggleMerge() {
+        val chip = mergeChip.value ?: return
+        selectedCandidate.value = if (chip.selected) null else chip.candidateId
+    }
 
     private val _results = Channel<ItemEntryResult>(Channel.BUFFERED)
     /** 画面を閉じるときの結果 */
@@ -134,7 +176,9 @@ class ItemEntryViewModel @Inject constructor(
             if (editing == null) {
                 // 選んだ公開範囲を、このリストでの次の追加の初期値にする
                 if (entry.visibilitySelectable) lastVisibility.set(listId, values.visibility)
-                itemRepository.addItem(NewItem(listId, values.name, values.quantity, values.unit, values.memo, values.visibility))
+                // チップを選んでいれば、新しい商品を最初から候補の商品に統合する
+                val mergeInto = mergeChip.value?.takeIf { it.selected }?.candidateId
+                itemRepository.addItem(NewItem(listId, values.name, values.quantity, values.unit, values.memo, values.visibility, mergeInto))
                 _results.send(ItemEntryResult.ADDED)
             } else {
                 val update = ItemUpdate(values.name, values.quantity, values.unit, values.memo)
@@ -155,5 +199,6 @@ class ItemEntryViewModel @Inject constructor(
     private companion object {
         const val STOP_TIMEOUT_MILLIS = 5_000L
         val COMPLETED_WINDOW: Duration = Duration.ofHours(24)
+        val PURCHASE_WINDOW: Duration = Duration.ofDays(365)
     }
 }

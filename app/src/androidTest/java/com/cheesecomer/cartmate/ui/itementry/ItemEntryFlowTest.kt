@@ -51,6 +51,7 @@ import org.junit.runner.RunWith
 import java.time.Clock
 import java.time.Instant
 import kotlinx.coroutines.flow.flowOf
+import com.cheesecomer.cartmate.domain.product.NormalizationDictionary
 
 /** リスト詳細と商品詳細入力画面の行き来。アプリと同じ Navigation の配線で確かめる */
 @RunWith(AndroidJUnit4::class)
@@ -92,7 +93,7 @@ class ItemEntryFlowTest {
                     }
                     composable<ItemEntryRoute> { backStackEntry ->
                         val viewModel = viewModel {
-                            ItemEntryViewModel(createSavedStateHandle(), store, store, lastVisibility, clock, { flowOf(emptyList()) })
+                            ItemEntryViewModel(createSavedStateHandle(), store, store, lastVisibility, clock, { flowOf(emptyList()) }, store, store, NormalizationDictionary.EMPTY)
                         }
                         ItemEntryScreen(onClose = { navController.closeEntry(backStackEntry, it) }, viewModel = viewModel)
                     }

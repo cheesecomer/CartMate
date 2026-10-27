@@ -95,6 +95,7 @@
     <string name="entry_memo_optional">任意</string>
     <string name="entry_memo_placeholder">メモ（例: 特売品なら2個、賞味期限が長いものなど）</string>
     <string name="entry_add">リストに追加する</string>
+    <string name="entry_merge_chip">「%1$s」と同じ商品として記録する</string>
     <string name="entry_update">更新する</string>
 
     <!-- ログイン -->
