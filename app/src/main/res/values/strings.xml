@@ -181,15 +181,33 @@
     <string name="family_products_section">商品</string>
 
     <!-- 商品の統合 -->
-    <string name="product_merge_title">商品の統合</string>
-    <string name="product_merge_hint">同じ商品なのに別々に記録されているものをまとめると、購入の周期をまとめて計算します</string>
-    <string name="product_merge_empty">まだ商品がありません</string>
-    <string name="product_merge_into_other">別の商品に統合</string>
-    <string name="product_merge_unmerge">統合を解除</string>
+    <string name="product_merge_title">商品名の管理</string>
+    <string name="product_names_hint">同じ商品なのに別々に記録されているものをまとめると、購入の周期をまとめて計算します。商品を開いて「商品をまとめる」から、ほかの商品をまとめます</string>
+    <string name="product_names_empty">まだ商品がありません</string>
+    <string name="product_names_members">%1$d件をまとめています</string>
+    <string name="product_names_dictionary">辞書：%1$s</string>
+    <string name="product_names_opted_out">辞書でまとめていません</string>
+    <string name="product_detail_members">まとめている商品（%1$d件）</string>
+    <string name="product_detail_no_members">まとめている商品はありません</string>
+    <string name="product_detail_unmerge">解除</string>
+    <string name="product_detail_unmerge_description">%1$sの統合を解除する</string>
+    <string name="product_detail_merge">商品をまとめる</string>
+    <string name="product_detail_merged_into">「%1$s」にまとめています</string>
+    <string name="product_detail_merged_hint">まとめ先を変えるときは、解除してから、新しいまとめ先の「商品をまとめる」で選びます</string>
+    <string name="product_detail_dictionary_section">辞書の名寄せ</string>
+    <string name="product_detail_dictionary">辞書で「%1$s」として、次の名前をまとめています：%2$s</string>
+    <string name="product_detail_opted_out">この商品は辞書でまとめていません</string>
+    <string name="product_detail_not_found">この商品は見つかりません</string>
     <string name="product_merge_opt_out">別の商品として扱う</string>
     <string name="product_merge_opt_in">辞書でまとめる</string>
-    <string name="product_merge_choose_target">「%1$s」をどの商品に統合しますか？</string>
-    <string name="product_merge_reason_manual">「%1$s」に統合しています</string>
-    <string name="product_merge_reason_dictionary">辞書で「%1$s」としてまとめています</string>
-    <string name="product_merge_reason_opted_out">辞書でまとめていません</string>
+    <string name="merge_products_title">商品をまとめる</string>
+    <string name="merge_products_target">残す商品</string>
+    <string name="merge_products_hint">「%1$s」にまとめる商品を選んでください（%2$d件まで）</string>
+    <string name="merge_products_empty">まとめられる商品がありません</string>
+    <string name="merge_products_selected">%1$d件を選択中</string>
+    <string name="merge_products_confirm_action">まとめる</string>
+    <string name="merge_products_too_many">一度にまとめられるのは%1$d件までです</string>
+    <string name="merge_products_confirm_title">「%1$s」に%2$d件をまとめますか？</string>
+    <string name="merge_products_confirm_members">「%1$s」にまとめている%2$d件も一緒に移ります。</string>
+    <string name="merge_products_rejected">商品のまとめ方を変更できませんでした。ほかのメンバーが先に変更しています</string>
 </resources>

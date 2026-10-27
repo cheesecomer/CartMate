@@ -248,7 +248,13 @@ class FirestoreShoppingStore @Inject constructor(
                 F.CREATED_BY to scope.uid,
                 F.CREATED_AT to FieldValue.serverTimestamp(),
             ) + if (mergeInto != null) {
-                mapOf(F.MERGED_INTO to mergeInto.value, F.MERGED_AT to FieldValue.serverTimestamp(), F.MERGED_BY to scope.uid)
+                mapOf(
+                    F.MERGED_INTO to mergeInto.value,
+                    F.MERGED_AT to FieldValue.serverTimestamp(),
+                    F.MERGED_BY to scope.uid,
+                    F.MERGE_UPDATED_AT to FieldValue.serverTimestamp(),
+                    F.MERGE_UPDATED_BY to scope.uid,
+                )
             } else {
                 mapOf(F.MERGED_INTO to null)
             })

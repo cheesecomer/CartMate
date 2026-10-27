@@ -256,12 +256,12 @@ service cloud.firestore {
         allow create: if isImport('products', pid, me(), []);   // 合流
         allow create: if isMember(hid)
           && request.resource.data.keys().hasOnly(['displayName','normalizedName','searchKey','createdBy','createdAt',
-                'mergedInto','mergedAt','mergedBy'])
+                'mergedInto','mergedAt','mergedBy','mergeUpdatedAt','mergeUpdatedBy'])
           && str(request.resource.data.displayName, 60)
           && str(request.resource.data.normalizedName, 60)
           && str(request.resource.data.searchKey, 60)
           && (request.resource.data.mergedInto == null || isCreatedMerged());
-        allow update: if isMember(hid) && (isRecreate() || isMerge() || isUnmerge() || isDictionaryOptOut());
+        allow update: if isMember(hid) && (isRecreate() || isMerge() || isRepoint() || isUnmerge() || isDictionaryOptOut());
         allow delete: if false;
 
         // 2端末が同じ決定的IDで同時に作成した場合の上書きを許す（正規化名は不変）
@@ -269,17 +269,45 @@ service cloud.firestore {
           return request.resource.data.normalizedName == resource.data.normalizedName
             && changed().hasOnly(['displayName','searchKey','createdBy','createdAt']);
         }
+        function productPath(id) { return /databases/$(db)/documents/households/$(hid)/products/$(id); }
+        // 統合関係を変えた人と時刻（docs/design/data-model.md）。統合・付け替え・解除のどれでも書く
+        function isMergeUpdatedByMe() {
+          return request.resource.data.get('mergeUpdatedBy', null) == me()
+            && request.resource.data.get('mergeUpdatedAt', null) == request.time;
+        }
+        // 統合（「商品をまとめる」）。未統合の商品だけを、未統合の商品に統合できる。最初に統合した人と時刻を書く
         function isMerge() {
           let target = request.resource.data.mergedInto;
-          return changed().hasOnly(['mergedInto','mergedAt','mergedBy'])
+          return resource.data.get('mergedInto', null) == null
+            && changed().hasOnly(['mergedInto','mergedAt','mergedBy','mergeUpdatedAt','mergeUpdatedBy'])
             && target is string && target != pid
-            && get(/databases/$(db)/documents/households/$(hid)/products/$(target)).data.mergedInto == null
+            && get(productPath(target)).data.get('mergedInto', null) == null
             && request.resource.data.mergedBy == me()
-            && request.resource.data.mergedAt == request.time;
+            && request.resource.data.mergedAt == request.time
+            && isMergeUpdatedByMe();
         }
+        // 付け替え。今の統合先 parent が、同じ書き込みの中で次のどちらかになるときだけ、統合先を変えられる。
+        // ①parent の統合を解除し、parent の元の統合先へ移す（中間の商品の解除）
+        // ②parent を新しく統合し、同じ統合先へ移す（ほかの商品をまとめている商品の統合）
+        // 古い統合関係を前提にした書き込み（すでに解除された商品の付け替え）は、ここで拒否される
+        function isRepoint() {
+          let parent = resource.data.get('mergedInto', null);
+          let target = request.resource.data.mergedInto;
+          return parent is string && target is string && target != pid
+            && changed().hasOnly(['mergedInto','mergeUpdatedAt','mergeUpdatedBy'])
+            && isMergeUpdatedByMe()
+            && ((getAfter(productPath(parent)).data.get('mergedInto', null) == null
+                  && get(productPath(parent)).data.get('mergedInto', null) == target)
+                || (get(productPath(parent)).data.get('mergedInto', null) == null
+                  && getAfter(productPath(parent)).data.get('mergedInto', null) == target));
+        }
+        // 統合の解除。最初に統合した人と時刻も消す
         function isUnmerge() {
-          return changed().hasOnly(['mergedInto','mergedAt','mergedBy'])
-            && request.resource.data.mergedInto == null;
+          return changed().hasOnly(['mergedInto','mergedAt','mergedBy','mergeUpdatedAt','mergeUpdatedBy'])
+            && request.resource.data.mergedInto == null
+            && request.resource.data.get('mergedBy', null) == null
+            && request.resource.data.get('mergedAt', null) == null
+            && isMergeUpdatedByMe();
         }
         // 表記ゆれのチップを選んで、新しい商品を最初から統合して作る。統合先は未統合でなければならない
         function isCreatedMerged() {
@@ -287,7 +315,8 @@ service cloud.firestore {
           return target is string && target != pid
             && get(/databases/$(db)/documents/households/$(hid)/products/$(target)).data.mergedInto == null
             && request.resource.data.mergedBy == me()
-            && request.resource.data.mergedAt == request.time;
+            && request.resource.data.mergedAt == request.time
+            && isMergeUpdatedByMe();
         }
         // 名寄せ辞書でまとめない（「別の商品として扱う」）とその取り消し
         function isDictionaryOptOut() {

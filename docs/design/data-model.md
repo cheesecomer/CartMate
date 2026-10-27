@@ -39,7 +39,9 @@ households/{hid}/items/{itemId}              # リストの下ではなく家族
 households/{hid}/products/{productId}        # productId = 正規化名から決まる決定的ID
   displayName, normalizedName, searchKey,
   createdBy, createdAt,
-  mergedInto: string | null, mergedAt?, mergedBy?
+  mergedInto: string | null,
+  mergedAt?, mergedBy?,                      # 最初に統合した日時と人。付け替えでは変えない。解除で消す
+  mergeUpdatedAt?, mergeUpdatedBy?,          # 最後に統合関係（統合・付け替え・解除）を変えた日時と人
   dictionaryOptOut?: bool                    # 名寄せ辞書でまとめない（手動の分離）。辞書を更新しても元に戻らない
   suggestionExcluded?: bool                  # 時期が近い商品の提案から除外する（フェーズ4）
 
@@ -56,6 +58,7 @@ households/{hid}/purchases/{purchaseId}      # purchaseId = itemId
 | 判断 | 理由 |
 |---|---|
 | **items をフラットにする**（`lists/{id}/items` ではなく `households/{hid}/items` + `listId`） | ①リスト一覧の未購入件数、②「家族の未購入リストにある商品は重複サジェストしない」の判定、③リスト詳細、を **`status == "open"` の購読1本** でまかなえる。サブコレクションにすると、リストの数だけ購読するか collection group クエリが必要になる。また、リストを論理削除しても items が孤立しない。 |
+| **統合は1段にし、変更は1つのバッチで書く** | 「商品をまとめる」では、選んだ商品を統合先に統合し、選んだ商品に直接まとまっている商品も同じ統合先に付け替える。解除では、解除する商品に直接まとまっている商品を、その商品の元の統合先に付け替える（画面で1件を解除したら、その1件だけが外れる）。以前の画面で作られた多段の統合は一括では直さず、触れたときに1段ずつ直す（読むときは `ProductGraph` でたどる）。付け替えは、今の統合先が同じバッチの中で解除されるか新しく統合される場合だけルールが認めるので、古い統合関係を前提にした付け替え（ほかのメンバーがすでに解除した商品をまとめ直すなど）は拒否される。バッチは原子的なので、一部だけが反映されることはない。トランザクションは使わない（オフラインで使えないため） |
 | **ProductAlias のサブコレクションを使わず、`products.mergedInto` で表す** | 別表記も1つの product ドキュメントとして持ち、統合するときは `mergedInto` に統合先を入れるだけにする。購入履歴を書き換えずに済み（追記専用を保てる）、統合の解除も `null` に戻すだけで済む。家族単位の product は数百件程度と見込まれるので全件を購読でき、統合の解決はクライアント（`ProductGraph`）で行う。 |
 | **productId を正規化名のハッシュから決める**（`"n_" + sha256(normalizedName)` の先頭128bitを hex 化） | オフライン中に2台の端末が同じ「牛乳」を追加しても、product が重複しない。機械的な正規化で一致する名前は自動で同じ商品になる（[要件](../requirements.md) §4.2）。 |
 | **purchaseId = itemId** | 冪等性の要。1つの item から購入履歴が2件できることが、構造上起きない（[sync.md](sync.md)）。 |

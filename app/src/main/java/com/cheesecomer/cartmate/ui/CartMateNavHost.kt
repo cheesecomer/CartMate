@@ -31,8 +31,12 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.serialization.Serializable
-import com.cheesecomer.cartmate.ui.products.ProductMergeRoute
-import com.cheesecomer.cartmate.ui.products.ProductMergeScreen
+import com.cheesecomer.cartmate.ui.products.MergeProductsRoute
+import com.cheesecomer.cartmate.ui.products.MergeProductsScreen
+import com.cheesecomer.cartmate.ui.products.ProductDetailRoute
+import com.cheesecomer.cartmate.ui.products.ProductDetailScreen
+import com.cheesecomer.cartmate.ui.products.ProductNamesRoute
+import com.cheesecomer.cartmate.ui.products.ProductNamesScreen
 
 @Serializable
 data object ListsRoute
@@ -60,11 +64,30 @@ fun CartMateNavHost(pending: PendingNavigation, onDeleteAccount: () -> Unit) {
                 onBack = { navController.popBackStack() },
                 onJoinWithCode = { navController.navigate(JoinCodeRoute) },
                 onDeleteAccount = onDeleteAccount,
-                onOpenProductMerge = { navController.navigate(ProductMergeRoute) },
+                onOpenProductMerge = { navController.navigate(ProductNamesRoute) },
             )
         }
-        composable<ProductMergeRoute> {
-            ProductMergeScreen(onBack = { navController.popBackStack() })
+        composable<ProductNamesRoute> {
+            ProductNamesScreen(
+                onBack = { navController.popBackStack() },
+                onOpen = { navController.navigate(ProductDetailRoute(it.value)) },
+            )
+        }
+        composable<ProductDetailRoute> {
+            ProductDetailScreen(
+                onBack = { navController.popBackStack() },
+                onMerge = { navController.navigate(MergeProductsRoute(it.value)) },
+                onOpen = { navController.navigate(ProductDetailRoute(it.value)) },
+            )
+        }
+        composable<MergeProductsRoute> { backStackEntry ->
+            MergeProductsScreen(
+                onBack = { navController.popBackStack() },
+                // まとめたら統合先の画面に戻る。完了と戻るキーが重なっても、1回だけ戻る
+                onDone = {
+                    if (backStackEntry.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) navController.popBackStack()
+                },
+            )
         }
         joinGraph(navController)
         composable<ListDetailRoute> { backStackEntry ->

@@ -32,6 +32,8 @@ class EmulatorClient private constructor(
         private set
     lateinit var households: FirestoreHouseholdRepository
         private set
+    lateinit var products: FirestoreProductRepository
+        private set
 
     val uid: String get() = checkNotNull(auth.currentUser).uid
     val account: Account get() = Account(UserId(uid), displayName, "$displayName@example.com", photoUrl = null)
@@ -42,6 +44,7 @@ class EmulatorClient private constructor(
         session = FirestoreSession(auth, db)
         store = FirestoreShoppingStore(session, db, Clock.systemUTC())
         households = FirestoreHouseholdRepository(session, db, FamilyMerger(context, db), Clock.systemUTC())
+        products = FirestoreProductRepository(context, session, db)
     }
 
     /**
@@ -52,10 +55,14 @@ class EmulatorClient private constructor(
         withTimeout(10_000) { session.householdId.first { it == householdId } }
     }
 
-    /** Firestore を終了して作り直す。書き込みのキューは端末に残っているので、つながると送られる */
-    suspend fun restart() {
+    /**
+     * Firestore を終了して作り直す。書き込みのキューは端末に残っているので、つながると送られる。
+     * [offline] なら、つながる前にオフラインにする（起動し直した直後に送られないように）
+     */
+    suspend fun restart(offline: Boolean = false) {
         db.terminate().await()
         connect()
+        if (offline) offline()
     }
 
     suspend fun offline() {

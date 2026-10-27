@@ -20,6 +20,7 @@ import org.junit.jupiter.api.extension.RegisterExtension
 import java.time.Instant
 import kotlinx.coroutines.flow.flowOf
 import com.cheesecomer.cartmate.domain.product.NormalizationDictionary
+import com.cheesecomer.cartmate.domain.product.ProductMerge
 import com.cheesecomer.cartmate.testing.awaitUntil
 
 class ItemEntryViewModelTest {
@@ -180,7 +181,7 @@ class ItemEntryViewModelTest {
     fun `編集ではチップを出さない`() = runTest {
         store.addItem(newItem(listId, "牛乳"))
         val itemId = store.addItem(newItem(listId, "牛乳 1L"))
-        store.unmerge(store.observeProducts().first().first { it.displayName == "牛乳 1L" }.id)
+        store.applyMergeChanges(listOf(ProductMerge.Change.Unmerge(store.observeProducts().first().first { it.displayName == "牛乳 1L" }.id)))
         val viewModel = viewModel(itemId = itemId)
         viewModel.mergeChip.test {
             assertThat(awaitItem()).isNull()

@@ -44,6 +44,11 @@ fun CartMateApp(viewModel: AppViewModel = hiltViewModel()) {
             Toast.makeText(context, R.string.family_action_failed, Toast.LENGTH_LONG).show()
         }
     }
+    LaunchedEffect(viewModel) {
+        viewModel.mergeRejected.collect {
+            Toast.makeText(context, R.string.merge_products_rejected, Toast.LENGTH_LONG).show()
+        }
+    }
     when (val current = destination) {
         Destination.Loading -> Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface))
         Destination.Login -> SignInScreen()

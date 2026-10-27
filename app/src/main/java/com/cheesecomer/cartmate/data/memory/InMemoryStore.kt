@@ -37,6 +37,7 @@ import com.cheesecomer.cartmate.domain.list.ShoppingRound
 import com.cheesecomer.cartmate.domain.repository.RejectedCheck
 import kotlinx.coroutines.flow.emptyFlow
 import com.cheesecomer.cartmate.domain.model.ProductId
+import com.cheesecomer.cartmate.domain.product.ProductMerge
 import com.cheesecomer.cartmate.domain.text.NameNormalizer
 import com.cheesecomer.cartmate.domain.model.Product
 import com.cheesecomer.cartmate.domain.repository.ProductRepository
@@ -292,9 +293,20 @@ class InMemoryStore @Inject constructor(
 
     override fun observeProducts(): Flow<List<Product>> = data.map { it.products.values.toList() }.distinctUntilChanged()
 
-    override suspend fun merge(from: ProductId, into: ProductId) = updateProduct(from) { it.copy(mergedInto = into) }
+    override suspend fun applyMergeChanges(changes: List<ProductMerge.Change>) {
+        for (change in changes) {
+            when (change) {
+                is ProductMerge.Change.Merge -> updateProduct(change.id) { it.copy(mergedInto = change.into) }
+                is ProductMerge.Change.Repoint -> updateProduct(change.id) { it.copy(mergedInto = change.into) }
+                is ProductMerge.Change.Unmerge -> updateProduct(change.id) { it.copy(mergedInto = null) }
+            }
+        }
+    }
 
-    override suspend fun unmerge(id: ProductId) = updateProduct(id) { it.copy(mergedInto = null) }
+    /** インメモリでは書き込みが拒否されることはない */
+    override fun observeRejectedMergeChanges(): Flow<Unit> = emptyFlow()
+
+    override suspend fun verifyPendingMergeChanges() = Unit
 
     override suspend fun setDictionaryOptOut(id: ProductId, optOut: Boolean) = updateProduct(id) { it.copy(dictionaryOptOut = optOut) }
 
