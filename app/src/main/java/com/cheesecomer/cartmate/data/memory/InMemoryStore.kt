@@ -337,5 +337,20 @@ class InMemoryStore @Inject constructor(
         }
             .distinctUntilChanged()
 
+    override suspend fun setExcludedFromPrediction(id: ItemId, excluded: Boolean) {
+        val me = currentUser.currentUserId()
+        val now = clock.instant()
+        data.update { d ->
+            val purchase = d.purchases[id]?.takeIf { it.visible } ?: return@update d
+            d.copy(purchases = d.purchases + (id to purchase.copy(
+                excludedFromPrediction = excluded,
+                excludedAt = now.takeIf { excluded },
+                excludedBy = me.takeIf { excluded },
+            )))
+        }
+    }
+
+    override suspend fun setSuggestionExcluded(id: ProductId, excluded: Boolean) = updateProduct(id) { it.copy(suggestionExcluded = excluded) }
+
     private fun newId(): String = UUID.randomUUID().toString()
 }

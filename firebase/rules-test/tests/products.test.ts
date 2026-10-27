@@ -322,3 +322,26 @@ describe("商品の非表示", () => {
     await assertFails(updateDoc(doc(as("jiro"), path("n_test")), hiding("jiro")));
   });
 });
+
+describe("提案から除外", () => {
+  it("メンバーは時期が近い商品の提案から除外して、戻せる", async () => {
+    await seedHousehold(HID, "taro", "hanako");
+    await seedProduct("n_milk");
+    await assertSucceeds(updateDoc(doc(as("hanako"), path("n_milk")), { suggestionExcluded: true }));
+    await assertSucceeds(updateDoc(doc(as("taro"), path("n_milk")), { suggestionExcluded: false }));
+  });
+
+  it("真偽値だけで、ほかのフィールドと一緒には変えられない", async () => {
+    await seedHousehold(HID, "taro");
+    await seedProduct("n_milk");
+    await assertFails(updateDoc(doc(as("taro"), path("n_milk")), { suggestionExcluded: "yes" }));
+    await assertFails(updateDoc(doc(as("taro"), path("n_milk")), { suggestionExcluded: true, displayName: "別" }));
+  });
+
+  it("メンバーでなければ変えられない", async () => {
+    await seedHousehold(HID, "taro");
+    await seedProduct("n_milk");
+    await assertFails(updateDoc(doc(as("jiro"), path("n_milk")), { suggestionExcluded: true }));
+  });
+});
+

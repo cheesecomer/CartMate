@@ -414,6 +414,18 @@ class FirestoreShoppingStore @Inject constructor(
         map = { it.toPurchase() },
     ).mapSorted { it.purchasedAt }
 
+    /** 予測に使わないにした人と時刻を書き、戻すときは消す。完了は待たない */
+    override suspend fun setExcludedFromPrediction(id: ItemId, excluded: Boolean) {
+        val scope = session.requireScope()
+        val ref = Paths.purchases(db, scope.householdId).document(id.value)
+        val task = if (excluded) {
+            ref.update(F.EXCLUDED_FROM_PREDICTION, true, F.EXCLUDED_AT, FieldValue.serverTimestamp(), F.EXCLUDED_BY, scope.uid)
+        } else {
+            ref.update(F.EXCLUDED_FROM_PREDICTION, false, F.EXCLUDED_AT, FieldValue.delete(), F.EXCLUDED_BY, FieldValue.delete())
+        }
+        task.logFailure("setExcludedFromPrediction")
+    }
+
     private fun <T, K : Comparable<K>> Flow<List<T>>.mapSorted(key: (T) -> K): Flow<List<T>> = map { it.sortedBy(key) }
 
     /** 動かした1件だけを書き込むか、全件を振り直す */

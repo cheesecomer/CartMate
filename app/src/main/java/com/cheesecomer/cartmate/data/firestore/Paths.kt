@@ -81,6 +81,10 @@ object F {
     const val MERGE_UPDATED_BY = "mergeUpdatedBy"
     const val HIDDEN_AT = "hiddenAt"
     const val HIDDEN_BY = "hiddenBy"
+    const val SUGGESTION_EXCLUDED = "suggestionExcluded"
+    const val EXCLUDED_FROM_PREDICTION = "excludedFromPrediction"
+    const val EXCLUDED_AT = "excludedAt"
+    const val EXCLUDED_BY = "excludedBy"
     const val DICTIONARY_OPT_OUT = "dictionaryOptOut"
 }
 

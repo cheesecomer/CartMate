@@ -30,4 +30,7 @@ interface ProductRepository {
 
     /** 名寄せ辞書でまとめないようにする（「別の商品として扱う」）。false で辞書の名寄せに戻す */
     suspend fun setDictionaryOptOut(id: ProductId, optOut: Boolean)
+
+    /** 時期が近い商品の提案に出さない（補完には出す）。false で戻す。家族で共有し、オフラインでも行える */
+    suspend fun setSuggestionExcluded(id: ProductId, excluded: Boolean)
 }

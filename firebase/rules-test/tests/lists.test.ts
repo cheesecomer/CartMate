@@ -2,6 +2,7 @@ import { assertFails, assertSucceeds } from "@firebase/rules-unit-testing";
 import {
   collection,
   deleteDoc,
+  deleteField,
   doc,
   getDoc,
   getDocs,
@@ -415,3 +416,60 @@ describe("チェックと Undo", () => {
     await assertSucceeds(getDoc(doc(as("hanako"), `households/${HID}/purchases/i1`)));
   });
 });
+
+describe("予測に使わない", () => {
+  async function seedPurchase(visibility: "shared" | "private" = "shared", purchasedBy = "taro") {
+    await seedHousehold(HID, "taro", "hanako");
+    await seed(`households/${HID}/purchases/i1`, {
+      itemId: "i1",
+      listId: "l1",
+      listNameSnapshot: "スーパー",
+      productId: PRODUCT,
+      inputName: "牛乳",
+      quantity: 1,
+      unit: "本",
+      memo: null,
+      visibility,
+      checkedAt: new Date(),
+      purchasedAt: new Date(),
+      purchasedBy,
+      active: true,
+      revokedAt: null,
+      revokedBy: null,
+    });
+  }
+  const path = `households/${HID}/purchases/i1`;
+  const excluding = (uid: string) => ({ excludedFromPrediction: true, excludedAt: serverTimestamp(), excludedBy: uid });
+  const including = { excludedFromPrediction: false, excludedAt: deleteField(), excludedBy: deleteField() };
+
+  it("共有の記録は家族の誰でも予測に使わないにして、戻せる", async () => {
+    await seedPurchase();
+    await assertSucceeds(updateDoc(doc(as("hanako"), path), excluding("hanako")));
+    await assertSucceeds(updateDoc(doc(as("taro"), path), including));
+  });
+
+  it("プライベートの記録はほかのメンバーが切り替えられない", async () => {
+    await seedPurchase("private", "taro");
+    await assertFails(updateDoc(doc(as("hanako"), path), excluding("hanako")));
+    await assertSucceeds(updateDoc(doc(as("taro"), path), excluding("taro")));
+  });
+
+  it("外した人と時刻は偽れない", async () => {
+    await seedPurchase();
+    await assertFails(updateDoc(doc(as("hanako"), path), excluding("taro")));
+    await assertFails(updateDoc(doc(as("hanako"), path), { excludedFromPrediction: true, excludedAt: new Date(0), excludedBy: "hanako" }));
+  });
+
+  it("戻すときに外した人と時刻を残せない", async () => {
+    await seedPurchase();
+    await updateDoc(doc(as("hanako"), path), excluding("hanako"));
+    await assertFails(updateDoc(doc(as("hanako"), path), { excludedFromPrediction: false }));
+  });
+
+  it("一緒にほかのフィールドは変えられない", async () => {
+    await seedPurchase();
+    await assertFails(updateDoc(doc(as("hanako"), path), { ...excluding("hanako"), quantity: 3 }));
+    await assertFails(updateDoc(doc(as("hanako"), path), { ...excluding("hanako"), active: false }));
+  });
+});
+

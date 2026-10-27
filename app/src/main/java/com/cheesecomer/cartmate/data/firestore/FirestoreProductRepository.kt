@@ -104,6 +104,11 @@ class FirestoreProductRepository @Inject constructor(
         Paths.products(db, scope.householdId).document(id.value).update(F.DICTIONARY_OPT_OUT, optOut).logFailure("setDictionaryOptOut")
     }
 
+    override suspend fun setSuggestionExcluded(id: ProductId, excluded: Boolean) {
+        val scope = session.requireScope()
+        Paths.products(db, scope.householdId).document(id.value).update(F.SUGGESTION_EXCLUDED, excluded).logFailure("setSuggestionExcluded")
+    }
+
     /** 名前の訂正で作る商品（FirestoreShoppingStore で項目と一緒に作る商品と同じ形） */
     private fun newProduct(name: String, uid: String): Map<String, Any?> = mapOf(
         F.DISPLAY_NAME to NameNormalizer.displayName(name),

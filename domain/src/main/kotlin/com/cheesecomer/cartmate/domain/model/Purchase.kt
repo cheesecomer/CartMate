@@ -26,4 +26,7 @@ data class Purchase(
     val productId: ProductId? = null,
     /** 「予測に使わない」。記録は残し、周期の推定・早すぎる再購入・リスト類似度・補完の購入回数に使わない */
     val excludedFromPrediction: Boolean = false,
+    /** 「予測に使わない」にした時刻と人（履歴に表示する） */
+    val excludedAt: Instant? = null,
+    val excludedBy: UserId? = null,
 )

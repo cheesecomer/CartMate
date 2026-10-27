@@ -219,7 +219,7 @@ service cloud.firestore {
         allow create: if isImport('purchases', pid, request.resource.data.purchasedBy, []);   // 合流（フェーズ3）
         allow create: if isMember(hid) && isRecording();
         allow update: if isMember(hid) && canSee(resource.data, resource.data.purchasedBy)
-          && ((resource.data.active == false && isRecording()) || isRevoking());
+          && ((resource.data.active == false && isRecording()) || isRevoking() || isExcluding());
         allow delete: if isMember(hid) && isOwnPrivate(resource.data, resource.data.purchasedBy);   // アカウントの削除
 
         // 購入完了時（初回、またはUndo後の再完了）。スナップショット値は item と list に一致させる
@@ -241,6 +241,14 @@ service cloud.firestore {
             && d.memo == item.memo && d.visibility == item.visibility
             && d.listNameSnapshot == get(/databases/$(db)/documents/households/$(hid)/lists/$(item.listId)).data.name;
         }
+        // 「予測に使わない」とその取り消し。ほかのフィールドは変えられない。外した人と時刻を書き、戻すときは消す
+        function isExcluding() {
+          let d = request.resource.data;
+          return changed().hasOnly(['excludedFromPrediction','excludedAt','excludedBy'])
+            && ((d.excludedFromPrediction == true && d.excludedBy == me() && d.excludedAt == request.time)
+                || (d.excludedFromPrediction == false
+                    && d.get('excludedAt', null) == null && d.get('excludedBy', null) == null));
+        }
         function isRevoking() {
           return resource.data.active == true
             && request.resource.data.active == false
@@ -261,7 +269,8 @@ service cloud.firestore {
           && str(request.resource.data.normalizedName, 60)
           && str(request.resource.data.searchKey, 60)
           && (request.resource.data.mergedInto == null || isCreatedMerged());
-        allow update: if isMember(hid) && (isRecreate() || isMerge() || isRepoint() || isUnmerge() || isDictionaryOptOut() || isHide() || isShow());
+        allow update: if isMember(hid) && (isRecreate() || isMerge() || isRepoint() || isUnmerge() || isDictionaryOptOut() || isHide() || isShow()
+          || isSuggestionExclusion());
         allow delete: if false;
 
         // 2端末が同じ決定的IDで同時に作成した場合の上書きを許す（正規化名は不変）
@@ -331,6 +340,10 @@ service cloud.firestore {
           return changed().hasOnly(['hiddenAt','hiddenBy'])
             && request.resource.data.get('hiddenAt', null) == null
             && request.resource.data.get('hiddenBy', null) == null;
+        }
+        // 時期が近い商品の提案から除外する（補完には出す）とその取り消し
+        function isSuggestionExclusion() {
+          return changed().hasOnly(['suggestionExcluded']) && request.resource.data.suggestionExcluded is bool;
         }
         // 名寄せ辞書でまとめない（「別の商品として扱う」）とその取り消し
         function isDictionaryOptOut() {
