@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -97,34 +98,56 @@ fun ProductNamesScreen(onBack: () -> Unit, onOpen: (ProductId) -> Unit, viewMode
             items(loaded.entries, key = { it.product.id.value }) { entry ->
                 EntryRow(entry, onOpen)
             }
-            // 非表示の商品は一番下にまとめ、開いたときだけ並べる
+            // 非表示の商品は、一覧と分けた別枠に控えめに出す。見出しのタップで開閉する
             if (loaded.hidden.isNotEmpty()) {
                 item(key = "hidden") {
-                    ListItem(
-                        headlineContent = { Text(stringResource(R.string.product_names_hidden, loaded.hidden.size)) },
-                        trailingContent = {
-                            Icon(
-                                painterResource(if (showHidden) R.drawable.ic_expand_less else R.drawable.ic_expand_more),
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        },
-                        colors = ListItemDefaults.colors(
-                            containerColor = MaterialTheme.colorScheme.surface,
-                            headlineColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        ),
-                        modifier = Modifier.clickable(role = Role.Button) { showHidden = !showHidden },
-                    )
-                    HorizontalDivider(color = MaterialTheme.colorScheme.surfaceContainer)
+                    Spacer(Modifier.height(CartMateSpacing.xLarge))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(role = Role.Button) { showHidden = !showHidden }
+                            .heightIn(min = 48.dp)
+                            .padding(horizontal = CartMateSpacing.large),
+                    ) {
+                        Text(
+                            stringResource(R.string.product_names_hidden, loaded.hidden.size),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Icon(
+                            painterResource(if (showHidden) R.drawable.ic_expand_less else R.drawable.ic_expand_more),
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
                 }
                 if (showHidden) {
                     items(loaded.hidden, key = { "hidden-" + it.product.id.value }) { entry ->
-                        EntryRow(entry, onOpen)
+                        HiddenEntryRow(entry, onOpen)
                     }
                 }
+                item(key = "hidden-bottom") { Spacer(Modifier.height(CartMateSpacing.xLarge)) }
             }
         }
     }
+}
+
+/** 非表示の商品の行。一覧の行より小さく、薄い色で出す */
+@Composable
+private fun HiddenEntryRow(entry: ProductMerge.Entry, onOpen: (ProductId) -> Unit) {
+    Text(
+        entry.product.displayName,
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(role = Role.Button) { onOpen(entry.product.id) }
+            .heightIn(min = 40.dp)
+            .padding(horizontal = CartMateSpacing.xLarge, vertical = CartMateSpacing.small),
+    )
 }
 
 @Composable
