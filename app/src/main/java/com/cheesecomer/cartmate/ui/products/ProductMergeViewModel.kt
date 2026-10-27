@@ -3,7 +3,6 @@ package com.cheesecomer.cartmate.ui.products
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.cheesecomer.cartmate.domain.model.ProductId
-import com.cheesecomer.cartmate.domain.product.NormalizationDictionary
 import com.cheesecomer.cartmate.domain.product.ProductGraph
 import com.cheesecomer.cartmate.domain.product.ProductMerge
 import com.cheesecomer.cartmate.domain.repository.ItemRepository
@@ -18,6 +17,7 @@ import kotlinx.coroutines.launch
 import java.time.Clock
 import java.time.Duration
 import javax.inject.Inject
+import com.cheesecomer.cartmate.domain.repository.DictionaryProvider
 
 /**
  * 商品の統合画面（docs/requirements.md §3.5「商品の統合」）。統合・統合の解除・辞書の名寄せを外す。
@@ -29,7 +29,7 @@ class ProductMergeViewModel @Inject constructor(
     itemRepository: ItemRepository,
     purchaseRepository: PurchaseRepository,
     clock: Clock,
-    dictionary: NormalizationDictionary,
+    dictionaryProvider: DictionaryProvider,
 ) : ViewModel() {
 
     /** 自分に見える項目か購入の記録がある商品の行（他のメンバーがプライベートでだけ使った名前を出さない） */
@@ -37,7 +37,8 @@ class ProductMergeViewModel @Inject constructor(
         productRepository.observeProducts(),
         itemRepository.observeOpenItems(),
         purchaseRepository.observePurchases(since = clock.instant().minus(PURCHASE_WINDOW)),
-    ) { products, items, purchases ->
+        dictionaryProvider.observeDictionary(),
+    ) { products, items, purchases, dictionary ->
         val visible = (items.mapNotNull { it.productId } + purchases.mapNotNull { it.productId }).toSet()
         ProductMerge.rows(products, visible, dictionary)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), emptyList())

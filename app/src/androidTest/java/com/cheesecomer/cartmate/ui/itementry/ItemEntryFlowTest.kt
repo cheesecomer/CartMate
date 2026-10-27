@@ -93,7 +93,7 @@ class ItemEntryFlowTest {
                     }
                     composable<ItemEntryRoute> { backStackEntry ->
                         val viewModel = viewModel {
-                            ItemEntryViewModel(createSavedStateHandle(), store, store, lastVisibility, clock, { flowOf(emptyList()) }, store, store, NormalizationDictionary.EMPTY)
+                            ItemEntryViewModel(createSavedStateHandle(), store, store, lastVisibility, clock, { flowOf(emptyList()) }, store, store, { flowOf(NormalizationDictionary.EMPTY) })
                         }
                         ItemEntryScreen(onClose = { navController.closeEntry(backStackEntry, it) }, viewModel = viewModel)
                     }

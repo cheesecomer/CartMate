@@ -8,6 +8,38 @@ plugins {
     alias(libs.plugins.google.services)
 }
 
+/**
+ * 名寄せ辞書の元データ（リポジトリの dictionary/）を、アセットの dictionary/ に写す。CSV と VERSION だけを含める
+ * （docs/design/suggestions.md「名寄せ辞書」）
+ */
+abstract class CopyNormalizationDictionary : DefaultTask() {
+    @get:InputDirectory
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val sourceDir: DirectoryProperty
+
+    @get:OutputDirectory
+    abstract val outputDir: DirectoryProperty
+
+    @TaskAction
+    fun copy() {
+        val target = outputDir.get().asFile.resolve("dictionary")
+        target.deleteRecursively()
+        target.mkdirs()
+        sourceDir.get().asFile.listFiles { file -> file.name == "VERSION" || file.extension == "csv" }!!
+            .forEach { it.copyTo(target.resolve(it.name)) }
+    }
+}
+
+val copyNormalizationDictionary = tasks.register<CopyNormalizationDictionary>("copyNormalizationDictionary") {
+    sourceDir.set(rootProject.layout.projectDirectory.dir("dictionary"))
+}
+
+androidComponents {
+    onVariants { variant ->
+        variant.sources.assets?.addGeneratedSourceDirectory(copyNormalizationDictionary, CopyNormalizationDictionary::outputDir)
+    }
+}
+
 android {
     namespace = "com.cheesecomer.cartmate"
     compileSdk = 37

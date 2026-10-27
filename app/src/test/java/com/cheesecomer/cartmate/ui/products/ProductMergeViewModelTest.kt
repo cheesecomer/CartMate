@@ -15,6 +15,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
+import kotlinx.coroutines.flow.flowOf
 
 class ProductMergeViewModelTest {
 
@@ -25,7 +26,7 @@ class ProductMergeViewModelTest {
     private val clock = MutableClock()
     private val store = InMemoryStore(clock) { UserId("taro") }
     private val listId = runBlocking { store.createList("スーパー") }
-    private val viewModel = ProductMergeViewModel(store, store, store, clock, NormalizationDictionary.EMPTY)
+    private val viewModel = ProductMergeViewModel(store, store, store, clock, { flowOf(NormalizationDictionary.EMPTY) })
 
     private suspend fun productId(name: String) = store.observeProducts().first().first { it.displayName == name }.id
 

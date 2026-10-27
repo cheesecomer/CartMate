@@ -50,7 +50,7 @@ class ItemEntryViewModelTest {
         memberDirectory = { flowOf(emptyList()) },
         productRepository = store,
         purchaseRepository = store,
-        dictionary = NormalizationDictionary.EMPTY,
+        dictionaryProvider = { flowOf(NormalizationDictionary.EMPTY) },
     )
 
     private suspend fun listItems(listId: ListId = this.listId) = store.observeListItems(listId, Instant.EPOCH).first()

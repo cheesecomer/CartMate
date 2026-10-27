@@ -34,10 +34,10 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import com.cheesecomer.cartmate.domain.model.ProductId
 import com.cheesecomer.cartmate.domain.product.MergeCandidates
-import com.cheesecomer.cartmate.domain.product.NormalizationDictionary
 import com.cheesecomer.cartmate.domain.repository.ProductRepository
 import com.cheesecomer.cartmate.domain.repository.PurchaseRepository
 import kotlinx.coroutines.flow.combine
+import com.cheesecomer.cartmate.domain.repository.DictionaryProvider
 
 /**
  * 商品詳細入力画面。[itemId] があれば編集、なければ [name]・[quantity]・[unit] を初期値にした新規。
@@ -72,7 +72,7 @@ class ItemEntryViewModel @Inject constructor(
     memberDirectory: MemberDirectory,
     productRepository: ProductRepository,
     purchaseRepository: PurchaseRepository,
-    dictionary: NormalizationDictionary,
+    dictionaryProvider: DictionaryProvider,
 ) : ViewModel() {
 
     /** 「追加先: スーパー（共有リスト 3人）」の人数 */
@@ -103,7 +103,8 @@ class ItemEntryViewModel @Inject constructor(
         productRepository.observeProducts(),
         visibleProductIds,
         selectedCandidate,
-    ) { state, products, visibleIds, selected ->
+        dictionaryProvider.observeDictionary(),
+    ) { state, products, visibleIds, selected, dictionary ->
         val entry = state.entry?.takeIf { it.editing == null } ?: return@combine null
         val candidate = MergeCandidates.find(entry.name, products.filter { it.id in visibleIds }, products, dictionary)
             ?: return@combine null

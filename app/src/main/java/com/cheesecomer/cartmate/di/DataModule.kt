@@ -3,7 +3,6 @@ package com.cheesecomer.cartmate.di
 import com.cheesecomer.cartmate.data.firestore.FirestoreProductRepository
 import com.cheesecomer.cartmate.data.firestore.FirestoreShoppingStore
 import com.cheesecomer.cartmate.domain.model.UserId
-import com.cheesecomer.cartmate.domain.product.NormalizationDictionary
 import com.cheesecomer.cartmate.domain.repository.CurrentUserProvider
 import com.cheesecomer.cartmate.domain.repository.ItemRepository
 import com.cheesecomer.cartmate.domain.repository.ProductRepository
@@ -16,6 +15,8 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import java.time.Clock
+import com.cheesecomer.cartmate.data.dictionary.AssetDictionaryProvider
+import com.cheesecomer.cartmate.domain.repository.DictionaryProvider
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -34,13 +35,13 @@ abstract class DataModule {
     @Binds
     abstract fun bindProductRepository(repository: FirestoreProductRepository): ProductRepository
 
+    // 同梱の名寄せ辞書（docs/design/suggestions.md「名寄せ辞書」）
+    @Binds
+    abstract fun bindDictionaryProvider(provider: AssetDictionaryProvider): DictionaryProvider
+
     companion object {
         @Provides
         fun provideClock(): Clock = Clock.systemDefaultZone()
-
-        // 名寄せ辞書の中身は、同梱の辞書を読み込むまで空（docs/design/suggestions.md「名寄せ辞書」）
-        @Provides
-        fun provideNormalizationDictionary(): NormalizationDictionary = NormalizationDictionary.EMPTY
 
         @Provides
         fun provideCurrentUserProvider(auth: FirebaseAuth): CurrentUserProvider =

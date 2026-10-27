@@ -1,0 +1,16 @@
+alias,canonical_id,match,source
+たまご,egg,prefix,cartmate-manual
+タマゴ,egg,prefix,cartmate-manual
+玉子,egg,prefix,cartmate-manual
+しょうゆ,soy_sauce,prefix,cartmate-manual
+しょう油,soy_sauce,prefix,cartmate-manual
+胡麻油,sesame_oil,prefix,cartmate-manual
+ゴマ油,sesame_oil,prefix,cartmate-manual
+にんじん,carrot,prefix,cartmate-manual
+ニンジン,carrot,prefix,cartmate-manual
+たまねぎ,onion,prefix,cartmate-manual
+タマネギ,onion,prefix,cartmate-manual
+玉葱,onion,prefix,cartmate-manual
+6枚切り食パン,bread_6,prefix,cartmate-manual
+8枚切り食パン,bread_8,prefix,cartmate-manual
+トイレットペーパ,toilet_paper,prefix,cartmate-manual
