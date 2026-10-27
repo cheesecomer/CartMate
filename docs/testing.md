@@ -39,17 +39,17 @@
 
 ## 同時実行
 
-2つの FirebaseApp インスタンスと Firestore Emulator で実行します。
+2つの FirebaseApp インスタンスと、Firebase のエミュレータ（Auth と Firestore）で実行します（`ConcurrencyTest`。実行方法は下記「エミュレータを使う結合テスト」）。
 
 1. 同じ項目を同時にチェック → 有効な購入履歴がちょうど1件。両方とも例外にならない。後からチェックした側には、先にチェックした人の uid と時刻が返る。
 2. チェック → もう一方が Undo → 最初の端末も Undo → `AlreadyOpen`。購入履歴は `active=false`。
 3. Undo と再チェックを同時に実行 → 項目の状態と購入履歴の active が一致している。
-4. リスト削除と項目追加を同時に実行 → 一覧に表示されたまま。
+4. リスト削除と項目追加を同時に実行 → 一覧に表示されたまま。削除と追加のどちらが先にサーバーに届いても、追加した項目は消えない。
 5. 使用回数1の招待コードで2人が同時に参加 → 1人だけ成功する。
 6. オフラインで項目を追加 → 再接続 → もう一方の端末に反映される。
-7. オフラインでチェック → アプリのプロセスを終了 → 再接続 → WorkManager によって確定し、購入履歴の `checkedAt` がオフライン中の時刻になっている。
+7. オフラインでチェック → アプリのプロセスを終了 → 再接続 → Firestore の書き込みキュー（端末に残る）によって確定し、購入履歴の `checkedAt` がオフライン中の時刻になっている。
 8. オフラインでチェック → その間にもう一方がチェック → 再接続 → 有効な購入履歴は1件。オフラインだった側に `AlreadyCompleted` が返る。
-9. オフラインでチェック → オフラインのまま Undo → 再接続 → 何も書き込まれない。
+9. オフラインでチェック → オフラインのまま Undo → 再接続 → 項目は未購入で、有効な購入履歴はない（チェックと Undo の2つの書き込みが順に送られ、購入履歴は `active=false` で残る。[sync.md](design/sync.md#undo)）。
 10. チェック済みの項目をオフラインで Undo → 再接続 → 購入履歴が `active=false` になる。
 
 ## Compose UI
@@ -92,6 +92,21 @@ npm test
 
 - Firebase CLI は rules-test の依存に含めているので、グローバルに入れる必要はありません。エミュレータには Java が必要です。
 - エミュレータはポート 8085 を使い、実際のプロジェクトには接続しません（`demo-` で始まるプロジェクトID）。
+
+## エミュレータを使う結合テスト
+
+同時実行（上記）と、合流で購入の記録まで写ること（`FamilyMergeTest`）は、Android のテストから Firebase のエミュレータ（Auth と Firestore）につないで確かめます。アプリと同じリポジトリの実装を、端末ごとに別の FirebaseApp で動かします。これらのテストには `@EmulatorTest` を付けています。通常の `connectedDebugAndroidTest` では飛ばします（エミュレータのホストが渡されないため）。
+
+Android Emulator を起動しておき、次のコマンドで実行します。Firebase のエミュレータを起動し、テストが終わると止めます。
+
+```
+cd firebase/rules-test
+npx firebase emulators:exec --only firestore,auth --project demo-cartmate \
+  "cd ../.. && ./gradlew :app:connectedDebugAndroidTest -PemulatorTests"
+```
+
+- 端末からは、ホストの PC を `10.0.2.2` で参照します（Android Emulator）。実機で実行するときは `adb reverse tcp:8085 tcp:8085` と `adb reverse tcp:9099 tcp:9099` を実行し、`-PemulatorHost=127.0.0.1` を付けます。
+- Auth のエミュレータは HTTP なので、debug 版だけ、エミュレータのホストへの平文の通信を許しています（`app/src/debug/res/xml/network_security_config.xml`）。
 
 ## キーボードのタイミングに依存するテスト
 

@@ -44,6 +44,24 @@ const sourceProduct = {
   mergedInto: null,
 };
 
+const sourcePurchase = {
+  itemId: "i1",
+  listId: "l1",
+  listNameSnapshot: "スーパー",
+  productId: PRODUCT,
+  inputName: "牛乳",
+  quantity: 1,
+  unit: "本",
+  memo: null,
+  visibility: "shared",
+  checkedAt: createdAt,
+  purchasedAt: createdAt,
+  purchasedBy: "hanako",
+  active: true,
+  revokedAt: null,
+  revokedBy: null,
+};
+
 /** 合流の最初の手順（合流先に参加する）までが終わった状態 */
 async function seedMerging() {
   await seedHousehold(TO, "taro");
@@ -59,6 +77,7 @@ async function seedMerging() {
   await seed(`households/${FROM}/lists/l1`, sourceList);
   await seed(`households/${FROM}/items/i1`, sourceItem);
   await seed(`households/${FROM}/products/${PRODUCT}`, sourceProduct);
+  await seed(`households/${FROM}/purchases/i1`, sourcePurchase);
 }
 
 /** アプリの FamilyMerger.copy と同じ書き込み */
@@ -123,6 +142,43 @@ describe("合流", () => {
     const privateItem = { ...sourceItem, visibility: "private", createdBy: "kenta" };
     await seed(`households/${FROM}/items/i2`, privateItem);
     await assertFails(copy(as("hanako"), "items/i2", privateItem));
+  });
+
+  it("購入の記録を、購入日時も含めてそのまま写せる", async () => {
+    await seedMerging();
+    await assertSucceeds(copy(as("hanako"), "purchases/i1", sourcePurchase));
+  });
+
+  it("取り消した購入の記録も写せる", async () => {
+    await seedMerging();
+    const revoked = { ...sourcePurchase, active: false, revokedAt: createdAt, revokedBy: "hanako" };
+    await seed(`households/${FROM}/purchases/i1`, revoked);
+    await assertSucceeds(copy(as("hanako"), "purchases/i1", revoked));
+  });
+
+  it("購入の記録の内容を変えて写せない", async () => {
+    await seedMerging();
+    const db = as("hanako");
+    await assertFails(copy(db, "purchases/i1", { ...sourcePurchase, purchasedAt: Timestamp.now() }));
+    await assertFails(copy(db, "purchases/i1", { ...sourcePurchase, active: false }));
+    await assertFails(copy(db, "purchases/i1", { ...sourcePurchase, quantity: 3 }));
+  });
+
+  it("自分のプライベートな購入の記録は写せるが、ほかの人のものは写せない", async () => {
+    await seedMerging();
+    await seed(`households/${FROM}/members/kenta`, {
+      role: "member",
+      displayName: "kenta",
+      photoUrl: null,
+      joinedAt: Timestamp.now(),
+      joinedVia: null,
+    });
+    const mine = { ...sourcePurchase, itemId: "i2", visibility: "private" };
+    const others = { ...sourcePurchase, itemId: "i3", visibility: "private", purchasedBy: "kenta" };
+    await seed(`households/${FROM}/purchases/i2`, mine);
+    await seed(`households/${FROM}/purchases/i3`, others);
+    await assertSucceeds(copy(as("hanako"), "purchases/i2", mine));
+    await assertFails(copy(as("hanako"), "purchases/i3", others));
   });
 
   it("写し終えたら、所属を切り替えて元の家族を抜けられる", async () => {

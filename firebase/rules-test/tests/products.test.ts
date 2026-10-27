@@ -1,5 +1,5 @@
 import { assertFails, assertSucceeds } from "@firebase/rules-unit-testing";
-import { doc, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
+import { deleteDoc, doc, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
 import { describe, it } from "vitest";
 import { as, HID, seed, seedHousehold } from "./setup";
 
@@ -61,6 +61,41 @@ describe("商品", () => {
     const db = as("hanako");
     await assertSucceeds(updateDoc(doc(db, path("n_gyunyu")), { mergedInto: "n_milk", mergedAt: serverTimestamp(), mergedBy: "hanako" }));
     await assertSucceeds(updateDoc(doc(db, path("n_gyunyu")), { mergedInto: null }));
+  });
+
+  it("2つの端末が同じ商品を作っても、同じ ID で作り直せる", async () => {
+    await seedHousehold(HID, "taro", "hanako");
+    await seedProduct("n_milk");
+    await assertSucceeds(setDoc(doc(as("hanako"), path("n_milk")), product("hanako", { displayName: "ぎゅうにゅう" })));
+  });
+
+  it("作り直しで正規化した名前は変えられない", async () => {
+    await seedHousehold(HID, "taro", "hanako");
+    await seedProduct("n_milk");
+    await assertFails(setDoc(doc(as("hanako"), path("n_milk")), product("hanako", { normalizedName: "豆乳" })));
+  });
+
+  it("統合済みの商品には、あとからも統合できない", async () => {
+    await seedHousehold(HID, "taro");
+    await seedProduct("n_milk", { mergedInto: "n_dairy" });
+    await seedProduct("n_gyunyu");
+    await assertFails(
+      updateDoc(doc(as("taro"), path("n_gyunyu")), { mergedInto: "n_milk", mergedAt: serverTimestamp(), mergedBy: "taro" }),
+    );
+  });
+
+  it("自分自身には統合できない", async () => {
+    await seedHousehold(HID, "taro");
+    await seedProduct("n_milk");
+    await assertFails(
+      updateDoc(doc(as("taro"), path("n_milk")), { mergedInto: "n_milk", mergedAt: serverTimestamp(), mergedBy: "taro" }),
+    );
+  });
+
+  it("商品は削除できない", async () => {
+    await seedHousehold(HID, "taro");
+    await seedProduct("n_milk");
+    await assertFails(deleteDoc(doc(as("taro"), path("n_milk"))));
   });
 
   it("辞書の名寄せを外し、元に戻せる", async () => {

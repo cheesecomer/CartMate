@@ -198,11 +198,15 @@ class FirestoreShoppingStore @Inject constructor(
             windowStart = now - ShoppingRound.COMPLETED_WINDOW,
                 clearedAt = list?.clearedAt,
         )
+        // 買い終わったリストに追加したら、前回の買い物のチェック済みを片付ける（docs/requirements.md §3.2）。
+        // 項目の追加とは別に書く。同じ書き込みにすると、ほかの端末がそのリストを先に削除していた場合などに片付けが拒否され、
+        // 追加した項目まで消えてしまう（docs/design/sync.md「リスト削除の競合」）
+        if (list != null && ShoppingRound.clearsOnAdd(shown)) {
+            Paths.lists(db, scope.householdId).document(list.id.value)
+                .update(F.CLEARED_AT, now.toTimestamp())
+                .logFailure("clearRound")
+        }
         db.batch().apply {
-            // 買い終わったリストに追加したら、前回の買い物のチェック済みを片付ける（docs/requirements.md §3.2）
-            if (list != null && ShoppingRound.clearsOnAdd(shown)) {
-                update(Paths.lists(db, scope.householdId).document(list.id.value), F.CLEARED_AT, now.toTimestamp())
-            }
             val productId = putProduct(scope, newItem.inputName, newItem.mergeInto)
             set(ref, mapOf(
                 F.LIST_ID to newItem.listId.value,

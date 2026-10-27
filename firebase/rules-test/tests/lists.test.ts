@@ -327,6 +327,32 @@ describe("チェックと Undo", () => {
     );
   });
 
+  it("購入日時はサーバーの時刻でなければならない", async () => {
+    await seedOpenItem();
+    await assertFails(complete(as("hanako"), "hanako", "i1", { purchasedAt: new Date() }));
+  });
+
+  it("チェックした時刻は、5分より先や7日より前にできない", async () => {
+    await seedOpenItem();
+    const at = (minutes: number) => new Date(Date.now() + minutes * 60_000);
+    const db = as("hanako");
+    await assertFails(complete(db, "hanako", "i1", { checkedAt: at(6) }, at(6)));
+    await assertFails(complete(db, "hanako", "i1", { checkedAt: at(-8 * 24 * 60) }, at(-8 * 24 * 60)));
+    // オフラインのまま数日たってから届いたチェックは受け付ける
+    await assertSucceeds(complete(db, "hanako", "i1", { checkedAt: at(-6 * 24 * 60) }, at(-6 * 24 * 60)));
+  });
+
+  it("購入の記録の公開範囲と備考は項目に一致しなければならない", async () => {
+    await seedOpenItem();
+    await assertFails(complete(as("hanako"), "hanako", "i1", { visibility: "private" }));
+    await assertFails(complete(as("hanako"), "hanako", "i1", { memo: "特売なら" }));
+  });
+
+  it("チェックした人を偽れない", async () => {
+    await seedOpenItem();
+    await assertFails(complete(as("hanako"), "taro", "i1"));
+  });
+
   it("チェック済みの項目はもう一度チェックできない", async () => {
     await seedOpenItem();
     await complete(as("taro"), "taro", "i1");
@@ -345,6 +371,22 @@ describe("チェックと Undo", () => {
     await assertFails(
       updateDoc(doc(as("taro"), `households/${HID}/items/i1`), { status: "open", completedAt: null, completedBy: null }),
     );
+  });
+
+  it("項目のチェックを外さずに、購入の記録だけを無効にできない", async () => {
+    await seedOpenItem();
+    await complete(as("taro"), "taro", "i1");
+    await assertFails(
+      updateDoc(doc(as("taro"), `households/${HID}/purchases/i1`), { active: false, revokedAt: serverTimestamp(), revokedBy: "taro" }),
+    );
+  });
+
+  it("購入の記録は削除できない", async () => {
+    await seedOpenItem();
+    await complete(as("taro"), "taro", "i1");
+    await assertFails(deleteDoc(doc(as("taro"), `households/${HID}/purchases/i1`)));
+    await reopen(as("taro"), "taro", "i1");
+    await assertFails(deleteDoc(doc(as("taro"), `households/${HID}/purchases/i1`)));
   });
 
   it("Undo のあとにもう一度チェックできる", async () => {

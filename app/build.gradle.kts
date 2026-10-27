@@ -52,13 +52,21 @@ android {
         versionName = "0.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        // キーボードの表示のタイミングに依存するテストは、通常の実行から外す。
-        // -PkeyboardTimingTests を付けたときは、そのテストだけを実行する（docs/testing.md）
+        // キーボードの表示のタイミングに依存するテストは、通常の実行から外す。Firebase のエミュレータが必要なテストは、
+        // エミュレータのホストが渡されないと飛ばす（EmulatorClient）。
+        // -PkeyboardTimingTests、-PemulatorTests を付けたときは、そのテストだけを実行する（docs/testing.md）
         val keyboardTimingTest = "com.cheesecomer.cartmate.testing.KeyboardTimingTest"
-        if (project.hasProperty("keyboardTimingTests")) {
-            testInstrumentationRunnerArguments["annotation"] = keyboardTimingTest
-        } else {
-            testInstrumentationRunnerArguments["notAnnotation"] = keyboardTimingTest
+        val emulatorTest = "com.cheesecomer.cartmate.testing.EmulatorTest"
+        when {
+            project.hasProperty("keyboardTimingTests") ->
+                testInstrumentationRunnerArguments["annotation"] = keyboardTimingTest
+            project.hasProperty("emulatorTests") -> {
+                testInstrumentationRunnerArguments["annotation"] = emulatorTest
+                // 端末から見たエミュレータのホスト。Android Emulator ではホストの PC が 10.0.2.2 になる
+                testInstrumentationRunnerArguments["emulatorHost"] =
+                    project.findProperty("emulatorHost")?.toString() ?: "10.0.2.2"
+            }
+            else -> testInstrumentationRunnerArguments["notAnnotation"] = keyboardTimingTest
         }
     }
 
