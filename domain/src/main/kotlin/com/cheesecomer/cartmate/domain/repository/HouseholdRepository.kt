@@ -16,6 +16,14 @@ interface HouseholdRepository : MemberDirectory {
     /** 今の家族のメンバー。家族に参加していなければ空 */
     override fun observeMembers(): Flow<List<Member>>
 
+    override fun observeAliases(): Flow<Map<UserId, String>>
+
+    /** 自分の表示名を設定する。null で解除。オフラインでも行える（docs/requirements.md §3.5「表示名と呼び名」） */
+    suspend fun setNickname(nickname: String?)
+
+    /** [userId] に自分だけの呼び名を付ける。null で解除。オフラインでも行える */
+    suspend fun setAlias(userId: UserId, alias: String?)
+
     /** 今の家族の招待（期限切れ・使用済みも含む。表示するかどうかは呼び出し側で判定する） */
     fun observeInvites(): Flow<List<Invite>>
 

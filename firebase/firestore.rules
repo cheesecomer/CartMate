@@ -15,13 +15,19 @@ service cloud.firestore {
     function validVisibility(v) { return v in ['shared', 'private']; }
     // 公開範囲。owner は lists/items では createdBy、purchases では purchasedBy
     function canSee(d, owner) { return d.visibility == 'shared' || owner == me(); }
+    // 表示名と呼び名（20文字まで）。空にはせず、解除はフィールドの削除で表す
+    function optName(v) { return v == null || str(v, 20); }
 
     match /users/{uid} {
       allow read: if signedIn() && me() == uid;
       allow create, update: if signedIn() && me() == uid
-        && request.resource.data.keys().hasOnly(['householdId', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['householdId', 'updatedAt', 'nickname', 'memberAliases'])
         && (request.resource.data.householdId == null
-            || existsAfter(memberPath(request.resource.data.householdId, uid)));
+            || existsAfter(memberPath(request.resource.data.householdId, uid)))
+        // 自分の表示名と、自分がほかのメンバーに付けた呼び名（本人しか読めない）
+        && optName(request.resource.data.get('nickname', null))
+        && request.resource.data.get('memberAliases', {}) is map
+        && request.resource.data.get('memberAliases', {}).size() <= 100;
       allow delete: if signedIn() && me() == uid;   // アカウントの削除
     }
 
@@ -75,7 +81,8 @@ service cloud.firestore {
       match /members/{uid} {
         allow read: if isMember(hid);
         allow create: if signedIn() && uid == me()
-          && request.resource.data.keys().hasOnly(['role','displayName','photoUrl','joinedAt','joinedVia'])
+          && request.resource.data.keys().hasOnly(['role','displayName','photoUrl','joinedAt','joinedVia','nickname'])
+          && optName(request.resource.data.get('nickname', null))
           && request.resource.data.joinedAt == request.time
           && (isFounding() || isJoiningByInvite());
         // オーナーの引き継ぎ。オーナーが自分の members を消すのと同じバッチでだけ成立する
@@ -83,6 +90,10 @@ service cloud.firestore {
           && changed().hasOnly(['role'])
           && resource.data.role == 'member' && request.resource.data.role == 'owner'
           && !existsAfter(memberPath(hid, me()));
+        // 自分の表示名の変更と解除
+        allow update: if isMember(hid) && uid == me()
+          && changed().hasOnly(['nickname'])
+          && optName(request.resource.data.get('nickname', null));
         allow delete: if (isOwner(hid) && uid != me())   // オーナーによるメンバー削除
           || (isMember(hid) && uid == me());             // 離脱・アカウントの削除
       }

@@ -26,6 +26,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -56,6 +59,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.cheesecomer.cartmate.R
+import com.cheesecomer.cartmate.domain.family.DisplayName
 import com.cheesecomer.cartmate.domain.family.InviteCode
 import com.cheesecomer.cartmate.domain.model.Account
 import com.cheesecomer.cartmate.domain.model.Member
@@ -107,6 +111,8 @@ fun FamilyScreen(
         onInvite = viewModel::invite,
         onRevoke = viewModel::revokeInvite,
         onRemove = viewModel::removeMember,
+        onSetNickname = viewModel::setNickname,
+        onSetAlias = viewModel::setAlias,
         onJoinWithCode = onJoinWithCode,
         onLeave = viewModel::leave,
         onSignOut = {
@@ -132,8 +138,12 @@ fun FamilyContent(
     onLeave: () -> Unit,
     onSignOut: () -> Unit,
     onDeleteAccount: () -> Unit,
+    onSetNickname: (String) -> Unit = {},
+    onSetAlias: (UserId, String) -> Unit = { _, _ -> },
 ) {
     var removing by remember { mutableStateOf<Member?>(null) }
+    var editingNickname by rememberSaveable { mutableStateOf(false) }
+    var aliasing by remember { mutableStateOf<Member?>(null) }
     var confirmLeave by rememberSaveable { mutableStateOf(false) }
     var confirmDelete by rememberSaveable { mutableStateOf(false) }
 
@@ -168,11 +178,21 @@ fun FamilyContent(
                         .cardFrame()
                         .padding(CartMateSpacing.large),
                 ) {
-                    Avatar(account.displayName, account.photoUrl, size = 48.dp)
+                    Avatar(state.myName, account.photoUrl, size = 48.dp)
                     Spacer(Modifier.width(CartMateSpacing.large))
-                    Column {
-                        Text(account.displayName, style = MaterialTheme.typography.titleLarge)
+                    Column(Modifier.weight(1f)) {
+                        Text(state.myName, style = MaterialTheme.typography.titleLarge)
+                        // 表示名を設定していれば、Google アカウントの名前も出す
+                        if (state.myName != account.displayName) {
+                            Text(account.displayName, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                         Text(account.email, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    // 家族に参加していない間（members がない）は設定できない
+                    if (state.me != null) {
+                        TextButton(onClick = { editingNickname = true }) {
+                            Text(stringResource(R.string.family_nickname_edit))
+                        }
                     }
                 }
             }
@@ -191,9 +211,11 @@ fun FamilyContent(
                         if (index > 0) HorizontalDivider(Modifier.padding(horizontal = CartMateSpacing.large), color = MaterialTheme.colorScheme.surfaceContainer)
                         MemberRow(
                             member = member,
+                            name = state.nameOf(member),
                             isMe = member.userId == state.account?.userId,
                             canRemove = state.isOwner && member.userId != state.account?.userId,
                             onRemove = { removing = member },
+                            onAlias = { aliasing = member },
                         )
                     }
                 }
@@ -255,7 +277,7 @@ fun FamilyContent(
 
     removing?.let { member ->
         ConfirmDialog(
-            title = stringResource(R.string.family_remove_title, member.displayName),
+            title = stringResource(R.string.family_remove_title, state.nameOf(member)),
             message = stringResource(R.string.family_remove_message),
             confirm = stringResource(R.string.family_remove_confirm),
             onConfirm = {
@@ -263,6 +285,30 @@ fun FamilyContent(
                 onRemove(member.userId)
             },
             onDismiss = { removing = null },
+        )
+    }
+    if (editingNickname) {
+        NameDialog(
+            title = stringResource(R.string.family_nickname_title),
+            hint = stringResource(R.string.family_nickname_hint, DisplayName.MAX_LENGTH),
+            initial = state.me?.nickname.orEmpty(),
+            onSave = {
+                editingNickname = false
+                onSetNickname(it)
+            },
+            onDismiss = { editingNickname = false },
+        )
+    }
+    aliasing?.let { member ->
+        NameDialog(
+            title = stringResource(R.string.family_alias_title, DisplayName.of(member, alias = null) ?: member.displayName),
+            hint = stringResource(R.string.family_alias_hint, DisplayName.MAX_LENGTH),
+            initial = state.aliases[member.userId].orEmpty(),
+            onSave = {
+                aliasing = null
+                onSetAlias(member.userId, it)
+            },
+            onDismiss = { aliasing = null },
         )
     }
     if (confirmLeave) {
@@ -302,7 +348,7 @@ private fun SectionLabel(text: String) {
 }
 
 @Composable
-private fun MemberRow(member: Member, isMe: Boolean, canRemove: Boolean, onRemove: () -> Unit) {
+private fun MemberRow(member: Member, name: String, isMe: Boolean, canRemove: Boolean, onRemove: () -> Unit, onAlias: () -> Unit) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
@@ -310,26 +356,66 @@ private fun MemberRow(member: Member, isMe: Boolean, canRemove: Boolean, onRemov
             .heightIn(min = 72.dp)
             .padding(horizontal = CartMateSpacing.large, vertical = CartMateSpacing.small),
     ) {
-        Avatar(member.displayName, member.photoUrl, size = 40.dp)
+        Avatar(name, member.photoUrl, size = 40.dp)
         Spacer(Modifier.width(CartMateSpacing.large))
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(CartMateSpacing.small),
-            modifier = Modifier.weight(1f),
-        ) {
-            Text(member.displayName, style = MaterialTheme.typography.titleMedium)
-            if (member.role == MemberRole.OWNER) OwnerBadge()
+        Column(Modifier.weight(1f)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(CartMateSpacing.small),
+            ) {
+                Text(name, style = MaterialTheme.typography.titleMedium)
+                if (member.role == MemberRole.OWNER) OwnerBadge()
+            }
+            // 呼び名や表示名が Google アカウントの名前と違えば、誰か分かるように出す
+            if (name != member.displayName) {
+                Text(member.displayName, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
-        when {
-            isMe -> Text(stringResource(R.string.family_me), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            canRemove -> {
-                val description = stringResource(R.string.family_remove_description, member.displayName)
-                TextButton(onClick = onRemove, modifier = Modifier.semantics { contentDescription = description }) {
-                    Text(stringResource(R.string.family_remove), color = MaterialTheme.colorScheme.error)
-                }
+        if (isMe) {
+            Text(stringResource(R.string.family_me), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        } else {
+            val aliasDescription = stringResource(R.string.family_alias_description, name)
+            TextButton(onClick = onAlias, modifier = Modifier.semantics { contentDescription = aliasDescription }) {
+                Text(stringResource(R.string.family_alias))
+            }
+        }
+        if (canRemove) {
+            val description = stringResource(R.string.family_remove_description, name)
+            TextButton(onClick = onRemove, modifier = Modifier.semantics { contentDescription = description }) {
+                Text(stringResource(R.string.family_remove), color = MaterialTheme.colorScheme.error)
             }
         }
     }
+}
+
+/** 表示名や呼び名の入力。空にして保存するか「解除」で、設定を消す */
+@Composable
+private fun NameDialog(title: String, hint: String, initial: String, onSave: (String) -> Unit, onDismiss: () -> Unit) {
+    var name by rememberSaveable { mutableStateOf(initial) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it.take(DisplayName.MAX_LENGTH) },
+                supportingText = { Text(hint) },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { onSave(name) }) { Text(stringResource(R.string.family_name_save)) }
+        },
+        dismissButton = {
+            Row {
+                if (initial.isNotEmpty()) {
+                    TextButton(onClick = { onSave("") }) { Text(stringResource(R.string.family_name_clear)) }
+                }
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+            }
+        },
+    )
 }
 
 @Composable

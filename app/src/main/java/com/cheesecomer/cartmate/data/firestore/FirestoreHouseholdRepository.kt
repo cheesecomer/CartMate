@@ -16,6 +16,8 @@ import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
+import com.google.firebase.firestore.Source
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -86,6 +88,40 @@ class FirestoreHouseholdRepository @Inject constructor(
         )
     }
 
+    override fun observeAliases(): Flow<Map<UserId, String>> = session.uid.flatMapLatest { uid ->
+        if (uid == null) flowOf(emptyMap())
+        else recoverListen(
+            listen = {
+                Paths.user(db, uid).snapshotFlow().map { snapshot ->
+                    (snapshot.get(F.MEMBER_ALIASES) as? Map<*, *>).orEmpty()
+                        .mapNotNull { (key, value) -> if (key is String && value is String) UserId(key) to value else null }
+                        .toMap()
+                }
+            },
+            denied = emptyMap(),
+            awaitPendingWrites = ::awaitPendingWrites,
+            onError = ::logListenError,
+        )
+    }
+
+    /** 本人だけが読める users と、家族全員が読める members の両方に書く。オフラインでも行えるよう、完了を待たない */
+    override suspend fun setNickname(nickname: String?) {
+        val uid = requireUid()
+        val householdId = checkNotNull(householdId.first()) { "家族に参加していません" }
+        val value: Any = nickname ?: FieldValue.delete()
+        db.batch()
+            .set(Paths.user(db, uid), mapOf(F.NICKNAME to value), SetOptions.merge())
+            .update(Paths.member(db, householdId, uid), F.NICKNAME, value)
+            .commit().addOnFailureListener { Log.w(TAG, "setNickname failed", it) }
+    }
+
+    override suspend fun setAlias(userId: UserId, alias: String?) {
+        val uid = requireUid()
+        Paths.user(db, uid)
+            .set(mapOf(F.MEMBER_ALIASES to mapOf(userId.value to (alias ?: FieldValue.delete()))), SetOptions.merge())
+            .addOnFailureListener { Log.w(TAG, "setAlias failed", it) }
+    }
+
     override fun observeInvites(): Flow<List<Invite>> = householdId.flatMapLatest { householdId ->
         if (householdId == null) flowOf(emptyList())
         else recoverListen(
@@ -110,8 +146,8 @@ class FirestoreHouseholdRepository @Inject constructor(
                 F.CREATED_BY to uid,
                 F.CREATED_AT to FieldValue.serverTimestamp(),
             ))
-            .set(Paths.member(db, householdId, uid), memberData(account, MemberRole.OWNER, joinedVia = null))
-            .set(Paths.user(db, uid), userData(householdId))
+            .set(Paths.member(db, householdId, uid), memberData(account, MemberRole.OWNER, joinedVia = null, ownNickname(uid, Source.CACHE)))
+            .set(Paths.user(db, uid), userData(householdId), SetOptions.merge())
             // オフラインでも作成できるよう、書き込みの完了を待たない（docs/requirements.md §3.3）
             .commit().addOnFailureListener { Log.w(TAG, "createHousehold failed", it) }
         return householdId
@@ -153,10 +189,11 @@ class FirestoreHouseholdRepository @Inject constructor(
 
     override suspend fun join(invite: Invite, account: Account): JoinResult = runCatching {
         val uid = account.userId.value
+        val nickname = ownNickname(uid, Source.DEFAULT)
         db.batch()
-            .set(Paths.member(db, invite.householdId, uid), memberData(account, MemberRole.MEMBER, joinedVia = invite.code))
+            .set(Paths.member(db, invite.householdId, uid), memberData(account, MemberRole.MEMBER, joinedVia = invite.code, nickname))
             .update(Paths.invite(db, invite.code), F.USED_COUNT, FieldValue.increment(1))
-            .set(Paths.user(db, uid), userData(invite.householdId))
+            .set(Paths.user(db, uid), userData(invite.householdId), SetOptions.merge())
             .commit().await()
     }.fold(
         onSuccess = { JoinResult.Joined },
@@ -173,8 +210,9 @@ class FirestoreHouseholdRepository @Inject constructor(
         val uid = account.userId.value
         // 合流先に参加する。所属（users）は写し終えてから切り替える（途中で画面が切り替わらないように）
         val joined = runCatching {
+            val nickname = ownNickname(uid, Source.DEFAULT)
             db.batch()
-                .set(Paths.member(db, invite.householdId, uid), memberData(account, MemberRole.MEMBER, joinedVia = invite.code))
+                .set(Paths.member(db, invite.householdId, uid), memberData(account, MemberRole.MEMBER, joinedVia = invite.code, nickname))
                 .update(Paths.invite(db, invite.code), F.USED_COUNT, FieldValue.increment(1))
                 .commit().await()
         }
@@ -199,7 +237,7 @@ class FirestoreHouseholdRepository @Inject constructor(
             // ルールは、オーナーが自分の members を消すのと同じバッチでだけ、引き継ぎを認める
             successor?.let { update(Paths.member(db, householdId, it.value), F.ROLE, ROLE_OWNER) }
             delete(Paths.member(db, householdId, uid))
-            set(Paths.user(db, uid), userData(null))
+            set(Paths.user(db, uid), userData(null), SetOptions.merge())
         }.commit().await()
     }
 
@@ -209,17 +247,25 @@ class FirestoreHouseholdRepository @Inject constructor(
     }
 
     override suspend fun clearRemovedMembership() {
-        Paths.user(db, requireUid()).set(userData(null)).await()
+        Paths.user(db, requireUid()).set(userData(null), SetOptions.merge()).await()
     }
 
-    private fun memberData(account: Account, role: MemberRole, joinedVia: InviteCode?) = mapOf(
+    private fun memberData(account: Account, role: MemberRole, joinedVia: InviteCode?, nickname: String?) = mapOf(
         F.ROLE to if (role == MemberRole.OWNER) ROLE_OWNER else ROLE_MEMBER,
         F.DISPLAY_NAME to account.displayName,
         F.PHOTO_URL to account.photoUrl,
         F.JOINED_AT to FieldValue.serverTimestamp(),
         F.JOINED_VIA to joinedVia?.value,
-    )
+    ) + listOfNotNull(nickname?.let { F.NICKNAME to it })
 
+    /**
+     * 自分の表示名。家族を移っても引き継げるよう、本人だけが読める users にも置いている（docs/design/data-model.md）。
+     * 家族の作成はオフラインでもできるので、端末のキャッシュから読む
+     */
+    private suspend fun ownNickname(uid: String, source: Source): String? =
+        runCatching { Paths.user(db, uid).get(source).await().getString(F.NICKNAME) }.getOrNull()
+
+    /** users は丸ごと上書きせず、マージで書く（表示名と呼び名を消さないため） */
     private fun userData(householdId: HouseholdId?) = mapOf(
         F.HOUSEHOLD_ID to householdId?.value,
         F.UPDATED_AT to FieldValue.serverTimestamp(),
@@ -234,6 +280,7 @@ class FirestoreHouseholdRepository @Inject constructor(
             displayName = getString(F.DISPLAY_NAME).orEmpty(),
             photoUrl = getString(F.PHOTO_URL),
             joinedAt = joinedAt.toDate().toInstant(),
+            nickname = getString(F.NICKNAME),
         )
     }
 

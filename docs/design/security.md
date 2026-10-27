@@ -28,6 +28,7 @@
 - 10文字、Crockford Base32（読み間違えやすい文字を含まない）。表示するときは `7KQ2-M9XP-HA` のように区切る。
 - 有効期限は24時間、使えるのは1回だけ。1人につき1つ発行する。
 - 招待を発行できるのは家族のメンバー全員。発行したコードは、同じ家族のメンバーなら取り消せる。
+- 表示名と呼び名（[data-model.md](data-model.md)）: `members/{uid}` は、本人が自分の `nickname`（20文字まで）だけを変更・解除できる。ほかの人の `members` の `nickname` は変更できない。`users/{uid}` の `nickname` と `memberAliases` は本人だけが読み書きでき、`memberAliases` は100件まで。
 - 招待には発行した人の表示名（`inviterName`）を写す。参加前のユーザーは `members` を読めないため、参加の確認画面の「○○さんの家族」はここから表示する。
 
 ### 招待リンク（App Links）

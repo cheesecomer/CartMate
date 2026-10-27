@@ -2,6 +2,7 @@ import { assertFails, assertSucceeds } from "@firebase/rules-unit-testing";
 import {
   collection,
   deleteDoc,
+  deleteField,
   doc,
   getDoc,
   getDocs,
@@ -273,6 +274,91 @@ describe("メンバー", () => {
       writeBatch(db).delete(doc(db, `households/${HID}/members/taro`)).set(doc(db, "users/taro"), user(null)).commit(),
     );
     await assertFails(deleteDoc(doc(db, `households/${HID}`)));
+  });
+});
+
+describe("表示名と呼び名", () => {
+  /** アプリの FirestoreHouseholdRepository.setNickname と同じ書き込み */
+  function setNickname(db: Firestore, uid: string, nickname: unknown) {
+    return writeBatch(db)
+      .set(doc(db, `users/${uid}`), { nickname }, { merge: true })
+      .update(doc(db, `households/${HID}/members/${uid}`), { nickname })
+      .commit();
+  }
+
+  it("自分の表示名を設定して、解除できる", async () => {
+    await seedHousehold(HID, "taro", "hanako");
+    const db = as("hanako");
+    await assertSucceeds(setNickname(db, "hanako", "花子"));
+    await assertSucceeds(setNickname(db, "hanako", deleteField()));
+  });
+
+  it("表示名は20文字まで、空にはできない", async () => {
+    await seedHousehold(HID, "taro", "hanako");
+    const db = as("hanako");
+    await assertSucceeds(setNickname(db, "hanako", "あ".repeat(20)));
+    await assertFails(setNickname(db, "hanako", "あ".repeat(21)));
+    await assertFails(setNickname(db, "hanako", ""));
+  });
+
+  it("ほかのメンバーの表示名は変えられない", async () => {
+    await seedHousehold(HID, "taro", "hanako");
+    await assertFails(updateDoc(doc(as("taro"), `households/${HID}/members/hanako`), { nickname: "ママ" }));
+  });
+
+  it("表示名と一緒に、ほかのフィールドは変えられない", async () => {
+    await seedHousehold(HID, "taro", "hanako");
+    await assertFails(
+      updateDoc(doc(as("hanako"), `households/${HID}/members/hanako`), { nickname: "花子", role: "owner" }),
+    );
+  });
+
+  it("参加するときに、表示名を引き継げる", async () => {
+    await seedHousehold(HID, "taro");
+    await seedInvite(CODE, HID);
+    const db = as("hanako");
+    await assertSucceeds(
+      writeBatch(db)
+        .set(doc(db, `households/${HID}/members/hanako`), { ...member("member", CODE), nickname: "花子" })
+        .update(doc(db, `invites/${CODE}`), { usedCount: increment(1) })
+        .set(doc(db, "users/hanako"), user(HID), { merge: true })
+        .commit(),
+    );
+  });
+
+  it("呼び名は自分の users に置き、ほかの人には読めない", async () => {
+    await seedHousehold(HID, "taro", "hanako");
+    await assertSucceeds(setDoc(doc(as("taro"), "users/taro"), { memberAliases: { hanako: "ママ" } }, { merge: true }));
+    await assertSucceeds(getDoc(doc(as("taro"), "users/taro")));
+    await assertFails(getDoc(doc(as("hanako"), "users/taro")));
+  });
+
+  it("呼び名を解除できる", async () => {
+    await seedHousehold(HID, "taro", "hanako");
+    const db = as("taro");
+    await setDoc(doc(db, "users/taro"), { memberAliases: { hanako: "ママ" } }, { merge: true });
+    await assertSucceeds(setDoc(doc(db, "users/taro"), { memberAliases: { hanako: deleteField() } }, { merge: true }));
+  });
+
+  it("ほかの人の users に呼び名を書けない", async () => {
+    await seedHousehold(HID, "taro", "hanako");
+    await assertFails(setDoc(doc(as("taro"), "users/hanako"), { memberAliases: { taro: "パパ" } }, { merge: true }));
+  });
+
+  it("呼び名は100件まで", async () => {
+    await seedHousehold(HID, "taro");
+    const aliases = (n: number) => Object.fromEntries(Array.from({ length: n }, (_, i) => [`u${i}`, "名前"]));
+    await assertSucceeds(setDoc(doc(as("taro"), "users/taro"), { memberAliases: aliases(100) }, { merge: true }));
+    await assertFails(setDoc(doc(as("taro"), "users/taro"), { memberAliases: aliases(101) }, { merge: true }));
+  });
+
+  it("所属を変えても、表示名と呼び名は残せる（マージで書く）", async () => {
+    await seedHousehold(HID, "taro");
+    const db = as("taro");
+    await setDoc(doc(db, "users/taro"), { nickname: "太郎", memberAliases: { hanako: "ママ" } }, { merge: true });
+    await assertSucceeds(setDoc(doc(db, "users/taro"), user(null), { merge: true }));
+    const snapshot = await getDoc(doc(db, "users/taro"));
+    if (snapshot.get("nickname") !== "太郎" || snapshot.get("memberAliases.hanako") !== "ママ") throw new Error("消えた");
   });
 });
 

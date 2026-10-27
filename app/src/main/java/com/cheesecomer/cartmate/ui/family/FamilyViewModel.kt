@@ -3,6 +3,7 @@ package com.cheesecomer.cartmate.ui.family
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.cheesecomer.cartmate.data.connectivity.ConnectivityObserver
+import com.cheesecomer.cartmate.domain.family.DisplayName
 import com.cheesecomer.cartmate.domain.family.InviteCode
 import com.cheesecomer.cartmate.domain.family.InviteValidation
 import com.cheesecomer.cartmate.domain.model.Account
@@ -29,6 +30,8 @@ import javax.inject.Inject
 data class FamilyUiState(
     val account: Account? = null,
     val members: List<Member> = emptyList(),
+    /** 自分がほかのメンバーに付けた呼び名 */
+    val aliases: Map<UserId, String> = emptyMap(),
     /** 有効な招待コードと、期限までの残り時間 */
     val invites: List<ActiveInvite> = emptyList(),
     val online: Boolean = true,
@@ -39,6 +42,16 @@ data class FamilyUiState(
 
     /** 自分しかいない家族。ほかの家族への合流を表示し、「家族から抜ける」は表示しない */
     val solo: Boolean get() = members.none { it.userId != account?.userId }
+
+    /** 自分の members。家族の作成の直後などで、まだ読めていなければ null */
+    val me: Member? get() = members.find { it.userId == account?.userId }
+
+    /** 自分の表示名（設定していなければ Google アカウントの名前） */
+    val myName: String get() = me?.let { DisplayName.of(it, alias = null) } ?: account?.displayName.orEmpty()
+
+    /** 自分の画面に出す [member] の名前（docs/requirements.md §3.5「表示名と呼び名」） */
+    fun nameOf(member: Member): String =
+        DisplayName.of(member, alias = aliases[member.userId].takeIf { member.userId != account?.userId }) ?: member.displayName
 }
 
 data class ActiveInvite(val code: InviteCode, val remainingHours: Long)
@@ -62,15 +75,16 @@ class FamilyViewModel @Inject constructor(
 
     val uiState: StateFlow<FamilyUiState> = combine(
         accountRepository.observeAccount(),
-        householdRepository.observeMembers(),
+        householdRepository.observeMembers().combine(householdRepository.observeAliases(), ::Pair),
         householdRepository.observeInvites(),
         connectivity.online,
         busy,
-    ) { account, members, invites, online, busy ->
+    ) { account, (members, aliases), invites, online, busy ->
         val now = clock.instant()
         FamilyUiState(
             account = account,
             members = members,
+            aliases = aliases,
             invites = InviteValidation.active(invites, now).map { ActiveInvite(it.code, InviteValidation.remainingHours(it, now)) },
             online = online,
             busy = busy,
@@ -82,9 +96,21 @@ class FamilyViewModel @Inject constructor(
 
     /** 招待を発行して、共有シートで送る */
     fun invite() = online {
-        val name = uiState.value.account?.displayName.orEmpty()
-        val invite: Invite = householdRepository.createInvite(inviterName = name)
+        // 参加する人はまだ呼び名を付けていないので、自分の表示名を出す
+        val invite: Invite = householdRepository.createInvite(inviterName = uiState.value.myName)
         _events.send(FamilyEvent.ShareInvite(invite.code))
+    }
+
+    /** 自分の表示名を設定する。空にすると解除。オフラインでも行える */
+    fun setNickname(input: String) {
+        if (!DisplayName.isValid(input)) return
+        viewModelScope.launch { householdRepository.setNickname(DisplayName.normalize(input)) }
+    }
+
+    /** [userId] に自分だけの呼び名を付ける。空にすると解除。オフラインでも行える */
+    fun setAlias(userId: UserId, input: String) {
+        if (!DisplayName.isValid(input)) return
+        viewModelScope.launch { householdRepository.setAlias(userId, DisplayName.normalize(input)) }
     }
 
     fun revokeInvite(code: InviteCode) = online { householdRepository.revokeInvite(code) }

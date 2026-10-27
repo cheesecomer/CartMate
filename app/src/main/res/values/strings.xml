@@ -145,6 +145,15 @@
     <string name="family_owner">オーナー</string>
     <string name="family_me">（自分）</string>
     <string name="family_remove">削除</string>
+    <string name="family_nickname_edit">表示名を変更</string>
+    <string name="family_nickname_title">自分の表示名</string>
+    <string name="family_nickname_hint">家族に表示する名前です（%1$d文字まで）。空にすると Google アカウントの名前に戻ります</string>
+    <string name="family_alias">呼び名</string>
+    <string name="family_alias_description">%1$sさんの呼び名を設定する</string>
+    <string name="family_alias_title">%1$sさんの呼び名</string>
+    <string name="family_alias_hint">あなたの画面だけに表示されます（%1$d文字まで）</string>
+    <string name="family_name_save">保存</string>
+    <string name="family_name_clear">解除</string>
     <string name="family_remove_description">%1$sさんを家族から外す</string>
     <string name="family_invite_section">招待</string>
     <string name="family_invite_solo_section">あなたの家族に招待する</string>

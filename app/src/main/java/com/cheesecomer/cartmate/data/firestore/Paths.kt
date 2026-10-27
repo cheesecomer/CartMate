@@ -45,6 +45,8 @@ object F {
     const val ROLE = "role"
     const val DISPLAY_NAME = "displayName"
     const val PHOTO_URL = "photoUrl"
+    const val NICKNAME = "nickname"
+    const val MEMBER_ALIASES = "memberAliases"
     const val JOINED_AT = "joinedAt"
     const val JOINED_VIA = "joinedVia"
     const val MEMO = "memo"

@@ -5,9 +5,11 @@ Firestore には、アプリ全体で1つのデータベースがあります。
 ## コレクション
 
 ```
-users/{uid}
+users/{uid}                                  # 本人だけが読み書きできる
   householdId: string | null
   updatedAt: timestamp
+  nickname?: string                          # 自分の表示名（20文字まで）。members/{uid}.nickname と同じ値を書く
+  memberAliases?: map<uid, string>           # 自分がほかのメンバーに付けた呼び名（20文字まで）。本人の画面だけで使う
 
 invites/{code}                               # code = ドキュメントID（推測困難な乱数）
   householdId, createdBy, inviterName, createdAt, expiresAt, maxUses(=1), usedCount
@@ -16,7 +18,8 @@ households/{hid}
   name, createdBy, createdAt                   # name は「○○さんの家族」。画面には表示しない
 
 households/{hid}/members/{uid}
-  role: "owner" | "member", displayName, photoUrl?, joinedAt, joinedVia: string | null(招待コード)
+  role: "owner" | "member", displayName, photoUrl?, joinedAt, joinedVia: string | null(招待コード),
+  nickname?: string                          # 本人が設定した表示名。displayName は Google アカウントの名前（参加したときのもの）
 
 households/{hid}/lists/{listId}
   name, memo: string | null, visibility: "shared" | "private",
@@ -65,6 +68,7 @@ households/{hid}/purchases/{purchaseId}      # purchaseId = itemId
 | **product は公開範囲を持たない** | product は決定的ID（正規化名）で家族に1つなので、プライベートと共有で同じ名前の商品を分けられない。代わりに、補完の候補には「自分に見える項目か購入の記録がある product」だけを出す（[suggestions.md](suggestions.md#入力中の補完)）。そのため、プライベートだけで使った商品名は他のメンバーの画面には出ないが、データベース上の product の名前は家族のメンバーが読める。家族内のサプライズを画面に出さない程度の秘匿として受け入れる。 |
 | **購入の記録は消さず、予測から除外するフラグを持つ** | 共有の記録は家族のものなので、1人が消すとほかの人の予測も黙って変わる。除外なら誰がいつ外したかが残り、元に戻せる。Undo の `active` は項目のチェックの状態と対になっているので、除外には使わない。購入の記録を消さない前提（ルール、合流で同じ ID で写すこと）も保てる |
 | **名寄せ辞書は Firestore に置かず、アプリに同梱する** | 共通の商品辞書をサーバーに置くと、運用と読み取り数が増える。辞書は端末の中だけで照合し、家族ごとの訂正（`mergedInto`・`dictionaryOptOut`・`suggestionExcluded`）だけを既存の product に持たせて同期する（[suggestions.md](suggestions.md#名寄せ辞書)）。訂正は product に付くので、新たにプライベートの情報が家族に見えることはない |
+| **表示名は `members`、呼び名は `users` に置く** | 本人の表示名は家族全員が読む必要があるので、メンバー全員が読める `members/{uid}.nickname` に置く。家族を移っても引き継げるよう、本人だけが読める `users/{uid}.nickname` にも同じ値を書き、参加や合流で新しい `members` に写す。呼び名は設定した本人だけが使うので、本人しか読めない `users/{uid}.memberAliases` に置く（ほかのメンバーには読めない。アカウントの削除で一緒に消える）。`users` は丸ごと上書きせず、マージで書く（呼び名と表示名を消さないため） |
 | **`users/{uid}` と `invites/{code}` を追加する** | 起動時に自分の所属家族を引くため。また、まだ家族に参加していないユーザーが招待コードを検証するため（家族の領域はメンバーしか読めない）。 |
 | **招待に `inviterName` を持つ** | 参加の確認画面の「○○さんの家族」を表示するため。参加前のユーザーは `members` を読めないので、発行した人の表示名を招待に写しておく。 |
 | **オーナーは `members.role` で表し、離脱時に引き継ぐ** | オーナーが抜けるときは、自分の `members` の削除と同じバッチで、`joinedAt` がいちばん早いメンバーの `role` を `owner` にする。 |

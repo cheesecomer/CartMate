@@ -116,7 +116,7 @@ class ListDetailViewModel @Inject constructor(
     private val memberDirectory: MemberDirectory,
 ) : ViewModel() {
 
-    private val members: Flow<MemberNames> = memberDirectory.observeMembers().map(::MemberNames)
+    private val members: Flow<MemberNames> = memberDirectory.observeNames()
 
     private val listId = ListId(checkNotNull(savedStateHandle.get<String>(ListDetailRoute::listId.name)))
 
@@ -221,7 +221,7 @@ class ListDetailViewModel @Inject constructor(
             when (val result = itemRepository.completeItem(item.id, checkedAt = clock.instant())) {
                 CompleteResult.Completed -> _messages.send(DetailMessage.Checked(item))
                 is CompleteResult.AlreadyCompleted -> {
-                    val names = MemberNames(memberDirectory.observeMembers().first())
+                    val names = memberDirectory.observeNames().first()
                     _messages.send(DetailMessage.AlreadyCompleted(item.inputName, names.of(result.by), result.at))
                 }
                 is CompleteResult.Retry, is CompleteResult.Rejected -> _messages.send(DetailMessage.Failed)

@@ -8,6 +8,7 @@ import com.google.firebase.firestore.CollectionReference
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.Source
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.tasks.await
@@ -82,7 +83,8 @@ class FamilyMerger @Inject constructor(
 
         // 所属を切り替えて、元の家族を抜ける（自分しかいないので、オーナーの引き継ぎはない）
         db.batch()
-            .set(Paths.user(db, uid), mapOf(F.HOUSEHOLD_ID to to.value, F.UPDATED_AT to FieldValue.serverTimestamp()))
+            // 表示名と呼び名を消さないよう、マージで書く
+            .set(Paths.user(db, uid), mapOf(F.HOUSEHOLD_ID to to.value, F.UPDATED_AT to FieldValue.serverTimestamp()), SetOptions.merge())
             .delete(Paths.member(db, from, uid))
             .commit().await()
         prefs.edit(commit = true) { clear() }
