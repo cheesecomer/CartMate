@@ -169,4 +169,18 @@
     <string name="family_delete_confirm">削除する</string>
     <string name="family_action_failed">操作できませんでした。通信状態を確かめて、もう一度お試しください</string>
     <string name="family_open">家族</string>
+    <string name="family_products_section">商品</string>
+
+    <!-- 商品の統合 -->
+    <string name="product_merge_title">商品の統合</string>
+    <string name="product_merge_hint">同じ商品なのに別々に記録されているものをまとめると、購入の周期をまとめて計算します</string>
+    <string name="product_merge_empty">まだ商品がありません</string>
+    <string name="product_merge_into_other">別の商品に統合</string>
+    <string name="product_merge_unmerge">統合を解除</string>
+    <string name="product_merge_opt_out">別の商品として扱う</string>
+    <string name="product_merge_opt_in">辞書でまとめる</string>
+    <string name="product_merge_choose_target">「%1$s」をどの商品に統合しますか？</string>
+    <string name="product_merge_reason_manual">「%1$s」に統合しています</string>
+    <string name="product_merge_reason_dictionary">辞書で「%1$s」としてまとめています</string>
+    <string name="product_merge_reason_opted_out">辞書でまとめていません</string>
 </resources>

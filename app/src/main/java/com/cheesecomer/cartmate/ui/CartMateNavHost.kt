@@ -31,6 +31,8 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.serialization.Serializable
+import com.cheesecomer.cartmate.ui.products.ProductMergeRoute
+import com.cheesecomer.cartmate.ui.products.ProductMergeScreen
 
 @Serializable
 data object ListsRoute
@@ -58,7 +60,11 @@ fun CartMateNavHost(pending: PendingNavigation, onDeleteAccount: () -> Unit) {
                 onBack = { navController.popBackStack() },
                 onJoinWithCode = { navController.navigate(JoinCodeRoute) },
                 onDeleteAccount = onDeleteAccount,
+                onOpenProductMerge = { navController.navigate(ProductMergeRoute) },
             )
+        }
+        composable<ProductMergeRoute> {
+            ProductMergeScreen(onBack = { navController.popBackStack() })
         }
         joinGraph(navController)
         composable<ListDetailRoute> { backStackEntry ->

@@ -69,11 +69,14 @@ import com.cheesecomer.cartmate.ui.theme.CartMateSpacing
 import com.cheesecomer.cartmate.ui.theme.CartMateTheme
 import kotlinx.coroutines.launch
 import java.time.Instant
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.semantics.Role
 
 @Composable
 fun FamilyScreen(
     onBack: () -> Unit,
     onJoinWithCode: () -> Unit,
+    onOpenProductMerge: () -> Unit,
     onDeleteAccount: () -> Unit,
     viewModel: FamilyViewModel = hiltViewModel(),
 ) {
@@ -111,6 +114,7 @@ fun FamilyScreen(
             viewModel.signOut()
         },
         onDeleteAccount = onDeleteAccount,
+        onOpenProductMerge = onOpenProductMerge,
     )
 }
 
@@ -124,6 +128,7 @@ fun FamilyContent(
     onRevoke: (InviteCode) -> Unit,
     onRemove: (UserId) -> Unit,
     onJoinWithCode: () -> Unit,
+    onOpenProductMerge: () -> Unit,
     onLeave: () -> Unit,
     onSignOut: () -> Unit,
     onDeleteAccount: () -> Unit,
@@ -219,6 +224,21 @@ fun FamilyContent(
                     Spacer(Modifier.height(CartMateSpacing.large))
                     InviteRow(invite, enabled = !state.busy, onRevoke = { onRevoke(invite.code) })
                 }
+            }
+
+            // 商品の統合（docs/requirements.md §3.5）。家族で共有する名寄せの訂正
+            SectionLabel(stringResource(R.string.family_products_section))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .cardFrame()
+                    .clickable(role = Role.Button, onClick = onOpenProductMerge)
+                    .heightIn(min = 56.dp)
+                    .padding(horizontal = CartMateSpacing.large),
+            ) {
+                Text(stringResource(R.string.product_merge_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                Icon(painterResource(R.drawable.ic_chevron_right), contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
 
             Spacer(Modifier.height(CartMateSpacing.xLarge))
@@ -422,7 +442,7 @@ private fun FamilyPreview() {
             ),
             snackbar = SnackbarHostState(),
             onBack = {}, onInvite = {}, onRevoke = {}, onRemove = {}, onJoinWithCode = {},
-            onLeave = {}, onSignOut = {}, onDeleteAccount = {},
+            onLeave = {}, onSignOut = {}, onDeleteAccount = {}, onOpenProductMerge = {},
         )
     }
 }
