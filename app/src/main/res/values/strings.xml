@@ -208,6 +208,14 @@
     <string name="product_detail_not_found">この商品は見つかりません</string>
     <string name="product_names_hidden">非表示の商品（%1$d件）</string>
     <string name="product_detail_other_section">名前の訂正と非表示</string>
+    <string name="product_detail_prediction_section">予測</string>
+    <string name="product_detail_history">購入履歴</string>
+    <string name="product_detail_suggest">時期が近い商品として提案する</string>
+    <string name="product_detail_suggest_description">オフにしても、商品名の入力中の候補には出ます</string>
+    <string name="purchase_history_title">%1$sの購入履歴</string>
+    <string name="purchase_history_hint">直近1年の購入です。間違えてチェックした・たまたま1回だけ買った記録は、オフにすると周期の予測に使わなくなります（記録は残ります）</string>
+    <string name="purchase_history_empty">購入の記録はありません</string>
+    <string name="purchase_history_excluded">予測に使わない（%1$s・%2$s）</string>
     <string name="product_detail_rename">名前を訂正</string>
     <string name="product_detail_rename_description">打ち間違えた名前のまま買った場合に使います。購入の記録は正しい名前の商品にまとまります</string>
     <string name="product_detail_rename_hint">正しい商品名を入力してください</string>

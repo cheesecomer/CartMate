@@ -102,6 +102,11 @@ class ProductDetailViewModel @Inject constructor(
         }
     }
 
+    /** 時期が近い商品の提案に出さない（[excluded] が false なら出す）。補完には出す */
+    fun setSuggestionExcluded(excluded: Boolean) {
+        viewModelScope.launch { productRepository.setSuggestionExcluded(productId, excluded) }
+    }
+
     fun setDictionaryOptOut(optOut: Boolean) {
         viewModelScope.launch { productRepository.setDictionaryOptOut(productId, optOut) }
     }

@@ -37,6 +37,8 @@ import com.cheesecomer.cartmate.ui.products.ProductDetailRoute
 import com.cheesecomer.cartmate.ui.products.ProductDetailScreen
 import com.cheesecomer.cartmate.ui.products.ProductNamesRoute
 import com.cheesecomer.cartmate.ui.products.ProductNamesScreen
+import com.cheesecomer.cartmate.ui.products.PurchaseHistoryRoute
+import com.cheesecomer.cartmate.ui.products.PurchaseHistoryScreen
 
 @Serializable
 data object ListsRoute
@@ -78,6 +80,7 @@ fun CartMateNavHost(pending: PendingNavigation, onDeleteAccount: () -> Unit) {
                 onBack = { navController.popBackStack() },
                 onMerge = { navController.navigate(MergeProductsRoute(it.value)) },
                 onOpen = { navController.navigate(ProductDetailRoute(it.value)) },
+                onOpenHistory = { navController.navigate(PurchaseHistoryRoute(it.value)) },
                 // 訂正した名前の商品の画面に置き換える（戻ると一覧に戻る）
                 onRenamed = { target ->
                     if (backStackEntry.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
@@ -87,6 +90,9 @@ fun CartMateNavHost(pending: PendingNavigation, onDeleteAccount: () -> Unit) {
                     }
                 },
             )
+        }
+        composable<PurchaseHistoryRoute> {
+            PurchaseHistoryScreen(onBack = { navController.popBackStack() })
         }
         composable<MergeProductsRoute> { backStackEntry ->
             MergeProductsScreen(

@@ -63,6 +63,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.material3.Switch
+import java.time.format.DateTimeFormatter
+import com.cheesecomer.cartmate.domain.input.formatQuantity
 import com.cheesecomer.cartmate.R
 import com.cheesecomer.cartmate.domain.model.Product
 import com.cheesecomer.cartmate.domain.model.ProductId
@@ -77,6 +80,10 @@ data object ProductNamesRoute
 /** 商品を開いた画面 */
 @Serializable
 data class ProductDetailRoute(val productId: String)
+
+/** 商品ごとの購入履歴 */
+@Serializable
+data class PurchaseHistoryRoute(val productId: String)
 
 /** 「商品をまとめる」。[targetId] が残す商品（統合先） */
 @Serializable
@@ -177,6 +184,7 @@ fun ProductDetailScreen(
     onOpen: (ProductId) -> Unit,
     /** 名前を訂正した。今の画面を閉じて、訂正した名前の商品を開く */
     onRenamed: (ProductId) -> Unit,
+    onOpenHistory: (ProductId) -> Unit,
     viewModel: ProductDetailViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -210,6 +218,8 @@ fun ProductDetailScreen(
                     onDictionaryOptOut = viewModel::setDictionaryOptOut,
                     onRename = { renaming = true },
                     onHide = { confirmHide = true },
+                    onOpenHistory = { onOpenHistory(detail.entry.product.id) },
+                    onSuggestionExcluded = viewModel::setSuggestionExcluded,
                 )
                 is ProductMerge.Detail.Merged -> MergedDetail(
                     target = detail.target,
@@ -285,6 +295,8 @@ private fun TargetDetail(
     onDictionaryOptOut: (Boolean) -> Unit,
     onRename: () -> Unit,
     onHide: () -> Unit,
+    onOpenHistory: () -> Unit,
+    onSuggestionExcluded: (Boolean) -> Unit,
 ) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         SectionLabel(stringResource(R.string.product_detail_members, entry.members.size))
@@ -323,6 +335,28 @@ private fun TargetDetail(
                 }
             }
         }
+
+        // 予測。購入履歴（1件ずつ予測に使わないにできる）と、時期が近い商品の提案に出すかどうか
+        SectionLabel(stringResource(R.string.product_detail_prediction_section))
+        ListItem(
+            headlineContent = { Text(stringResource(R.string.product_detail_history)) },
+            trailingContent = { Chevron() },
+            colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface),
+            modifier = Modifier.clickable(role = Role.Button, onClick = onOpenHistory),
+        )
+        ListItem(
+            headlineContent = { Text(stringResource(R.string.product_detail_suggest)) },
+            supportingContent = { Text(stringResource(R.string.product_detail_suggest_description)) },
+            trailingContent = {
+                Switch(checked = !entry.product.suggestionExcluded, onCheckedChange = null)
+            },
+            colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface),
+            modifier = Modifier.toggleable(
+                value = !entry.product.suggestionExcluded,
+                role = Role.Switch,
+                onValueChange = { suggest -> onSuggestionExcluded(!suggest) },
+            ),
+        )
 
         SectionLabel(stringResource(R.string.product_detail_other_section))
         Column(Modifier.padding(horizontal = CartMateSpacing.large)) {
@@ -490,6 +524,67 @@ fun MergeProductsScreen(onBack: () -> Unit, onDone: () -> Unit, viewModel: Merge
             )
         }
     }
+}
+
+/** 「10/18」 */
+private val HISTORY_DATE: DateTimeFormatter = DateTimeFormatter.ofPattern("M/d")
+
+@Composable
+fun PurchaseHistoryScreen(onBack: () -> Unit, viewModel: PurchaseHistoryViewModel = hiltViewModel()) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    ProductScaffold(title = stringResource(R.string.purchase_history_title, state.productName), onBack = onBack) {
+        if (state.loading) return@ProductScaffold
+        LazyColumn(Modifier.fillMaxSize()) {
+            item { Hint(stringResource(R.string.purchase_history_hint)) }
+            if (state.rows.isEmpty()) {
+                item { Empty(stringResource(R.string.purchase_history_empty)) }
+            }
+            items(state.rows, key = { it.purchase.itemId.value }) { row -> PurchaseRow(row, viewModel::setExcluded) }
+        }
+    }
+}
+
+@Composable
+private fun PurchaseRow(row: PurchaseHistoryViewModel.Row, onExcluded: (com.cheesecomer.cartmate.domain.model.ItemId, Boolean) -> Unit) {
+    val purchase = row.purchase
+    val amount = listOfNotNull(purchase.quantity?.let(::formatQuantity), purchase.unit).joinToString("")
+    val excluded = purchase.excludedFromPrediction
+    val dimmed = if (excluded) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
+    ListItem(
+        headlineContent = {
+            Text(
+                listOf(HISTORY_DATE.format(row.date), purchase.inputName, amount).filter { it.isNotEmpty() }.joinToString("  "),
+                color = dimmed,
+            )
+        },
+        supportingContent = {
+            Column {
+                Text(
+                    listOf(purchase.listNameSnapshot, row.checkerName ?: stringResource(R.string.former_member)).joinToString("・"),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                if (excluded) {
+                    Text(
+                        stringResource(
+                            R.string.purchase_history_excluded,
+                            row.excludedByName ?: stringResource(R.string.former_member),
+                            row.excludedDate?.let(HISTORY_DATE::format).orEmpty(),
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.tertiary,
+                    )
+                }
+            }
+        },
+        trailingContent = { Switch(checked = !excluded, onCheckedChange = null) },
+        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface),
+        modifier = Modifier.toggleable(
+            value = !excluded,
+            role = Role.Switch,
+            onValueChange = { use -> onExcluded(purchase.itemId, !use) },
+        ),
+    )
+    HorizontalDivider(color = MaterialTheme.colorScheme.surfaceContainer)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

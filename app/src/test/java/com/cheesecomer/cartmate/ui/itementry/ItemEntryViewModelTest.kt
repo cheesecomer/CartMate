@@ -1,5 +1,6 @@
 package com.cheesecomer.cartmate.ui.itementry
 
+import kotlinx.coroutines.Dispatchers
 import com.cheesecomer.cartmate.ui.suggestions.SuggestionSource
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
@@ -53,7 +54,7 @@ class ItemEntryViewModelTest {
         productRepository = store,
         purchaseRepository = store,
         dictionaryProvider = { flowOf(NormalizationDictionary.EMPTY) },
-        suggestionSource = SuggestionSource(store, store, store, clock) { flowOf(NormalizationDictionary.EMPTY) },
+        suggestionSource = SuggestionSource(store, store, store, clock, { flowOf(NormalizationDictionary.EMPTY) }, Dispatchers.Main),
     )
 
     private suspend fun listItems(listId: ListId = this.listId) = store.observeListItems(listId, Instant.EPOCH).first()

@@ -2,7 +2,6 @@ package com.cheesecomer.cartmate.ui.listdetail
 
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.Dispatchers
 import com.cheesecomer.cartmate.ui.suggestions.SuggestionSource
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
@@ -199,7 +198,7 @@ class ListDetailViewModel @Inject constructor(
         addItemState.map { it.text }.distinctUntilChanged(),
         listRepository.observeLists().map { lists -> lists.firstOrNull { it.id == listId }?.name.orEmpty() }.distinctUntilChanged(),
     ) { engine, text, listName -> SheetSuggestions.of(engine, text, listName) }
-        .flowOn(Dispatchers.Default)
+        .flowOn(source.dispatcher)
 
     /** サジェストのシートで公開範囲を切り替える。そのリストの次の追加の初期値になる（docs/requirements.md §3.4） */
     fun setAddVisibility(visibility: Visibility) {

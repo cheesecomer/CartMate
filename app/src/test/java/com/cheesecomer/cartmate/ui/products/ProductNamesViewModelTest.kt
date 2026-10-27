@@ -211,4 +211,20 @@ class ProductNamesViewModelTest {
             cancelAndIgnoreRemainingEvents()
         }
     }
+
+    @Test
+    fun `時期が近い商品の提案に出さないようにして、戻せる`() = runTest {
+        add("牛乳")
+        val milk = productId("牛乳")
+        val viewModel = detail(milk)
+        viewModel.state.test {
+            awaitUntil { it is ProductDetailViewModel.State.Loaded }
+            viewModel.setSuggestionExcluded(true)
+            awaitUntil { ((it as? ProductDetailViewModel.State.Loaded)?.detail as? ProductMerge.Detail.Target)?.entry?.product?.suggestionExcluded == true }
+            viewModel.setSuggestionExcluded(false)
+            awaitUntil { ((it as? ProductDetailViewModel.State.Loaded)?.detail as? ProductMerge.Detail.Target)?.entry?.product?.suggestionExcluded == false }
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
 }
+

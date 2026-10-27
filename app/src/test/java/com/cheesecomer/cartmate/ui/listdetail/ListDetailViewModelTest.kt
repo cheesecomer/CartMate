@@ -1,5 +1,6 @@
 package com.cheesecomer.cartmate.ui.listdetail
 
+import kotlinx.coroutines.Dispatchers
 import com.cheesecomer.cartmate.domain.product.NormalizationDictionary
 import com.cheesecomer.cartmate.ui.suggestions.SuggestionSource
 import androidx.lifecycle.SavedStateHandle
@@ -74,7 +75,7 @@ class ListDetailViewModelTest {
         clock = clock,
         currentUser = { UserId("taro") },
         memberDirectory = { members },
-        suggestionSource = SuggestionSource(store, store, store, clock) { flowOf(NormalizationDictionary.EMPTY) },
+        suggestionSource = SuggestionSource(store, store, store, clock, { flowOf(NormalizationDictionary.EMPTY) }, Dispatchers.Main),
     )
 
     @Test
@@ -142,6 +143,8 @@ class ListDetailViewModelTest {
             navigation.awaitItem()
             viewModel.onEntryResult(ItemEntryResult.ADDED)
             states.awaitUntil { it.addItem == AddItemState.Idle("") }
+            // そのあとのシートの候補の更新は、この確認の対象外
+            states.cancelAndIgnoreRemainingEvents()
         }
     }
 
@@ -462,7 +465,7 @@ class ListDetailViewModelTest {
         clock = clock,
         currentUser = { UserId("taro") },
         memberDirectory = { members },
-        suggestionSource = SuggestionSource(store, store, store, clock) { flowOf(NormalizationDictionary.EMPTY) },
+        suggestionSource = SuggestionSource(store, store, store, clock, { flowOf(NormalizationDictionary.EMPTY) }, Dispatchers.Main),
     )
 
     @Test

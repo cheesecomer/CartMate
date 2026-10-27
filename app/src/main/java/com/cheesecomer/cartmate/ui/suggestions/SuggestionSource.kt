@@ -5,6 +5,7 @@ import com.cheesecomer.cartmate.domain.repository.ItemRepository
 import com.cheesecomer.cartmate.domain.repository.ProductRepository
 import com.cheesecomer.cartmate.domain.repository.PurchaseRepository
 import com.cheesecomer.cartmate.domain.suggest.SuggestionEngine
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -18,13 +19,24 @@ import javax.inject.Inject
  * 予測とサジェストの入力（docs/design/suggestions.md「計算の実行場所」）。商品・直近365日の購入の記録・家族の未購入の項目・
  * 名寄せ辞書をまとめ、どれかが変わったら [SuggestionEngine] を作り直す。どれも自分に見えるものだけを購読している
  */
-class SuggestionSource @Inject constructor(
+class SuggestionSource(
     private val productRepository: ProductRepository,
     private val itemRepository: ItemRepository,
     private val purchaseRepository: PurchaseRepository,
     private val clock: Clock,
     private val dictionaryProvider: DictionaryProvider,
+    /** 計算を行うディスパッチャー。テストではテストのディスパッチャーを渡す（テストの終了後に計算が残らないように） */
+    val dispatcher: CoroutineDispatcher,
 ) {
+    @Inject
+    constructor(
+        productRepository: ProductRepository,
+        itemRepository: ItemRepository,
+        purchaseRepository: PurchaseRepository,
+        clock: Clock,
+        dictionaryProvider: DictionaryProvider,
+    ) : this(productRepository, itemRepository, purchaseRepository, clock, dictionaryProvider, Dispatchers.Default)
+
     fun observe(): Flow<SuggestionEngine> = combine(
         productRepository.observeProducts(),
         itemRepository.observeOpenItems(),
@@ -32,7 +44,7 @@ class SuggestionSource @Inject constructor(
         dictionaryProvider.observeDictionary(),
     ) { products, openItems, purchases, dictionary ->
         SuggestionEngine(products, purchases, openItems, dictionary, LocalDate.now(clock), clock.zone)
-    }.flowOn(Dispatchers.Default)
+    }.flowOn(dispatcher)
 
     private companion object {
         /** 購入の記録は直近365日分を使う（docs/design/data-model.md「購入履歴の取得範囲」） */
