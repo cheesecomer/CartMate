@@ -102,3 +102,16 @@ npm test
 ```
 ./gradlew :app:connectedDebugAndroidTest -PkeyboardTimingTests
 ```
+
+## 名寄せ辞書の計測
+
+辞書を大きく増やすときは、実機で次を実行し、Logcat の `DictionaryBenchmark` の結果を [suggestions.md](design/suggestions.md#計測) の表と比べます。通常のテストの実行では飛ばします。
+
+```
+./gradlew :app:connectedDebugAndroidTest \
+  -Pandroid.testInstrumentationRunnerArguments.class=com.cheesecomer.cartmate.data.dictionary.DictionaryBenchmark \
+  -Pandroid.testInstrumentationRunnerArguments.dictionaryBenchmark=true
+adb logcat -d -s DictionaryBenchmark:I
+```
+
+辞書の元データ（`dictionary/`）の検証は、`./gradlew :domain:test`（`DictionaryFilesTest`）で行います。
