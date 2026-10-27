@@ -1,5 +1,7 @@
 package com.cheesecomer.cartmate.ui.listdetail
 
+import com.cheesecomer.cartmate.domain.product.NormalizationDictionary
+import com.cheesecomer.cartmate.ui.suggestions.SuggestionSource
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
 import app.cash.turbine.turbineScope
@@ -72,6 +74,7 @@ class ListDetailViewModelTest {
         clock = clock,
         currentUser = { UserId("taro") },
         memberDirectory = { members },
+        suggestionSource = SuggestionSource(store, store, store, clock) { flowOf(NormalizationDictionary.EMPTY) },
     )
 
     @Test
@@ -459,6 +462,7 @@ class ListDetailViewModelTest {
         clock = clock,
         currentUser = { UserId("taro") },
         memberDirectory = { members },
+        suggestionSource = SuggestionSource(store, store, store, clock) { flowOf(NormalizationDictionary.EMPTY) },
     )
 
     @Test
@@ -475,4 +479,62 @@ class ListDetailViewModelTest {
             assertThat(messages.awaitItem()).isEqualTo(DetailMessage.Failed)
         }
     }
+
+    /** [name] を [listId] のリストで、[intervalDays] 日ごとに [times] 回買った。最後に買った日が今日 */
+    private suspend fun bought(name: String, times: Int, intervalDays: Long, listId: ListId = this.listId) {
+        repeat(times) { index ->
+            if (index > 0) clock.advance(java.time.Duration.ofDays(intervalDays))
+            val id = store.addItem(newItem(listId, name, quantity = 1.0, unit = "本"))
+            store.completeItem(id, clock.instant())
+        }
+    }
+
+    @Test
+    fun `シートを開くと、時期が近い商品を周期と前回からの日数を添えて出す`() = runTest {
+        bought("牛乳", times = 3, intervalDays = 10)
+        clock.advance(java.time.Duration.ofDays(9))
+        viewModel.uiState.test {
+            viewModel.onAddItemEvent(AddItemEvent.FieldFocused)
+            val items = awaitUntil { (it.suggestions as? SheetSuggestions.Items)?.rows?.isNotEmpty() == true }.suggestions as SheetSuggestions.Items
+            val row = items.rows.single()
+            assertThat(row.suggestion.name).isEqualTo("牛乳")
+            assertThat(row.suggestion.lastQuantity).isEqualTo(1.0)
+            assertThat(row.suggestion.lastUnit).isEqualTo("本")
+            assertThat(row.note).isEqualTo(SuggestionNote.Due(intervalDays = 10, daysSinceLast = 9))
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `入力すると補完に切り替わり、候補の＋で前回の数量と単位のまま追加する`() = runTest {
+        bought("牛乳", times = 1, intervalDays = 0)
+        viewModel.uiState.test {
+            viewModel.onAddItemEvent(AddItemEvent.FieldFocused)
+            viewModel.onAddItemEvent(AddItemEvent.TextChanged("ぎゅ"))
+            awaitUntil { it.suggestions == SheetSuggestions.Items(emptyList()) }
+            viewModel.onAddItemEvent(AddItemEvent.TextChanged("牛"))
+            val row = (awaitUntil { (it.suggestions as? SheetSuggestions.Items)?.rows?.isNotEmpty() == true }.suggestions as SheetSuggestions.Items)
+                .rows.single()
+            assertThat(row.note).isEqualTo(SuggestionNote.Completion(alreadyAdded = false, early = null))
+
+            viewModel.onAddItemEvent(AddItemEvent.SuggestionAdded(row.suggestion))
+            val added = awaitUntil { state -> state.items.any { it.status == com.cheesecomer.cartmate.domain.model.ItemStatus.OPEN } }
+            val item = added.items.single { it.status == com.cheesecomer.cartmate.domain.model.ItemStatus.OPEN }
+            assertThat(item.inputName).isEqualTo("牛乳")
+            assertThat(item.unit).isEqualTo("本")
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `関連する履歴がないリストでは、商品名を入力すると候補が出るとだけ表示する`() = runTest {
+        bought("牛乳", times = 3, intervalDays = 10, listId = otherListId)
+        clock.advance(java.time.Duration.ofDays(9))
+        viewModel.uiState.test {
+            viewModel.onAddItemEvent(AddItemEvent.FieldFocused)
+            assertThat(awaitUntil { it.suggestions != SheetSuggestions.Loading }.suggestions).isEqualTo(SheetSuggestions.Hint)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
 }
+

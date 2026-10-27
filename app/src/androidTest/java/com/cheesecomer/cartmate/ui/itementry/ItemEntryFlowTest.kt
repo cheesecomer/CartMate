@@ -1,5 +1,6 @@
 package com.cheesecomer.cartmate.ui.itementry
 
+import com.cheesecomer.cartmate.ui.suggestions.SuggestionSource
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.enableEdgeToEdge
@@ -62,6 +63,7 @@ class ItemEntryFlowTest {
 
     private val clock = Clock.systemUTC()
     private val store = InMemoryStore(clock) { UserId("taro") }
+    private val suggestions = SuggestionSource(store, store, store, clock) { flowOf(NormalizationDictionary.EMPTY) }
     private val lastVisibility = LastVisibilityStore()
 
     private fun createList(visibility: Visibility = Visibility.SHARED) =
@@ -79,7 +81,7 @@ class ItemEntryFlowTest {
                 NavHost(navController, startDestination = ListDetailRoute(listId.value)) {
                     composable<ListDetailRoute> { backStackEntry ->
                         val viewModel = viewModel {
-                            ListDetailViewModel(createSavedStateHandle(), store, store, lastVisibility, clock, { UserId("taro") }, { flowOf(emptyList()) })
+                            ListDetailViewModel(createSavedStateHandle(), store, store, lastVisibility, clock, { UserId("taro") }, { flowOf(emptyList()) }, suggestions)
                         }
                         ListDetailScreen(
                             onBack = {},
@@ -93,7 +95,7 @@ class ItemEntryFlowTest {
                     }
                     composable<ItemEntryRoute> { backStackEntry ->
                         val viewModel = viewModel {
-                            ItemEntryViewModel(createSavedStateHandle(), store, store, lastVisibility, clock, { flowOf(emptyList()) }, store, store, { flowOf(NormalizationDictionary.EMPTY) })
+                            ItemEntryViewModel(createSavedStateHandle(), store, store, lastVisibility, clock, { flowOf(emptyList()) }, store, store, { flowOf(NormalizationDictionary.EMPTY) }, suggestions)
                         }
                         ItemEntryScreen(onClose = { navController.closeEntry(backStackEntry, it) }, viewModel = viewModel)
                     }

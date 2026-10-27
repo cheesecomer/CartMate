@@ -1,5 +1,7 @@
 package com.cheesecomer.cartmate.ui.listdetail
 
+import com.cheesecomer.cartmate.domain.product.NormalizationDictionary
+import com.cheesecomer.cartmate.ui.suggestions.SuggestionSource
 import android.os.SystemClock
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
@@ -64,6 +66,7 @@ class AddItemSheetKeyboardTest {
             clock = clock,
             currentUser = { UserId("taro") },
             memberDirectory = { flowOf(emptyList()) },
+            suggestionSource = SuggestionSource(store, store, store, clock) { flowOf(NormalizationDictionary.EMPTY) },
         )
         composeRule.setContent {
             val bottom = WindowInsets.ime.getBottom(LocalDensity.current)

@@ -1,5 +1,6 @@
 package com.cheesecomer.cartmate.ui.itementry
 
+import com.cheesecomer.cartmate.ui.suggestions.SuggestionSource
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
 import com.cheesecomer.cartmate.data.memory.InMemoryStore
@@ -52,6 +53,7 @@ class ItemEntryViewModelTest {
         productRepository = store,
         purchaseRepository = store,
         dictionaryProvider = { flowOf(NormalizationDictionary.EMPTY) },
+        suggestionSource = SuggestionSource(store, store, store, clock) { flowOf(NormalizationDictionary.EMPTY) },
     )
 
     private suspend fun listItems(listId: ListId = this.listId) = store.observeListItems(listId, Instant.EPOCH).first()
@@ -247,4 +249,25 @@ class ItemEntryViewModelTest {
             assertThat(awaitItem()).isEqualTo(ItemEntryResult.EDIT_REJECTED_NOT_FOUND)
         }
     }
+
+    @Test
+    fun `新しい商品では、前回の購入と過去の備考を候補として出す`() = runTest {
+        repeat(3) { index ->
+            if (index > 0) clock.advance(java.time.Duration.ofDays(14))
+            val id = store.addItem(newItem(listId, "卵", quantity = 1.0, unit = "パック", memo = if (index == 2) "赤玉" else "特売なら2個"))
+            store.completeItem(id, clock.instant())
+        }
+        clock.advance(java.time.Duration.ofDays(2))
+        val viewModel = viewModel(name = "卵")
+        viewModel.history.test {
+            val history = awaitUntil { it?.previous != null }!!
+            assertThat(history.previous!!.unit).isEqualTo("パック")
+            assertThat(history.previous!!.typicalIntervalDays).isEqualTo(14)
+            // 前回から2日しかたっていないので、早すぎる再購入
+            assertThat(history.previous!!.early).isNotNull()
+            assertThat(history.memoCandidates).containsExactly("赤玉", "特売なら2個").inOrder()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
 }
+

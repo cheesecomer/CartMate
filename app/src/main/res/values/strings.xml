@@ -71,6 +71,10 @@
     <string name="add_item_sheet_label">商品名</string>
     <string name="add_item_detail">数量を設定して追加</string>
     <string name="add_item_suggestion_hint">商品名を入力すると候補が出ます</string>
+    <string name="add_item_add_suggestion">%1$sを追加</string>
+    <string name="add_item_note_due">約%1$d日ごと・最後は%2$d日前</string>
+    <string name="add_item_note_added">追加済み</string>
+    <string name="add_item_note_early">前回 %1$s に購入・いつもは約%2$d日ごと</string>
 
     <!-- 商品詳細入力 -->
     <string name="entry_title_new">商品の詳細入力</string>
@@ -93,6 +97,10 @@
     <string name="entry_visibility_note">※ 登録後に公開範囲を変更することはできません</string>
     <string name="entry_memo">備考・メモ</string>
     <string name="entry_memo_optional">任意</string>
+    <string name="entry_memo_candidates">候補:</string>
+    <string name="entry_previous">前回: %1$s（%2$s 購入）</string>
+    <string name="entry_previous_with_cycle">前回: %1$s（%2$s 購入・約%3$d日ごと）</string>
+    <string name="entry_early">いつもより早い再購入です（いつもは約%1$d日ごと）</string>
     <string name="entry_memo_placeholder">メモ（例: 特売品なら2個、賞味期限が長いものなど）</string>
     <string name="entry_add">リストに追加する</string>
     <string name="entry_merge_chip">「%1$s」と同じ商品として記録する</string>

@@ -42,6 +42,12 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import java.time.format.DateTimeFormatter
 import com.cheesecomer.cartmate.R
 import com.cheesecomer.cartmate.domain.input.AddItemEvent
 import com.cheesecomer.cartmate.domain.input.AddItemState
@@ -55,6 +61,7 @@ import com.cheesecomer.cartmate.domain.model.Visibility
 object AddItemTags {
     const val FIELD = "add_item_field"
     const val SHEET_INPUT = "add_item_sheet_input"
+    const val SUGGESTION = "add_item_suggestion"
 }
 
 /**
@@ -98,7 +105,7 @@ fun AddItemField(text: String, onClick: () -> Unit, modifier: Modifier = Modifie
 
 /**
  * サジェストのシート。キーボードと一緒にせり上がる（docs/design/ui.md「商品追加欄とサジェストのシート」）。
- * 候補（時期が近い商品・補完）はフェーズ4で追加する
+ * 未入力なら時期が近い商品、入力中なら補完を出す
  */
 @Composable
 fun AddItemSheet(
@@ -107,6 +114,7 @@ fun AddItemSheet(
     /** 追加するときの公開範囲。null なら表示しない（プライベートのリスト） */
     visibility: Visibility? = null,
     onVisibilityChange: (Visibility) -> Unit = {},
+    suggestions: SheetSuggestions = SheetSuggestions.Loading,
 ) {
     val focusRequester = remember { FocusRequester() }
     // カーソル位置を保つため TextFieldValue で持ち、外から変わったとき（Enter で空にした など）だけ置き換える
@@ -124,6 +132,7 @@ fun AddItemSheet(
             focusRequester = focusRequester,
             visibility = visibility,
             onVisibilityChange = onVisibilityChange,
+            suggestions = suggestions,
         )
     }
 }
@@ -138,6 +147,7 @@ internal fun AddItemSheetContent(
     focusRequester: FocusRequester = remember { FocusRequester() },
     visibility: Visibility? = null,
     onVisibilityChange: (Visibility) -> Unit = {},
+    suggestions: SheetSuggestions = SheetSuggestions.Loading,
 ) {
     val colors = MaterialTheme.colorScheme
     Column(Modifier.fillMaxWidth().padding(bottom = CartMateSpacing.large)) {
@@ -174,17 +184,82 @@ internal fun AddItemSheetContent(
         )
         if (visibility != null) VisibilityChips(visibility, onVisibilityChange)
         Spacer(Modifier.size(CartMateSpacing.medium))
-        if (value.text.isNotBlank()) {
-            DetailRow(onClick = { onEvent(AddItemEvent.DetailRequested) })
-        } else {
-            Text(
-                stringResource(R.string.add_item_suggestion_hint),
-                style = MaterialTheme.typography.bodyMedium,
-                color = colors.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = CartMateSpacing.xLarge, vertical = CartMateSpacing.large),
-            )
+        if (value.text.isNotBlank()) DetailRow(onClick = { onEvent(AddItemEvent.DetailRequested) })
+        when (suggestions) {
+            SheetSuggestions.Loading -> Unit
+            SheetSuggestions.Hint -> if (value.text.isBlank()) {
+                Text(
+                    stringResource(R.string.add_item_suggestion_hint),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colors.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = CartMateSpacing.xLarge, vertical = CartMateSpacing.large),
+                )
+            }
+            is SheetSuggestions.Items -> if (suggestions.rows.isNotEmpty()) {
+                // シートがキーボードより上に伸びすぎないよう、一覧の高さを抑えて中でスクロールする
+                LazyColumn(Modifier.fillMaxWidth().heightIn(max = SUGGESTIONS_MAX_HEIGHT)) {
+                    items(suggestions.rows, key = { it.suggestion.name }) { row ->
+                        SuggestionRowView(
+                            row = row,
+                            onOpen = { onEvent(AddItemEvent.SuggestionOpened(row.suggestion)) },
+                            onAdd = { onEvent(AddItemEvent.SuggestionAdded(row.suggestion)) },
+                        )
+                    }
+                }
+            }
         }
     }
+}
+
+/** 候補の一覧の最大の高さ。4行ほどが見える */
+private val SUGGESTIONS_MAX_HEIGHT = 300.dp
+
+/** 「10/18」 */
+private val NOTE_DATE: DateTimeFormatter = DateTimeFormatter.ofPattern("M/d")
+
+/** 候補の1行。名前のタップで商品詳細入力画面、右端の「＋」で前回の数量・単位のまますぐ追加する */
+@Composable
+private fun SuggestionRowView(row: SuggestionRow, onOpen: () -> Unit, onAdd: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 64.dp)
+            .padding(horizontal = CartMateSpacing.large)
+            .testTag(AddItemTags.SUGGESTION),
+    ) {
+        Column(
+            Modifier
+                .weight(1f)
+                .clip(MaterialTheme.shapes.medium)
+                .clickable(role = Role.Button, onClick = onOpen)
+                .padding(horizontal = CartMateSpacing.small, vertical = CartMateSpacing.small),
+        ) {
+            Text(row.suggestion.name, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            noteText(row.note)?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
+            }
+        }
+        val description = stringResource(R.string.add_item_add_suggestion, row.suggestion.name)
+        FilledIconButton(
+            onClick = onAdd,
+            shape = CircleShape,
+            modifier = Modifier.size(48.dp).semantics { contentDescription = description },
+        ) {
+            Icon(painterResource(R.drawable.ic_add), contentDescription = null)
+        }
+    }
+}
+
+/** 候補の補足。時期が近い商品は周期と前回からの日数、補完は「追加済み」と早すぎる再購入 */
+@Composable
+private fun noteText(note: SuggestionNote): String? = when (note) {
+    is SuggestionNote.Due -> stringResource(R.string.add_item_note_due, note.intervalDays, note.daysSinceLast.toInt())
+    is SuggestionNote.Completion -> listOfNotNull(
+        stringResource(R.string.add_item_note_added).takeIf { note.alreadyAdded },
+        note.early?.let { stringResource(R.string.add_item_note_early, NOTE_DATE.format(it.lastPurchase), it.typicalIntervalDays) },
+    ).joinToString("・").ifEmpty { null }
 }
 
 /**

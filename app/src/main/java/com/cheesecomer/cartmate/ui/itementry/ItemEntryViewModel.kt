@@ -1,5 +1,8 @@
 package com.cheesecomer.cartmate.ui.itementry
 
+import kotlinx.coroutines.flow.distinctUntilChanged
+import com.cheesecomer.cartmate.domain.suggest.SuggestionEngine
+import com.cheesecomer.cartmate.ui.suggestions.SuggestionSource
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -54,6 +57,13 @@ data class ItemEntryRoute(
     val unit: String? = null,
 )
 
+/** 新しい商品の追加で、入力した名前の商品の前回の購入と備考の候補（docs/design/ui.md「商品詳細入力画面」） */
+data class EntryHistory(
+    /** 購入の記録がなければ null */
+    val previous: SuggestionEngine.PreviousPurchase?,
+    val memoCandidates: List<String>,
+)
+
 /** 表記ゆれのチップ「『[candidateName]』と同じ商品として記録する」 */
 data class MergeChip(val candidateId: ProductId, val candidateName: String, val selected: Boolean)
 
@@ -75,6 +85,7 @@ class ItemEntryViewModel @Inject constructor(
     productRepository: ProductRepository,
     purchaseRepository: PurchaseRepository,
     dictionaryProvider: DictionaryProvider,
+    suggestionSource: SuggestionSource,
 ) : ViewModel() {
 
     /** 「追加先: スーパー（共有リスト 3人）」の人数 */
@@ -115,6 +126,17 @@ class ItemEntryViewModel @Inject constructor(
             ?: return@combine null
         MergeChip(candidate.id, candidate.displayName, selected = selected == candidate.id)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), null)
+
+    /** 前回の購入と備考の候補。新しい商品の追加で、商品名があるときだけ（編集では出さない） */
+    val history: StateFlow<EntryHistory?> = combine(
+        suggestionSource.observe(),
+        _uiState.map { state -> state.entry?.takeIf { it.editing == null }?.name?.trim() }.distinctUntilChanged(),
+    ) { engine, name ->
+        if (name.isNullOrEmpty()) null else EntryHistory(engine.previous(name), engine.memoCandidates(name))
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), null)
+
+    /** 備考の候補を選んだ。備考を候補の文で置き換える */
+    fun selectMemo(memo: String) = onMemoChange(memo)
 
     /** チップの選択を切り替える */
     fun toggleMerge() {

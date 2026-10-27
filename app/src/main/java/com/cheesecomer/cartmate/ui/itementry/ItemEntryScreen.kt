@@ -63,6 +63,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.material3.AssistChip
+import com.cheesecomer.cartmate.domain.suggest.SuggestionEngine
+import java.time.format.DateTimeFormatter
 import com.cheesecomer.cartmate.R
 import com.cheesecomer.cartmate.domain.input.ItemEntry
 import com.cheesecomer.cartmate.domain.input.formatQuantity
@@ -94,11 +97,14 @@ fun ItemEntryScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val memberCount by viewModel.memberCount.collectAsStateWithLifecycle()
     val mergeChip by viewModel.mergeChip.collectAsStateWithLifecycle()
+    val history by viewModel.history.collectAsStateWithLifecycle()
     LaunchedEffect(viewModel) { viewModel.results.collect(onClose) }
     ItemEntryContent(
         state = state,
         memberCount = memberCount,
         mergeChip = mergeChip,
+        history = history,
+        onSelectMemo = viewModel::selectMemo,
         onToggleMerge = viewModel::toggleMerge,
         onClose = { onClose(ItemEntryResult.CANCELLED) },
         onNameChange = viewModel::onNameChange,
@@ -130,6 +136,9 @@ fun ItemEntryContent(
     /** 表記ゆれのチップ。候補がなければ null */
     mergeChip: MergeChip? = null,
     onToggleMerge: () -> Unit = {},
+    /** 前回の購入と備考の候補。新しい商品の追加だけ */
+    history: EntryHistory? = null,
+    onSelectMemo: (String) -> Unit = {},
 ) {
     val entry = state.entry
     val editing = entry?.editing != null
@@ -191,6 +200,7 @@ fun ItemEntryContent(
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                     modifier = Modifier.fillMaxWidth().testTag(ItemEntryTags.NAME),
                 )
+                history?.previous?.let { PreviousPurchaseText(it) }
                 // 似た名前の商品があれば「『牛乳』と同じ商品として記録する」。初期は未選択（docs/design/suggestions.md）
                 mergeChip?.let { chip ->
                     FilterChip(
@@ -210,7 +220,7 @@ fun ItemEntryContent(
             UnitSection(entry, onUnitChange)
             // プライベートのリストでは、すべてプライベートになるので表示しない
             if (state.listVisibility == Visibility.SHARED) VisibilitySection(entry, onVisibilityChange)
-            MemoSection(entry, onMemoChange)
+            MemoSection(entry, onMemoChange, history?.memoCandidates.orEmpty(), onSelectMemo)
         }
     }
 }
@@ -396,8 +406,9 @@ private fun VisibilitySection(entry: ItemEntry, onVisibilityChange: (Visibility)
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun MemoSection(entry: ItemEntry, onMemoChange: (String) -> Unit) {
+private fun MemoSection(entry: ItemEntry, onMemoChange: (String) -> Unit, candidates: List<String>, onSelect: (String) -> Unit) {
     Section(title = stringResource(R.string.entry_memo), trailing = stringResource(R.string.entry_memo_optional)) {
         OutlinedTextField(
             value = entry.memo,
@@ -406,8 +417,57 @@ private fun MemoSection(entry: ItemEntry, onMemoChange: (String) -> Unit) {
             minLines = 3,
             modifier = Modifier.fillMaxWidth().testTag(ItemEntryTags.MEMO),
         )
+        // 過去にその商品に付けた備考（新しい順に3件まで）。選ぶと備考をその文にする
+        if (candidates.isNotEmpty()) {
+            FlowRow(
+                verticalArrangement = Arrangement.Center,
+                horizontalArrangement = Arrangement.spacedBy(CartMateSpacing.small),
+                modifier = Modifier.padding(top = CartMateSpacing.small),
+            ) {
+                Text(
+                    stringResource(R.string.entry_memo_candidates),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.align(Alignment.CenterVertically),
+                )
+                candidates.forEach { memo ->
+                    AssistChip(onClick = { onSelect(memo) }, label = { Text(memo) }, shape = CircleShape)
+                }
+            }
+        }
     }
 }
+
+/** 「前回: 1パック（10/18 購入・約14日ごと）」。早すぎる再購入なら注意を添える（追加は妨げない） */
+@Composable
+private fun PreviousPurchaseText(previous: SuggestionEngine.PreviousPurchase) {
+    val amount = listOfNotNull(previous.quantity?.let(::formatQuantity), previous.unit).joinToString("")
+    val date = PREVIOUS_DATE.format(previous.date)
+    val text = previous.typicalIntervalDays
+        ?.let { stringResource(R.string.entry_previous_with_cycle, amount, date, it) }
+        ?: stringResource(R.string.entry_previous, amount, date)
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = CartMateSpacing.small)) {
+        Icon(
+            painterResource(R.drawable.ic_history),
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(16.dp),
+        )
+        Spacer(Modifier.width(CartMateSpacing.xSmall))
+        Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+    previous.early?.let {
+        Text(
+            stringResource(R.string.entry_early, it.typicalIntervalDays),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.tertiary,
+            modifier = Modifier.padding(top = CartMateSpacing.xSmall),
+        )
+    }
+}
+
+/** 「10/18」 */
+private val PREVIOUS_DATE: DateTimeFormatter = DateTimeFormatter.ofPattern("M/d")
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable

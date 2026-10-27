@@ -1,5 +1,9 @@
 package com.cheesecomer.cartmate.ui.listdetail
 
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.Dispatchers
+import com.cheesecomer.cartmate.ui.suggestions.SuggestionSource
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -64,6 +68,8 @@ data class ListDetailUiState(
     val addVisibility: Visibility = Visibility.SHARED,
     /** 家族のメンバーの名前。チェック済みの項目に、チェックした人を表示する */
     val memberNames: MemberNames = MemberNames(emptyList()),
+    /** サジェストのシートの候補 */
+    val suggestions: SheetSuggestions = SheetSuggestions.Loading,
 ) {
     /** [item] をチェックした人の名前。家族にいない人（退会したメンバー）は null */
     fun checkerName(item: Item): String? = item.completedBy?.let(memberNames::of)
@@ -114,6 +120,7 @@ class ListDetailViewModel @Inject constructor(
     private val clock: Clock,
     private val currentUser: CurrentUserProvider,
     private val memberDirectory: MemberDirectory,
+    suggestionSource: SuggestionSource,
 ) : ViewModel() {
 
     private val members: Flow<MemberNames> = memberDirectory.observeNames()
@@ -144,6 +151,7 @@ class ListDetailViewModel @Inject constructor(
             loading = false,
         )
     }.combine(members) { state, names -> state.copy(memberNames = names) }
+        .combine(suggestions(suggestionSource)) { state, suggestions -> state.copy(suggestions = suggestions) }
         .combine(lastVisibility.observe(listId)) { state, remembered ->
             state.copy(addVisibility = VisibilityDefaults.initial(state.listVisibility, remembered))
         }
@@ -184,6 +192,14 @@ class ListDetailViewModel @Inject constructor(
             }
         }
     }
+
+    /** シートの候補。未入力なら時期が近い商品、入力中なら補完（docs/design/suggestions.md） */
+    private fun suggestions(source: SuggestionSource): Flow<SheetSuggestions> = combine(
+        source.observe(),
+        addItemState.map { it.text }.distinctUntilChanged(),
+        listRepository.observeLists().map { lists -> lists.firstOrNull { it.id == listId }?.name.orEmpty() }.distinctUntilChanged(),
+    ) { engine, text, listName -> SheetSuggestions.of(engine, text, listName) }
+        .flowOn(Dispatchers.Default)
 
     /** サジェストのシートで公開範囲を切り替える。そのリストの次の追加の初期値になる（docs/requirements.md §3.4） */
     fun setAddVisibility(visibility: Visibility) {

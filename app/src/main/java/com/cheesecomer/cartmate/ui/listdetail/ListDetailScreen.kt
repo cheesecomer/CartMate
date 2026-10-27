@@ -241,6 +241,7 @@ fun ListDetailContent(
                 // 今どちらの公開範囲で追加されるかを示す。プライベートのリストでは出さない
                 visibility = state.addVisibility.takeIf { state.addVisibilitySelectable },
                 onVisibilityChange = onAddVisibilityChange,
+                suggestions = state.suggestions,
             )
         }
     }
