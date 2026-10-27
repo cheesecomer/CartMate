@@ -299,6 +299,18 @@ class InMemoryStore @Inject constructor(
                 is ProductMerge.Change.Merge -> updateProduct(change.id) { it.copy(mergedInto = change.into) }
                 is ProductMerge.Change.Repoint -> updateProduct(change.id) { it.copy(mergedInto = change.into) }
                 is ProductMerge.Change.Unmerge -> updateProduct(change.id) { it.copy(mergedInto = null) }
+                is ProductMerge.Change.Hide -> updateProduct(change.id) { it.copy(hiddenAt = clock.instant()) }
+                is ProductMerge.Change.Show -> updateProduct(change.id) { it.copy(hiddenAt = null) }
+                is ProductMerge.Change.Create -> data.update { d ->
+                    if (change.id in d.products) d
+                    else d.copy(products = d.products + (change.id to Product(
+                        id = change.id,
+                        displayName = NameNormalizer.displayName(change.name),
+                        normalizedName = NameNormalizer.normalizedName(change.name),
+                        searchKey = NameNormalizer.searchKey(change.name),
+                        createdAt = clock.instant(),
+                    )))
+                }
             }
         }
     }

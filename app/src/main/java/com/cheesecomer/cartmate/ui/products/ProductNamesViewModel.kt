@@ -27,9 +27,16 @@ private const val STOP_TIMEOUT_MILLIS = 5_000L
 @HiltViewModel
 class ProductNamesViewModel @Inject constructor(catalog: ProductCatalog) : ViewModel() {
 
-    /** 読み込み中は null */
-    val entries: StateFlow<List<ProductMerge.Entry>?> = catalog.observe()
-        .map { ProductMerge.entries(it.products, it.visibleIds, it.dictionary) }
+    data class Lists(val entries: List<ProductMerge.Entry>, val hidden: List<ProductMerge.Entry>)
+
+    /** 一覧と、一番下の「非表示の商品」。読み込み中は null */
+    val lists: StateFlow<Lists?> = catalog.observe()
+        .map {
+            Lists(
+                entries = ProductMerge.entries(it.products, it.visibleIds, it.dictionary, it.hidden),
+                hidden = ProductMerge.hiddenEntries(it.products, it.visibleIds, it.dictionary, it.hidden),
+            )
+        }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), null)
 }
 
@@ -52,10 +59,40 @@ class ProductDetailViewModel @Inject constructor(
 
     val state: StateFlow<State> = catalog.observe()
         .map { snapshot ->
-            ProductMerge.detail(productId, snapshot.products, snapshot.visibleIds, snapshot.dictionary)
+            ProductMerge.detail(productId, snapshot.products, snapshot.visibleIds, snapshot.dictionary, snapshot.hidden)
                 ?.let(State::Loaded) ?: State.NotFound
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), State.Loading)
+
+    sealed interface Event {
+        /** 名前を訂正した。訂正した名前の商品（統合先）の画面に移る */
+        data class Renamed(val target: ProductId) : Event
+    }
+
+    private val _events = Channel<Event>(Channel.BUFFERED)
+    val events: Flow<Event> = _events.receiveAsFlow()
+
+    /** 名前を [name] に訂正する。購入の記録は書き換えず、正しい名前の商品（なければ作る）にまとめる */
+    fun rename(name: String) {
+        viewModelScope.launch {
+            val snapshot = catalog.observe().first()
+            val changes = ProductMerge.renameChanges(productId, name.trim(), snapshot.products, snapshot.hidden) ?: return@launch
+            productRepository.applyMergeChanges(changes)
+            val target = changes.first { it is ProductMerge.Change.Merge } as ProductMerge.Change.Merge
+            _events.send(Event.Renamed(target.into))
+        }
+    }
+
+    /** 家族全員の一覧・候補・予測に出さない。記録は消さない */
+    fun hide() {
+        viewModelScope.launch {
+            ProductMerge.hideChanges(productId, catalog.observe().first().products)?.let { productRepository.applyMergeChanges(it) }
+        }
+    }
+
+    fun show() {
+        viewModelScope.launch { productRepository.applyMergeChanges(listOf(ProductMerge.Change.Show(productId))) }
+    }
 
     /** [id] の統合を解除する。[id] にまとまっていた商品は、元の統合先に残す */
     fun unmerge(id: ProductId) {
@@ -108,7 +145,7 @@ class MergeProductsViewModel @Inject constructor(
     val events: Flow<Event> = _events.receiveAsFlow()
 
     val state: StateFlow<State> = combine(catalog.observe(), selected, submitted) { snapshot, selected, submitted ->
-        val entries = ProductMerge.entries(snapshot.products, snapshot.visibleIds, snapshot.dictionary)
+        val entries = ProductMerge.entries(snapshot.products, snapshot.visibleIds, snapshot.dictionary, snapshot.hidden)
         val candidates = entries.filter { it.product.id != targetId }
         State(
             target = entries.find { it.product.id == targetId },

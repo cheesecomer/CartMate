@@ -79,6 +79,8 @@ object F {
     const val MERGED_BY = "mergedBy"
     const val MERGE_UPDATED_AT = "mergeUpdatedAt"
     const val MERGE_UPDATED_BY = "mergeUpdatedBy"
+    const val HIDDEN_AT = "hiddenAt"
+    const val HIDDEN_BY = "hiddenBy"
     const val DICTIONARY_OPT_OUT = "dictionaryOptOut"
 }
 

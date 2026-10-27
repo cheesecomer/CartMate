@@ -261,7 +261,7 @@ service cloud.firestore {
           && str(request.resource.data.normalizedName, 60)
           && str(request.resource.data.searchKey, 60)
           && (request.resource.data.mergedInto == null || isCreatedMerged());
-        allow update: if isMember(hid) && (isRecreate() || isMerge() || isRepoint() || isUnmerge() || isDictionaryOptOut());
+        allow update: if isMember(hid) && (isRecreate() || isMerge() || isRepoint() || isUnmerge() || isDictionaryOptOut() || isHide() || isShow());
         allow delete: if false;
 
         // 2端末が同じ決定的IDで同時に作成した場合の上書きを許す（正規化名は不変）
@@ -275,13 +275,14 @@ service cloud.firestore {
           return request.resource.data.get('mergeUpdatedBy', null) == me()
             && request.resource.data.get('mergeUpdatedAt', null) == request.time;
         }
-        // 統合（「商品をまとめる」）。未統合の商品だけを、未統合の商品に統合できる。最初に統合した人と時刻を書く
+        // 統合（「商品をまとめる」「名前を訂正」）。未統合の商品だけを、書き込んだあとで未統合の商品に統合できる
+        // （名前の訂正では、統合先を同じ書き込みで作るか、統合を外す）。最初に統合した人と時刻を書く
         function isMerge() {
           let target = request.resource.data.mergedInto;
           return resource.data.get('mergedInto', null) == null
             && changed().hasOnly(['mergedInto','mergedAt','mergedBy','mergeUpdatedAt','mergeUpdatedBy'])
             && target is string && target != pid
-            && get(productPath(target)).data.get('mergedInto', null) == null
+            && getAfter(productPath(target)).data.get('mergedInto', null) == null
             && request.resource.data.mergedBy == me()
             && request.resource.data.mergedAt == request.time
             && isMergeUpdatedByMe();
@@ -317,6 +318,19 @@ service cloud.firestore {
             && request.resource.data.mergedBy == me()
             && request.resource.data.mergedAt == request.time
             && isMergeUpdatedByMe();
+        }
+        // 非表示（docs/design/security.md「商品の非表示」）。統合先の商品だけを非表示にでき、非表示にした人と時刻を書く
+        function isHide() {
+          return resource.data.get('mergedInto', null) == null
+            && changed().hasOnly(['hiddenAt','hiddenBy'])
+            && request.resource.data.hiddenAt == request.time
+            && request.resource.data.hiddenBy == me();
+        }
+        // また表示する。非表示にした人と時刻を消す
+        function isShow() {
+          return changed().hasOnly(['hiddenAt','hiddenBy'])
+            && request.resource.data.get('hiddenAt', null) == null
+            && request.resource.data.get('hiddenBy', null) == null;
         }
         // 名寄せ辞書でまとめない（「別の商品として扱う」）とその取り消し
         function isDictionaryOptOut() {

@@ -3,6 +3,8 @@ package com.cheesecomer.cartmate.ui.products
 import com.cheesecomer.cartmate.domain.model.Product
 import com.cheesecomer.cartmate.domain.model.ProductId
 import com.cheesecomer.cartmate.domain.product.NormalizationDictionary
+import com.cheesecomer.cartmate.domain.product.ProductHiding
+import com.cheesecomer.cartmate.domain.product.ProductUsage
 import com.cheesecomer.cartmate.domain.repository.DictionaryProvider
 import com.cheesecomer.cartmate.domain.repository.ItemRepository
 import com.cheesecomer.cartmate.domain.repository.ProductRepository
@@ -28,6 +30,8 @@ class ProductCatalog @Inject constructor(
         val products: List<Product>,
         val visibleIds: Set<ProductId>,
         val dictionary: NormalizationDictionary,
+        /** 非表示になっている統合先（[ProductHiding.hiddenRoots]） */
+        val hidden: Set<ProductId> = emptySet(),
     )
 
     fun observe(): Flow<Snapshot> = combine(
@@ -36,8 +40,8 @@ class ProductCatalog @Inject constructor(
         purchaseRepository.observePurchases(since = clock.instant().minus(PURCHASE_WINDOW)),
         dictionaryProvider.observeDictionary(),
     ) { products, items, purchases, dictionary ->
-        val visible = (items.mapNotNull { it.productId } + purchases.mapNotNull { it.productId }).toSet()
-        Snapshot(products, visible, dictionary)
+        val usage = ProductUsage.of(items, purchases)
+        Snapshot(products, usage.visibleIds, dictionary, ProductHiding.hiddenRoots(products, usage))
     }
 
     private companion object {

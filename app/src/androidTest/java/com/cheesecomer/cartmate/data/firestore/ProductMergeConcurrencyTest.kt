@@ -11,6 +11,8 @@ import com.cheesecomer.cartmate.domain.model.Product
 import com.cheesecomer.cartmate.domain.model.ProductId
 import com.cheesecomer.cartmate.domain.model.Visibility
 import com.cheesecomer.cartmate.domain.product.ProductGraph
+import com.cheesecomer.cartmate.domain.product.ProductHiding
+import com.cheesecomer.cartmate.domain.product.ProductUsage
 import com.cheesecomer.cartmate.domain.product.ProductMerge
 import com.cheesecomer.cartmate.domain.repository.JoinResult
 import com.cheesecomer.cartmate.testing.EmulatorTest
@@ -213,6 +215,43 @@ class ProductMergeConcurrencyTest {
 
         assertThat(f.serverRelations()).containsExactly("牛乳", null, "ぎゅうにゅう", "牛乳")
         awaitCount(rejections, 1)
+    }
+
+    @Test
+    fun 誤字のまま完了した1件目の記録は名前の訂正で正しい名前の商品にまとまり家族にも届く(): Unit = runBlocking {
+        val f = family("牛入")
+        val typo = f.taro.id("牛入")
+        val changes = checkNotNull(ProductMerge.renameChanges(typo, "牛乳", f.taro.awaitProducts { true }))
+        f.taro.products.applyMergeChanges(changes)
+        f.taro.db.waitForPendingWrites().await()
+
+        assertThat(f.serverRelations()).containsExactly("牛乳", null, "牛入", "牛乳")
+        f.hanako.awaitProducts { products -> products.any { it.displayName == "牛入" && it.mergedInto != null } }
+    }
+
+    @Test
+    fun 非表示は家族に届き同じ名前をまた追加すると書き込みなしでまた表示される(): Unit = runBlocking {
+        val f = family("テスト", "牛乳")
+        val test = f.taro.id("テスト")
+        f.taro.products.applyMergeChanges(checkNotNull(ProductMerge.hideChanges(test, f.taro.awaitProducts { true })))
+        f.taro.db.waitForPendingWrites().await()
+
+        // hanako の端末でも非表示になる
+        val products = f.hanako.awaitProducts { products -> products.any { it.id == test && it.hiddenAt != null } }
+        val usage = ProductUsage.of(f.hanako.store.observeOpenItems().first(), emptyList())
+        assertThat(ProductHiding.hiddenRoots(products, usage)).containsExactly(test)
+
+        // hanako が同じ名前をまた追加すると、また表示される（非表示の時刻は残ったまま）
+        val listId = f.hanako.store.observeLists().first().first().id
+        f.hanako.store.addItem(NewItem(listId, "テスト", 1.0, "個", memo = null, Visibility.SHARED))
+        f.hanako.db.waitForPendingWrites().await()
+        // 追加した時刻は、サーバーに届くまでは端末の時計の見積もり。届いたあとはサーバーの時刻で比べる
+        val all = f.hanako.awaitProducts { true }
+        withTimeout(TIMEOUT_MILLIS) {
+            f.hanako.store.observeOpenItems().first { items ->
+                items.count { it.productId == test } == 2 && ProductHiding.hiddenRoots(all, ProductUsage.of(items, emptyList())).isEmpty()
+            }
+        }
     }
 
     private companion object {

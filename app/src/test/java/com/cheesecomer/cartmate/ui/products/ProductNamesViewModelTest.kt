@@ -48,8 +48,8 @@ class ProductNamesViewModelTest {
         add("豚バラ肉", "豚ばら肉", "豚バラ")
         val target = productId("豚バラ肉")
         store.applyMergeChanges(ProductMerge.mergeChanges(target, listOf(productId("豚ばら肉")), store.observeProducts().first())!!)
-        ProductNamesViewModel(catalog).entries.test {
-            val entries = awaitUntil { it != null && it.size == 2 }!!
+        ProductNamesViewModel(catalog).lists.test {
+            val entries = awaitUntil { it != null && it.entries.size == 2 }!!.entries
             assertThat(entries.map { it.product.displayName }).containsExactly("豚バラ", "豚バラ肉")
             assertThat(entries.first { it.product.id == target }.members.map { it.displayName }).containsExactly("豚ばら肉")
             cancelAndIgnoreRemainingEvents()
@@ -151,5 +151,64 @@ class ProductNamesViewModelTest {
         }
         assertThat(mergedInto("豚ばら肉")).isNull()
         assertThat(mergedInto("豚バラ")).isEqualTo(target)
+    }
+
+    @Test
+    fun `非表示にすると一覧から外れて非表示の商品に移り、同じ名前をまた追加すると一覧に戻る`() = runTest {
+        add("牛乳", "テスト")
+        val test = productId("テスト")
+        val names = ProductNamesViewModel(catalog)
+        names.lists.test {
+            awaitUntil { it != null && it.entries.size == 2 }
+            detail(test).hide()
+            val hidden = awaitUntil { it != null && it.hidden.isNotEmpty() }!!
+            assertThat(hidden.entries.map { it.product.displayName }).containsExactly("牛乳")
+            assertThat(hidden.hidden.map { it.product.displayName }).containsExactly("テスト")
+
+            // 非表示にしたあとに、同じ名前をまた追加した
+            clock.advance(java.time.Duration.ofMinutes(1))
+            add("テスト")
+            val shown = awaitUntil { it != null && it.hidden.isEmpty() }!!
+            assertThat(shown.entries.map { it.product.displayName }).containsExactly("テスト", "牛乳")
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `非表示の商品は表示するで一覧に戻る`() = runTest {
+        add("テスト")
+        val test = productId("テスト")
+        val viewModel = detail(test)
+        viewModel.state.test {
+            awaitUntil { (it as? ProductDetailViewModel.State.Loaded)?.detail is ProductMerge.Detail.Target }
+            viewModel.hide()
+            awaitUntil { (it as? ProductDetailViewModel.State.Loaded)?.detail is ProductMerge.Detail.Hidden }
+            viewModel.show()
+            awaitUntil { (it as? ProductDetailViewModel.State.Loaded)?.detail is ProductMerge.Detail.Target }
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `誤字の名前を訂正すると、正しい名前の商品を作ってまとめ、その商品の画面に移る`() = runTest {
+        add("牛入")
+        val typo = productId("牛入")
+        val viewModel = detail(typo)
+        viewModel.events.test {
+            viewModel.state.test {
+                awaitUntil { it is ProductDetailViewModel.State.Loaded }
+                viewModel.rename("牛乳")
+                cancelAndIgnoreRemainingEvents()
+            }
+            val renamed = awaitItem() as ProductDetailViewModel.Event.Renamed
+            assertThat(renamed.target).isEqualTo(productId("牛乳"))
+        }
+        assertThat(mergedInto("牛入")).isEqualTo(productId("牛乳"))
+        ProductNamesViewModel(catalog).lists.test {
+            val entries = awaitUntil { it != null && it.entries.isNotEmpty() }!!.entries
+            assertThat(entries.map { it.product.displayName }).containsExactly("牛乳")
+            assertThat(entries.single().members.map { it.displayName }).containsExactly("牛入")
+            cancelAndIgnoreRemainingEvents()
+        }
     }
 }

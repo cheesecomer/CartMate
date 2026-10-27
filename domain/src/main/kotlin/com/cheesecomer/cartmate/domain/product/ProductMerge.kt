@@ -2,6 +2,7 @@ package com.cheesecomer.cartmate.domain.product
 
 import com.cheesecomer.cartmate.domain.model.Product
 import com.cheesecomer.cartmate.domain.model.ProductId
+import com.cheesecomer.cartmate.domain.text.NameNormalizer
 
 /**
  * 「商品名の管理」と「商品をまとめる」（docs/requirements.md §3.5「商品名の管理」）。
@@ -37,6 +38,9 @@ object ProductMerge {
 
         /** 統合されている商品。今の統合先と「解除」 */
         data class Merged(val product: Product, val target: Product) : Detail
+
+        /** 非表示にした統合先。まとめている商品と「表示する」 */
+        data class Hidden(val entry: Entry) : Detail
     }
 
     /** 統合と解除で、1つのバッチに書き込む変更（docs/design/data-model.md「統合」） */
@@ -51,10 +55,37 @@ object ProductMerge {
 
         /** 統合を解除する */
         data class Unmerge(override val id: ProductId) : Change
+
+        /** [name] の商品を作る（名前の訂正で、正しい名前の商品がまだないとき）。ID は名前から決まる */
+        data class Create(override val id: ProductId, val name: String) : Change
+
+        /** 非表示にする */
+        data class Hide(override val id: ProductId) : Change
+
+        /** また表示する。非表示にする前の記録も、また予測に使う */
+        data class Show(override val id: ProductId) : Change
     }
 
-    /** 「商品名の管理」の一覧。自分に見える商品があるものだけを、名前の順に並べる */
-    fun entries(products: Collection<Product>, visibleIds: Set<ProductId>, dictionary: NormalizationDictionary): List<Entry> {
+    /**
+     * 「商品名の管理」の一覧。自分に見える商品があるものだけを、名前の順に並べる。
+     * [hidden]（[ProductHiding.hiddenRoots]）の商品は出さない（[hiddenEntries] に出す）
+     */
+    fun entries(
+        products: Collection<Product>,
+        visibleIds: Set<ProductId>,
+        dictionary: NormalizationDictionary,
+        hidden: Set<ProductId> = emptySet(),
+    ): List<Entry> = allEntries(products, visibleIds, dictionary).filter { it.product.id !in hidden }
+
+    /** 非表示にした統合先。「非表示の商品」に、名前の順に並べる */
+    fun hiddenEntries(
+        products: Collection<Product>,
+        visibleIds: Set<ProductId>,
+        dictionary: NormalizationDictionary,
+        hidden: Set<ProductId>,
+    ): List<Entry> = allEntries(products, visibleIds, dictionary).filter { it.product.id in hidden }
+
+    private fun allEntries(products: Collection<Product>, visibleIds: Set<ProductId>, dictionary: NormalizationDictionary): List<Entry> {
         val graph = ProductGraph(products)
         val byId = products.associateBy { it.id }
         // 統合先がない（読めていない）商品は、自分を統合先として扱う
@@ -82,21 +113,32 @@ object ProductMerge {
     }
 
     /** [id] の商品を開いたときの画面。見えない商品や、ない商品は null */
-    fun detail(id: ProductId, products: Collection<Product>, visibleIds: Set<ProductId>, dictionary: NormalizationDictionary): Detail? {
+    fun detail(
+        id: ProductId,
+        products: Collection<Product>,
+        visibleIds: Set<ProductId>,
+        dictionary: NormalizationDictionary,
+        hidden: Set<ProductId> = emptySet(),
+    ): Detail? {
         val byId = products.associateBy { it.id }
         val product = byId[id] ?: return null
         val root = byId[ProductGraph(products).resolve(id)]
         if (root != null && root.id != id) return Detail.Merged(product, root).takeIf { id in visibleIds }
-        return entries(products, visibleIds, dictionary).find { it.product.id == id }?.let(Detail::Target)
+        val entry = allEntries(products, visibleIds, dictionary).find { it.product.id == id } ?: return null
+        return if (id in hidden) Detail.Hidden(entry) else Detail.Target(entry)
     }
 
-    /** [target] にまとめられる商品。ほかの未統合の商品（すでに [target] にまとまっている商品は、統合済みなので入らない） */
+    /**
+     * [target] にまとめられる商品。ほかの未統合の商品（すでに [target] にまとまっている商品は、統合済みなので入らない）。
+     * 非表示の商品は出さない
+     */
     fun candidates(
         target: ProductId,
         products: Collection<Product>,
         visibleIds: Set<ProductId>,
         dictionary: NormalizationDictionary,
-    ): List<Entry> = entries(products, visibleIds, dictionary).filter { it.product.id != target }
+        hidden: Set<ProductId> = emptySet(),
+    ): List<Entry> = entries(products, visibleIds, dictionary, hidden).filter { it.product.id != target }
 
     /**
      * [selected] を [target] にまとめる変更。選んだ商品にまとまっている商品は、同じ統合先に付け替えて1段にする。
@@ -123,4 +165,36 @@ object ProductMerge {
         return listOf(Change.Unmerge(id)) +
             products.filter { it.mergedInto == id }.map { Change.Repoint(it.id, parent) }
     }
+
+    /**
+     * [id] の統合先の商品の名前を [name] に訂正する変更（誤字のまま完了した記録の訂正）。購入の記録は書き換えず、
+     * 正しい名前の商品に [id] をまとめる。正しい名前の商品がなければ作る。[id] にまとまっていた商品も一緒に移す。
+     * 正しい名前の商品が [id] にまとめられていれば、その商品を統合先にして入れ替える。
+     * 正しい名前の商品（の統合先）が非表示なら、また表示する。
+     * [id] が統合されている、名前が [id] と同じ（正規化すると同じ）、名前が空なら null
+     */
+    fun renameChanges(id: ProductId, name: String, products: Collection<Product>, hidden: Set<ProductId> = emptySet()): List<Change>? {
+        if (name.isBlank()) return null
+        val byId = products.associateBy { it.id }
+        val product = byId[id] ?: return null
+        if (product.mergedInto != null) return null
+        val newId = ProductId(NameNormalizer.productId(name))
+        if (newId == id) return null
+        val children = products.filter { it.mergedInto == id }
+        if (newId !in byId) {
+            return listOf(Change.Create(newId, name), Change.Merge(id, newId)) + children.map { Change.Repoint(it.id, newId) }
+        }
+        val root = ProductGraph(products).resolve(newId)
+        if (root == id) {
+            // 正しい名前の商品が、この商品にまとめられている。統合を外して統合先にし、残りを移す
+            return listOf(Change.Unmerge(newId), Change.Merge(id, newId)) +
+                children.filter { it.id != newId }.map { Change.Repoint(it.id, newId) }
+        }
+        val changes = listOf(Change.Merge(id, root)) + children.map { Change.Repoint(it.id, root) }
+        return if (root in hidden) changes + Change.Show(root) else changes
+    }
+
+    /** [id] を非表示にする変更。統合されている商品は、統合先を非表示にする（ここでは null） */
+    fun hideChanges(id: ProductId, products: Collection<Product>): List<Change>? =
+        products.find { it.id == id }?.takeIf { it.mergedInto == null }?.let { listOf(Change.Hide(id)) }
 }

@@ -73,11 +73,19 @@ fun CartMateNavHost(pending: PendingNavigation, onDeleteAccount: () -> Unit) {
                 onOpen = { navController.navigate(ProductDetailRoute(it.value)) },
             )
         }
-        composable<ProductDetailRoute> {
+        composable<ProductDetailRoute> { backStackEntry ->
             ProductDetailScreen(
                 onBack = { navController.popBackStack() },
                 onMerge = { navController.navigate(MergeProductsRoute(it.value)) },
                 onOpen = { navController.navigate(ProductDetailRoute(it.value)) },
+                // 訂正した名前の商品の画面に置き換える（戻ると一覧に戻る）
+                onRenamed = { target ->
+                    if (backStackEntry.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
+                        navController.navigate(ProductDetailRoute(target.value)) {
+                            popUpTo(backStackEntry.destination.id) { inclusive = true }
+                        }
+                    }
+                },
             )
         }
         composable<MergeProductsRoute> { backStackEntry ->

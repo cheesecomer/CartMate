@@ -1,5 +1,5 @@
 import { assertFails, assertSucceeds } from "@firebase/rules-unit-testing";
-import { deleteDoc, doc, getDoc, serverTimestamp, setDoc, updateDoc, writeBatch, type Firestore } from "firebase/firestore";
+import { deleteDoc, deleteField, doc, getDoc, serverTimestamp, setDoc, updateDoc, writeBatch, type Firestore } from "firebase/firestore";
 import { describe, it } from "vitest";
 import { as, HID, seed, seedHousehold } from "./setup";
 
@@ -248,5 +248,77 @@ describe("商品をまとめる・解除する", () => {
       ]);
     await assertFails(commit(as("taro"), changes(19)));
     await assertSucceeds(commit(as("taro"), changes(18)));
+  });
+});
+
+describe("名前の訂正", () => {
+  it("正しい名前の商品を作り、同じ書き込みでそこにまとめられる（1件目の記録の訂正）", async () => {
+    await seedHousehold(HID, "taro");
+    await seedProduct("n_typo");
+    const db = as("taro");
+    await assertSucceeds(
+      writeBatch(db)
+        .set(doc(db, path("n_milk")), product("taro"))
+        .update(doc(db, path("n_typo")), merging("taro", "n_milk"))
+        .commit(),
+    );
+  });
+
+  it("作らずに、ない商品にはまとめられない", async () => {
+    await seedHousehold(HID, "taro");
+    await seedProduct("n_typo");
+    await assertFails(updateDoc(doc(as("taro"), path("n_typo")), merging("taro", "n_milk")));
+  });
+
+  it("この商品にまとめられている正しい名前の商品と入れ替えられる", async () => {
+    await seedHousehold(HID, "taro");
+    await seedProduct("n_typo");
+    await seedProduct("n_milk", { mergedInto: "n_typo", mergedBy: "taro", mergedAt: new Date() });
+    await seedProduct("n_other", { mergedInto: "n_typo", mergedBy: "taro", mergedAt: new Date() });
+    await assertSucceeds(
+      commit(as("taro"), [
+        ["n_milk", unmerging("taro")],
+        ["n_typo", merging("taro", "n_milk")],
+        ["n_other", repointing("taro", "n_milk")],
+      ]),
+    );
+  });
+});
+
+describe("商品の非表示", () => {
+  const hiding = (uid: string) => ({ hiddenAt: serverTimestamp(), hiddenBy: uid });
+  const showing = { hiddenAt: deleteField(), hiddenBy: deleteField() };
+
+  it("メンバーは統合先の商品を非表示にして、また表示できる", async () => {
+    await seedHousehold(HID, "taro", "hanako");
+    await seedProduct("n_test");
+    await assertSucceeds(updateDoc(doc(as("hanako"), path("n_test")), hiding("hanako")));
+    await assertSucceeds(updateDoc(doc(as("taro"), path("n_test")), showing));
+  });
+
+  it("統合されている商品は非表示にできない", async () => {
+    await seedHousehold(HID, "taro");
+    await seedProduct("n_milk");
+    await seedProduct("n_gyunyu", { mergedInto: "n_milk", mergedBy: "taro", mergedAt: new Date() });
+    await assertFails(updateDoc(doc(as("taro"), path("n_gyunyu")), hiding("taro")));
+  });
+
+  it("非表示にした人と時刻は偽れない", async () => {
+    await seedHousehold(HID, "taro", "hanako");
+    await seedProduct("n_test");
+    await assertFails(updateDoc(doc(as("hanako"), path("n_test")), hiding("taro")));
+    await assertFails(updateDoc(doc(as("hanako"), path("n_test")), { hiddenAt: new Date(0), hiddenBy: "hanako" }));
+  });
+
+  it("非表示と一緒に、ほかのフィールドは変えられない", async () => {
+    await seedHousehold(HID, "taro");
+    await seedProduct("n_test");
+    await assertFails(updateDoc(doc(as("taro"), path("n_test")), { ...hiding("taro"), displayName: "別の名前" }));
+  });
+
+  it("メンバーでなければ非表示にできない", async () => {
+    await seedHousehold(HID, "taro");
+    await seedProduct("n_test");
+    await assertFails(updateDoc(doc(as("jiro"), path("n_test")), hiding("jiro")));
   });
 });

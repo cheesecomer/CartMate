@@ -19,7 +19,7 @@ class ProductMergeTest {
         aliases = mapOf("たまご" to Alias(egg, Match.PREFIX), "卵" to Alias(egg, Match.PREFIX)),
     )
 
-    private fun product(name: String, mergedInto: Product? = null, optOut: Boolean = false): Product = Product(
+    private fun product(name: String, mergedInto: Product? = null, optOut: Boolean = false, hiddenAt: Instant? = null): Product = Product(
         id = ProductId(NameNormalizer.productId(name)),
         displayName = name,
         normalizedName = NameNormalizer.normalizedName(name),
@@ -27,6 +27,7 @@ class ProductMergeTest {
         createdAt = Instant.EPOCH,
         mergedInto = mergedInto?.id,
         dictionaryOptOut = optOut,
+        hiddenAt = hiddenAt,
     )
 
     private fun ids(vararg products: Product) = products.map { it.id }.toSet()
@@ -180,5 +181,74 @@ class ProductMergeTest {
     fun `統合していない商品は解除できない`() {
         val target = product("豚バラ肉")
         assertThat(ProductMerge.unmergeChanges(target.id, listOf(target))).isNull()
+    }
+
+    @Test
+    fun `非表示の商品は一覧とまとめる候補に出さず、非表示の商品に出す`() {
+        val milk = product("牛乳")
+        val test = product("テスト", hiddenAt = Instant.EPOCH)
+        val all = listOf(milk, test)
+        val hidden = setOf(test.id)
+        assertThat(ProductMerge.entries(all, ids(milk, test), dictionary, hidden).map { it.product }).containsExactly(milk)
+        assertThat(ProductMerge.hiddenEntries(all, ids(milk, test), dictionary, hidden).map { it.product }).containsExactly(test)
+        assertThat(ProductMerge.candidates(milk.id, all, ids(milk, test), dictionary, hidden)).isEmpty()
+        assertThat(ProductMerge.detail(test.id, all, ids(milk, test), dictionary, hidden))
+            .isInstanceOf(ProductMerge.Detail.Hidden::class.java)
+    }
+
+    @Test
+    fun `統合されている商品は非表示にできない`() {
+        val milk = product("牛乳")
+        val kana = product("ぎゅうにゅう", mergedInto = milk)
+        assertThat(ProductMerge.hideChanges(kana.id, listOf(milk, kana))).isNull()
+        assertThat(ProductMerge.hideChanges(milk.id, listOf(milk, kana))).containsExactly(Change.Hide(milk.id))
+    }
+
+    @Test
+    fun `名前の訂正で、正しい名前の商品がまだなければ作ってまとめる（1件目の記録の訂正）`() {
+        val typo = product("牛入")
+        val milkId = ProductId(NameNormalizer.productId("牛乳"))
+        assertThat(ProductMerge.renameChanges(typo.id, "牛乳", listOf(typo)))
+            .containsExactly(Change.Create(milkId, "牛乳"), Change.Merge(typo.id, milkId))
+    }
+
+    @Test
+    fun `名前の訂正で、正しい名前の商品があればその統合先にまとめ、まとまっていた商品も移す`() {
+        val dairy = product("乳製品")
+        val milk = product("牛乳", mergedInto = dairy)
+        val typo = product("牛入")
+        val underTypo = product("ぎゅうにう", mergedInto = typo)
+        assertThat(ProductMerge.renameChanges(typo.id, "牛乳", listOf(dairy, milk, typo, underTypo)))
+            .containsExactly(Change.Merge(typo.id, dairy.id), Change.Repoint(underTypo.id, dairy.id))
+    }
+
+    @Test
+    fun `名前の訂正で、正しい名前の商品が非表示ならまた表示する`() {
+        val milk = product("牛乳", hiddenAt = Instant.EPOCH)
+        val typo = product("牛入")
+        assertThat(ProductMerge.renameChanges(typo.id, "牛乳", listOf(milk, typo), hidden = setOf(milk.id)))
+            .containsExactly(Change.Merge(typo.id, milk.id), Change.Show(milk.id))
+    }
+
+    @Test
+    fun `名前の訂正で、正しい名前の商品がこの商品にまとめられていれば、入れ替えて統合先にする`() {
+        val typo = product("牛入")
+        val milk = product("牛乳", mergedInto = typo)
+        val other = product("ぎゅうにゅう", mergedInto = typo)
+        assertThat(ProductMerge.renameChanges(typo.id, "牛乳", listOf(typo, milk, other))).containsExactly(
+            Change.Unmerge(milk.id),
+            Change.Merge(typo.id, milk.id),
+            Change.Repoint(other.id, milk.id),
+        )
+    }
+
+    @Test
+    fun `同じ名前（正規化すると同じ）や空の名前、統合されている商品の名前は訂正できない`() {
+        val milk = product("牛乳")
+        val kana = product("ぎゅうにゅう", mergedInto = milk)
+        val products = listOf(milk, kana)
+        assertThat(ProductMerge.renameChanges(milk.id, "牛乳 ", products)).isNull()
+        assertThat(ProductMerge.renameChanges(milk.id, "  ", products)).isNull()
+        assertThat(ProductMerge.renameChanges(kana.id, "牛にゅう", products)).isNull()
     }
 }

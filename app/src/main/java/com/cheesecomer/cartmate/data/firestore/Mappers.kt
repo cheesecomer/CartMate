@@ -63,6 +63,7 @@ fun DocumentSnapshot.toProduct(): Product? = Product(
     createdAt = instant(F.CREATED_AT) ?: return null,
     mergedInto = getString(F.MERGED_INTO)?.let(::ProductId),
     dictionaryOptOut = getBoolean(F.DICTIONARY_OPT_OUT) ?: false,
+    hiddenAt = instant(F.HIDDEN_AT),
 )
 
 fun DocumentSnapshot.toPurchase(): Purchase? = Purchase(

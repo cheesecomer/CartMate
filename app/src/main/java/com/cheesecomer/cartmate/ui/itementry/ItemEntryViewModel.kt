@@ -34,6 +34,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import com.cheesecomer.cartmate.domain.model.ProductId
 import com.cheesecomer.cartmate.domain.product.MergeCandidates
+import com.cheesecomer.cartmate.domain.product.ProductHiding
+import com.cheesecomer.cartmate.domain.product.ProductUsage
 import com.cheesecomer.cartmate.domain.repository.ProductRepository
 import com.cheesecomer.cartmate.domain.repository.PurchaseRepository
 import kotlinx.coroutines.flow.combine
@@ -88,11 +90,11 @@ class ItemEntryViewModel @Inject constructor(
     /** チップで選んだ候補。候補が変わったら選択を外すため、候補の ID で持つ */
     private val selectedCandidate = MutableStateFlow<ProductId?>(null)
 
-    /** 自分に見える項目か購入の記録がある商品の ID（他のメンバーがプライベートでだけ使った名前を出さない） */
-    private val visibleProductIds: Flow<Set<ProductId>> = combine(
+    /** 自分に見える項目と購入の記録から分かる、商品の使われ方（他のメンバーがプライベートでだけ使った名前を出さない） */
+    private val productUsage: Flow<ProductUsage> = combine(
         itemRepository.observeOpenItems(),
         purchaseRepository.observePurchases(since = clock.instant().minus(PURCHASE_WINDOW)),
-    ) { items, purchases -> (items.mapNotNull { it.productId } + purchases.mapNotNull { it.productId }).toSet() }
+    ) { items, purchases -> ProductUsage.of(items, purchases) }
 
     /**
      * 表記ゆれのチップ（docs/design/suggestions.md「表記ゆれの紐付け」）。新しい商品の追加で、入力した名前が新しい商品のときだけ出す。
@@ -101,12 +103,15 @@ class ItemEntryViewModel @Inject constructor(
     val mergeChip: StateFlow<MergeChip?> = combine(
         _uiState,
         productRepository.observeProducts(),
-        visibleProductIds,
+        productUsage,
         selectedCandidate,
         dictionaryProvider.observeDictionary(),
-    ) { state, products, visibleIds, selected, dictionary ->
+    ) { state, products, usage, selected, dictionary ->
         val entry = state.entry?.takeIf { it.editing == null } ?: return@combine null
-        val candidate = MergeCandidates.find(entry.name, products.filter { it.id in visibleIds }, products, dictionary)
+        // 非表示の商品は候補にしない
+        val hidden = ProductHiding.hiddenRoots(products, usage)
+        val visible = products.filter { it.id in usage.visibleIds && !ProductHiding.isHidden(it.id, products, hidden) }
+        val candidate = MergeCandidates.find(entry.name, visible, products, dictionary)
             ?: return@combine null
         MergeChip(candidate.id, candidate.displayName, selected = selected == candidate.id)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), null)
