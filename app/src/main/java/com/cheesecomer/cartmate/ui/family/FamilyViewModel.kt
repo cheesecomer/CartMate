@@ -104,7 +104,8 @@ class FamilyViewModel @Inject constructor(
     /** 自分の表示名を設定する。空にすると解除。オフラインでも行える */
     fun setNickname(input: String) {
         if (!DisplayName.isValid(input)) return
-        viewModelScope.launch { householdRepository.setNickname(DisplayName.normalize(input)) }
+        val googleName = uiState.value.account?.displayName.orEmpty()
+        viewModelScope.launch { householdRepository.setNickname(DisplayName.nicknameToSave(input, googleName)) }
     }
 
     /** [userId] に自分だけの呼び名を付ける。空にすると解除。オフラインでも行える */

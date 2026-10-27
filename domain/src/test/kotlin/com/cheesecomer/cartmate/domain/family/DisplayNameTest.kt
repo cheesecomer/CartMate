@@ -56,6 +56,14 @@ class DisplayNameTest {
     }
 
     @Test
+    fun `Google アカウントの名前と同じ表示名は保存しない（設定を解除する）`() {
+        assertThat(DisplayName.nicknameToSave("山田 花子", googleName = "山田 花子")).isNull()
+        assertThat(DisplayName.nicknameToSave(" 山田 花子 ", googleName = "山田 花子")).isNull()
+        assertThat(DisplayName.nicknameToSave("花子", googleName = "山田 花子")).isEqualTo("花子")
+        assertThat(DisplayName.nicknameToSave("", googleName = "山田 花子")).isNull()
+    }
+
+    @Test
     fun `20文字までなら保存できる`() {
         assertThat(DisplayName.isValid("あ".repeat(20))).isTrue()
         assertThat(DisplayName.isValid(" " + "あ".repeat(20) + " ")).isTrue()

@@ -5,11 +5,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -241,10 +244,14 @@ fun MergeProductsScreen(onBack: () -> Unit, onDone: () -> Unit, viewModel: Merge
         onBack = onBack,
         snackbar = snackbar,
         bottomBar = {
+            // 背景はナビゲーションバーの下まで伸ばし、件数とボタンはナビゲーションバーの上に置く（画面の端まで描いているため）
             Surface(tonalElevation = 3.dp) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth().padding(CartMateSpacing.large),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .windowInsetsPadding(WindowInsets.navigationBars)
+                        .padding(CartMateSpacing.large),
                 ) {
                     Text(
                         stringResource(R.string.merge_products_selected, state.selected.size),

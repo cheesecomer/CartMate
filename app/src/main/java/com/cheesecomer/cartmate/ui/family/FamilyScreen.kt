@@ -291,7 +291,9 @@ fun FamilyContent(
         NameDialog(
             title = stringResource(R.string.family_nickname_title),
             hint = stringResource(R.string.family_nickname_hint, DisplayName.MAX_LENGTH),
-            initial = state.me?.nickname.orEmpty(),
+            // 今出している名前（表示名、なければ Google アカウントの名前）
+            initial = state.myName,
+            clearable = !state.me?.nickname.isNullOrBlank(),
             onSave = {
                 editingNickname = false
                 onSetNickname(it)
@@ -304,6 +306,7 @@ fun FamilyContent(
             title = stringResource(R.string.family_alias_title, DisplayName.of(member, alias = null) ?: member.displayName),
             hint = stringResource(R.string.family_alias_hint, DisplayName.MAX_LENGTH),
             initial = state.aliases[member.userId].orEmpty(),
+            clearable = !state.aliases[member.userId].isNullOrBlank(),
             onSave = {
                 aliasing = null
                 onSetAlias(member.userId, it)
@@ -390,7 +393,15 @@ private fun MemberRow(member: Member, name: String, isMe: Boolean, canRemove: Bo
 
 /** 表示名や呼び名の入力。空にして保存するか「解除」で、設定を消す */
 @Composable
-private fun NameDialog(title: String, hint: String, initial: String, onSave: (String) -> Unit, onDismiss: () -> Unit) {
+private fun NameDialog(
+    title: String,
+    hint: String,
+    initial: String,
+    /** 設定しているので「解除」を出す */
+    clearable: Boolean,
+    onSave: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
     var name by rememberSaveable { mutableStateOf(initial) }
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -409,7 +420,7 @@ private fun NameDialog(title: String, hint: String, initial: String, onSave: (St
         },
         dismissButton = {
             Row {
-                if (initial.isNotEmpty()) {
+                if (clearable) {
                     TextButton(onClick = { onSave("") }) { Text(stringResource(R.string.family_name_clear)) }
                 }
                 TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }

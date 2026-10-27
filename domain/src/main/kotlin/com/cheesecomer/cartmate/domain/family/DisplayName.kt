@@ -17,6 +17,12 @@ object DisplayName {
     /** 入力した表示名や呼び名を、保存する値にする。前後の空白を除き、空なら解除（null） */
     fun normalize(input: String): String? = input.trim().takeIf { it.isNotEmpty() }
 
+    /**
+     * 自分の表示名として保存する値。Google アカウントの名前（[googleName]）と同じなら、表示名を設定しない（null）。
+     * 変更のダイアログの初期値は今の名前なので、そのまま保存しても、Google アカウントの名前を表示名として保存しないように
+     */
+    fun nicknameToSave(input: String, googleName: String): String? = normalize(input)?.takeIf { it != googleName.trim() }
+
     /** 保存できる長さか */
     fun isValid(input: String): Boolean = input.trim().length <= MAX_LENGTH
 }
