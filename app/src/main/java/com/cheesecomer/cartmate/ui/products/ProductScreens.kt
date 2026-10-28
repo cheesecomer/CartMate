@@ -717,10 +717,11 @@ private fun ProductScaffold(
 
 @Composable
 private fun SectionLabel(text: String) {
+    // 欄の見出し。中の案内（「まとめている商品はありません」など）より一段大きく太くして、見出しだと分かるようにする
     Text(
         text,
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        style = MaterialTheme.typography.titleMedium,
+        color = MaterialTheme.colorScheme.onSurface,
         modifier = Modifier.padding(start = CartMateSpacing.large, end = CartMateSpacing.large, top = CartMateSpacing.xLarge, bottom = CartMateSpacing.small),
     )
 }
