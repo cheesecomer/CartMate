@@ -30,6 +30,9 @@ keystore.properties
 # Stitch への指示文（デザインの検討用）
 docs/stitch-prompt-*.md
 
+# Firebase CLI のデプロイのキャッシュ
+firebase/.firebase/
+
 # rules-test の依存とエミュレータのログ
 firebase/rules-test/node_modules/
 firebase-debug.log
