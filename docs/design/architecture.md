@@ -27,7 +27,7 @@
 | minSdk / targetSdk | 26 / 実装時点の最新安定版 | |
 | ビルド | Gradle Kotlin DSL + Version Catalog | |
 
-自前のサーバーは持ちません。
+常時動く自前のサーバーは持ちません。AI による名寄せの候補の判定だけ、Cloud Functions（サーバーレス）から外部の AI API を呼びます（フェーズ6。[suggestions.md](suggestions.md#ai-による名寄せの候補フェーズ6)、[security.md](security.md#ai-の名寄せの関数)）。
 
 ## Firebase の設定
 
