@@ -572,7 +572,7 @@ class ListDetailViewModelTest {
     }
 
     @Test
-    fun `候補を長押しすると商品の画面を開き、そこで非表示にして戻ると、シートを開き直して変更後の候補を出す`() = runTest {
+    fun `候補を長押しすると、シートを閉じて候補の商品の画面を開く`() = runTest {
         bought("牛乳", times = 3, intervalDays = 10)
         clock.advance(java.time.Duration.ofDays(9))
         turbineScope {
@@ -586,24 +586,8 @@ class ListDetailViewModelTest {
 
             viewModel.onAddItemEvent(AddItemEvent.SuggestionLongPressed(row.suggestion))
             assertThat(navigation.awaitItem()).isEqualTo(DetailNavigation.OpenProduct(milk))
-            states.awaitUntil { it.addItem == AddItemState.Managing("") }
-
-            // 商品の画面で「一時的に非表示」にした
-            store.applyMergeChanges(listOf(com.cheesecomer.cartmate.domain.product.ProductMerge.Change.Hide(milk)))
-            viewModel.onResumed()
-
-            states.awaitUntil { it.addItem == AddItemState.Open("") && it.suggestions == SheetSuggestions.Hint }
+            states.awaitUntil { it.addItem == AddItemState.Idle("") }
             navigation.cancelAndIgnoreRemainingEvents()
-        }
-    }
-
-    @Test
-    fun `シートを開いていないときにリスト詳細に戻っても、シートは開かない`() = runTest {
-        viewModel.uiState.test {
-            awaitUntil { it.addItem == AddItemState.Idle("") }
-            viewModel.onResumed()
-            expectNoEvents()
-            cancelAndIgnoreRemainingEvents()
         }
     }
 

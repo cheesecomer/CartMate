@@ -233,12 +233,6 @@ class ListDetailViewModel @Inject constructor(
         }
     }
 
-    /**
-     * リスト詳細が再び前面に出た。候補の長押しで開いた商品の画面から戻ったなら、シートを開き直す。
-     * 候補は商品の変更（まとめる・非表示）を購読して作り直しているので、開き直したシートは変更後の候補になる
-     */
-    fun onResumed() = onAddItemEvent(AddItemEvent.ProductClosed)
-
     /** 商品詳細入力画面から戻った */
     fun onEntryResult(result: ItemEntryResult) {
         when (result) {

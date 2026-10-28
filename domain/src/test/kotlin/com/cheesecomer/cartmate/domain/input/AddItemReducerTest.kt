@@ -128,9 +128,9 @@ class AddItemReducerTest {
         private val egg = Suggestion("卵", 2.0, "パック", productId = com.cheesecomer.cartmate.domain.model.ProductId("n_egg"))
 
         @Test
-        fun `長押しすると、入力した商品名を残して商品の画面を開く`() {
+        fun `長押しすると、シートを閉じて商品の画面を開き、入力した商品名は商品追加欄に残す`() {
             assertThat(reduce(Open("た"), AddItemEvent.SuggestionLongPressed(egg)))
-                .isEqualTo(AddItemTransition(AddItemState.Managing("た"), AddItemEffect.OpenProduct(egg.productId!!)))
+                .isEqualTo(AddItemTransition(Idle("た"), AddItemEffect.OpenProduct(egg.productId!!)))
         }
 
         @Test
@@ -138,12 +138,5 @@ class AddItemReducerTest {
             assertThat(reduce(Open(""), AddItemEvent.SuggestionLongPressed(withHistory))).isEqualTo(AddItemTransition(Open("")))
         }
 
-        @Test
-        fun `商品の画面から戻ると、入力した商品名のままシートに戻る。ほかのときに戻っても何もしない`() {
-            assertThat(reduce(AddItemState.Managing("た"), AddItemEvent.ProductClosed)).isEqualTo(AddItemTransition(Open("た")))
-            assertThat(reduce(AddItemState.Managing("た"), AddItemEvent.Submitted)).isEqualTo(AddItemTransition(AddItemState.Managing("た")))
-            assertThat(reduce(Idle(""), AddItemEvent.ProductClosed)).isEqualTo(AddItemTransition(Idle("")))
-            assertThat(reduce(Entering("豆乳"), AddItemEvent.ProductClosed)).isEqualTo(AddItemTransition(Entering("豆乳")))
-        }
     }
 }

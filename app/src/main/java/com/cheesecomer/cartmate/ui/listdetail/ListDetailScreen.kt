@@ -1,6 +1,5 @@
 package com.cheesecomer.cartmate.ui.listdetail
 
-import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.cheesecomer.cartmate.domain.model.ProductId
 import android.content.res.Resources
 import androidx.compose.foundation.background
@@ -151,11 +150,6 @@ fun ListDetailScreen(
         }
     }
     LaunchedEffect(viewModel, entryResults) { entryResults.collect(viewModel::onEntryResult) }
-    // 商品の画面から戻ったら、サジェストのシートを開き直す
-    LifecycleResumeEffect(viewModel) {
-        viewModel.onResumed()
-        onPauseOrDispose { }
-    }
 
     ListDetailContent(
         state = state,

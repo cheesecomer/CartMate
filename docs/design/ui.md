@@ -98,7 +98,6 @@ sealed interface AddItemState {
     data class Idle(val text: String) : AddItemState   // シートを閉じている。商品追加欄に下書きを残す
     data class Open(val text: String) : AddItemState   // シートを開いている。空なら時期が近い商品、入力中なら補完
     data class Entering(val text: String) : AddItemState   // 商品詳細入力画面を開いている。戻ったらシートを開き直す
-    data class Managing(val text: String) : AddItemState   // 候補の長押しで商品の画面を開いている。戻ったらシートを開き直す
 }
 ```
 
@@ -110,12 +109,11 @@ sealed interface AddItemState {
 | Open | IME Enter/Done（空） | 変化なし | |
 | Open | 候補の「＋」 | Open（空） | 候補の前回の数量・単位（なければ 1・「個」）・直前の公開範囲で追加 |
 | Open | 候補の名前をタップ | Entering（入力文字は保持） | 候補の内容で商品詳細入力画面へ |
-| Open | 候補の名前を長押し | Managing（入力文字は保持） | 候補の商品（統合先）の商品の画面へ |
+| Open | 候補の名前を長押し | Idle（入力文字は保持） | 候補の商品（統合先）の商品の画面へ。戻ってもシートは開き直さない |
 | Open | 「数量を設定して追加」（空白以外） | Entering（入力文字は保持） | 入力した商品名・数量1・単位「個」で商品詳細入力画面へ |
 | Open | 戻るキー・幕のタップ・下へスワイプ | Idle（入力文字は保持） | シートを閉じる |
 | Entering | 追加して戻った | Idle（空） | |
 | Entering | 追加せずに戻った（✕・戻るキー） | Open（入力文字は保持） | シートを開き直す |
-| Managing | 商品の画面から戻った（リスト詳細が再び前面に出た） | Open（入力文字は保持） | シートを開き直す。候補は商品の変更を購読して作り直しているので、まとめた・非表示にした結果になる |
 
 - 商品詳細入力画面の結果（追加した・やめた・編集が拒否された）は、リスト詳細の `NavBackStackEntry.savedStateHandle` に渡します（`CartMateNavHost` の `closeEntry` / `rememberEntryResults`）。
 - サジェストのシートは、共通の `KeyboardSheet` の中に入力欄と候補を置いたものです（`AddItemSheet`。「部品」を参照）。

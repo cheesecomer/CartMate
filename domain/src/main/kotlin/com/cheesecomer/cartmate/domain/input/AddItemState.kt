@@ -18,9 +18,6 @@ sealed interface AddItemState {
     /** 商品詳細入力画面を開いている。閉じて戻ってきたらシートを開き直す */
     data class Entering(override val text: String) : AddItemState
 
-    /** 候補の長押しで、商品の画面（商品名の管理）を開いている。戻ってきたらシートを開き直す（候補はそのときの状態で作り直す） */
-    data class Managing(override val text: String) : AddItemState
-
     companion object {
         val Initial: AddItemState = Idle("")
     }
@@ -49,10 +46,8 @@ sealed interface AddItemEvent {
     data class SuggestionAdded(val suggestion: Suggestion) : AddItemEvent
     /** 候補の名前の部分をタップした */
     data class SuggestionOpened(val suggestion: Suggestion) : AddItemEvent
-    /** 候補を長押しした。商品の画面を開く */
+    /** 候補を長押しした。シートを閉じて商品の画面を開く */
     data class SuggestionLongPressed(val suggestion: Suggestion) : AddItemEvent
-    /** 商品の画面から戻った（リスト詳細が再び前面に出た） */
-    data object ProductClosed : AddItemEvent
     /** 「数量を設定して追加」 */
     data object DetailRequested : AddItemEvent
     /** 戻るキー、幕のタップ、下へのスワイプでシートを閉じた */

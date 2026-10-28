@@ -2,7 +2,6 @@ package com.cheesecomer.cartmate.domain.input
 
 import com.cheesecomer.cartmate.domain.input.AddItemState.Entering
 import com.cheesecomer.cartmate.domain.input.AddItemState.Idle
-import com.cheesecomer.cartmate.domain.input.AddItemState.Managing
 import com.cheesecomer.cartmate.domain.input.AddItemState.Open
 
 object AddItemReducer {
@@ -14,8 +13,6 @@ object AddItemReducer {
         is Idle -> reduceIdle(state, event)
         is Open -> reduceOpen(state, event)
         is Entering -> reduceEntering(state, event)
-        // 商品の画面から戻ったら、入力した商品名を残してシートに戻る
-        is Managing -> if (event == AddItemEvent.ProductClosed) AddItemTransition(Open(state.text)) else AddItemTransition(state)
     }
 
     private fun reduceIdle(state: Idle, event: AddItemEvent): AddItemTransition = when (event) {
@@ -44,8 +41,10 @@ object AddItemReducer {
                 val (quantity, unit) = lastOrDefault(event.suggestion)
                 AddItemTransition(Entering(state.text), AddItemEffect.OpenEntry(event.suggestion.name, quantity, unit))
             }
+            // 商品の画面から戻ってもシートは開き直さない（まとめる・非表示などの操作のあとで、元の入力に戻るのは不自然なため）。
+            // 入力した商品名は商品追加欄に残す
             is AddItemEvent.SuggestionLongPressed -> event.suggestion.productId
-                ?.let { AddItemTransition(Managing(state.text), AddItemEffect.OpenProduct(it)) }
+                ?.let { AddItemTransition(Idle(state.text), AddItemEffect.OpenProduct(it)) }
                 ?: AddItemTransition(state)
             AddItemEvent.DetailRequested ->
                 if (name.isEmpty()) {
