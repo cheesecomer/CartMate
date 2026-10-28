@@ -71,11 +71,14 @@ data class ListDetailUiState(
     val memberNames: MemberNames = MemberNames(emptyList()),
     /** サジェストのシートの候補 */
     val suggestions: SheetSuggestions = SheetSuggestions.Loading,
-    /** 自分。自分がチェックした項目にだけ、購入の削除を出す */
+    /** 自分。自分がチェックした項目にだけ、チェックを外す操作を出す */
     val me: UserId? = null,
 ) {
     /** [item] をチェックした人の名前。家族にいない人（退会したメンバー）は null */
     fun checkerName(item: Item): String? = item.completedBy?.let(memberNames::of)
+
+    /** チェックを外せるのは、チェックした本人だけ */
+    fun canUncheck(item: Item): Boolean = item.completedBy != null && item.completedBy == me
 
     val addVisibilitySelectable: Boolean get() = VisibilityDefaults.selectable(listVisibility)
 
@@ -96,6 +99,8 @@ sealed interface DetailMessage {
     /** 送ったチェックを反映できなかった（オフラインのまま7日を過ぎた など） */
     data class CheckNotApplied(val itemName: String) : DetailMessage
     data object AlreadyOpen : DetailMessage
+    /** ほかのメンバーがチェックした項目は外せない。[checkerName] が null なら退会したメンバー */
+    data class CheckedByOther(val checkerName: String?) : DetailMessage
     data class CannotDeleteCompleted(val item: Item) : DetailMessage
     /** 編集中に、ほかの操作でチェックされていた */
     data object CannotEditCompleted : DetailMessage
@@ -104,8 +109,6 @@ sealed interface DetailMessage {
     /** のこりの商品があるため、リストを削除できない */
     data object CannotDeleteList : DetailMessage
     data object Failed : DetailMessage
-    /** 自分がチェックした購入を削除した */
-    data class PurchaseDeleted(val itemName: String) : DetailMessage
 }
 
 /** 画面の移動 */
@@ -260,9 +263,18 @@ class ListDetailViewModel @Inject constructor(
         }
     }
 
-    /** チェックを外す（Undo を含む） */
+    /**
+     * チェックを外す（Undo を含む）。ほかのメンバーがチェックした項目は外さずに理由を知らせる
+     * （その人の購入の記録を予測から外させない。docs/design/sync.md「Undo」）
+     */
     fun uncheck(item: Item) {
         viewModelScope.launch {
+            // Snackbar の Undo はチェックする前の項目（completedBy なし）を渡す。自分のチェックなのでそのまま外す
+            val checker = item.completedBy
+            if (checker != null && checker != currentUser.currentUserId()) {
+                _messages.send(DetailMessage.CheckedByOther(memberDirectory.observeNames().first().of(checker)))
+                return@launch
+            }
             when (itemRepository.reopenItem(item.id)) {
                 ReopenResult.Reopened -> Unit
                 ReopenResult.AlreadyOpen -> _messages.send(DetailMessage.AlreadyOpen)
@@ -273,14 +285,6 @@ class ListDetailViewModel @Inject constructor(
 
     fun move(id: ItemId, previous: ItemId?, next: ItemId?) {
         viewModelScope.launch { itemRepository.moveItem(id, previous, next) }
-    }
-
-    /** 自分がチェックした購入を、項目ごと削除する（確認は画面で行う）。元に戻せない */
-    fun deletePurchase(item: Item) {
-        viewModelScope.launch {
-            itemRepository.deletePurchase(item.id)
-            _messages.send(DetailMessage.PurchaseDeleted(item.inputName))
-        }
     }
 
     fun delete(item: Item) {

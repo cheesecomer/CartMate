@@ -118,25 +118,27 @@ class ConcurrencyTest {
     }
 
     @Test
-    fun チェックのあとにもう一方がUndoしてから最初の端末もUndoするとAlreadyOpenになる(): Unit = runBlocking {
+    fun ほかの人がチェックした項目のチェックを外す書き込みはルールで拒否されチェック済みのまま両方の端末にそろう(): Unit = runBlocking {
         val f = family()
         f.taro.store.completeItem(f.itemId, Instant.now())
         f.taro.settle()
         f.hanako.awaitItem(f) { it.status == ItemStatus.COMPLETED }
 
-        assertThat(f.hanako.store.reopenItem(f.itemId)).isEqualTo(ReopenResult.Reopened)
+        // 画面からは外せないが、古い端末などから届いても反映されない
+        f.hanako.store.reopenItem(f.itemId)
         f.hanako.settle()
-        f.taro.awaitItem(f) { it.status == ItemStatus.OPEN }
 
-        assertThat(f.taro.store.reopenItem(f.itemId)).isEqualTo(ReopenResult.AlreadyOpen)
-        assertThat(f.taro.serverPurchase(f).getBoolean(F.ACTIVE)).isFalse()
+        assertThat(f.taro.serverItem(f).status).isEqualTo(ItemStatus.COMPLETED)
+        assertThat(f.taro.serverPurchase(f).getBoolean(F.ACTIVE)).isTrue()
+        f.hanako.awaitItem(f) { it.status == ItemStatus.COMPLETED }
     }
 
     @Test
     fun Undoと再チェックを同時に行っても項目の状態と購入の記録の有効がそろう(): Unit = runBlocking {
         val f = family()
         repeat(ROUNDS) { round ->
-            // 交互に、チェック済みからの「Undo と、Undo してからの再チェック」と、未購入からの「チェックと Undo と、チェック」を競わせる
+            // 交互に、チェック済みからの「本人の Undo と、もう一方の再チェック」と、未購入からの「チェックと Undo と、チェック」を競わせる。
+            // ほかの人のチェックを外す書き込みは拒否される
             val completed = round % 2 == 0
             if (completed) {
                 f.taro.store.completeItem(f.itemId, Instant.now())
@@ -151,10 +153,7 @@ class ConcurrencyTest {
                     if (!completed) f.taro.store.completeItem(f.itemId, Instant.now())
                     f.taro.store.reopenItem(f.itemId)
                 },
-                async(Dispatchers.IO) {
-                    if (completed) f.hanako.store.reopenItem(f.itemId)
-                    f.hanako.store.completeItem(f.itemId, Instant.now())
-                },
+                async(Dispatchers.IO) { f.hanako.store.completeItem(f.itemId, Instant.now()) },
             ).awaitAll()
             settle(f.taro, f.hanako)
 
@@ -163,12 +162,15 @@ class ConcurrencyTest {
             val active = purchase.exists() && purchase.getBoolean(F.ACTIVE) == true
             assertThat(active).isEqualTo(item.status == ItemStatus.COMPLETED)
 
-            // 次の回のために未購入に戻す
+            // 次の回のために、チェックした本人が未購入に戻す
             if (item.status == ItemStatus.COMPLETED) {
-                f.taro.awaitItem(f) { it.status == ItemStatus.COMPLETED }
-                f.taro.store.reopenItem(f.itemId)
-                f.taro.settle()
+                val checker = if (item.completedBy == UserId(f.taro.uid)) f.taro else f.hanako
+                checker.awaitItem(f) { it.status == ItemStatus.COMPLETED }
+                checker.store.reopenItem(f.itemId)
+                checker.settle()
             }
+            // 次の回の書き込みが古いキャッシュで判断されないよう、両方の端末に届くまで待つ
+            f.taro.awaitItem(f) { it.status == ItemStatus.OPEN }
             f.hanako.awaitItem(f) { it.status == ItemStatus.OPEN }
         }
     }
@@ -304,25 +306,6 @@ class ConcurrencyTest {
         f.hanako.settle()
         assertThat(f.taro.serverHas(f)).isEqualTo(false to false)
         f.taro.store.observeListItems(f.listId, Instant.EPOCH).awaitFirst { items -> items.none { it.id == f.itemId } }
-    }
-
-    @Test
-    fun 購入の削除とほかの人のUndoが重なっても項目と購入の記録が食い違わない(): Unit = runBlocking {
-        val f = family()
-        f.hanako.store.completeItem(f.itemId, Instant.now())
-        f.hanako.settle()
-        f.taro.awaitItem(f) { it.status == ItemStatus.COMPLETED }
-
-        // taro はオフラインでチェックを外し、その間に hanako が購入を削除した
-        f.taro.offline()
-        f.taro.store.reopenItem(f.itemId)
-        f.hanako.store.deletePurchase(f.itemId)
-        f.hanako.settle()
-        f.taro.online()
-        f.taro.settle()
-
-        // taro の Undo は、項目も購入の記録もないので反映されない。どちらも残らない
-        assertThat(f.taro.serverHas(f)).isEqualTo(false to false)
     }
 
     /**

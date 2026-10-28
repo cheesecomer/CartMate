@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -21,6 +22,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -41,7 +43,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.cheesecomer.cartmate.R
 import com.cheesecomer.cartmate.domain.input.formatQuantity
 import com.cheesecomer.cartmate.domain.model.ItemId
-import com.cheesecomer.cartmate.ui.listdetail.PurchaseDeleteDialog
 import com.cheesecomer.cartmate.ui.theme.CartMateSpacing
 import java.time.format.DateTimeFormatter
 
@@ -209,4 +210,20 @@ private fun PurchaseCard(
             )
         }
     }
+}
+
+/** 購入の削除の確認。家族の画面からも消え、元に戻せないことを伝える */
+@Composable
+private fun PurchaseDeleteDialog(itemName: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.purchase_delete_title, itemName)) },
+        text = { Text(stringResource(R.string.purchase_delete_message)) },
+        confirmButton = {
+            TextButton(onClick = onConfirm) { Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+        },
+    )
 }

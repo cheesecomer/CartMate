@@ -544,33 +544,27 @@ class ListDetailViewModelTest {
     }
 
     @Test
-    fun `自分がチェックした購入を項目ごと削除すると、リストからも消えて知らせる`() = runTest {
-        val id = store.addItem(newItem(listId, "ケーキ"))
-        store.completeItem(id, clock.instant())
-        viewModel.messages.test {
-            viewModel.uiState.test {
-                val state = awaitUntil { state -> state.me != null && state.items.any { it.id == id } }
-                assertThat(state.me).isEqualTo(UserId("taro"))
-                val item = state.items.single { it.id == id }
-                viewModel.deletePurchase(item)
-                awaitUntil { state -> state.items.none { it.id == id } }
-                cancelAndIgnoreRemainingEvents()
-            }
-            assertThat(awaitItem()).isEqualTo(DetailMessage.PurchaseDeleted("ケーキ"))
-        }
-        assertThat(store.observePurchases(Instant.EPOCH).first()).isEmpty()
-    }
-
-    @Test
-    fun `ほかのメンバーが購入を削除した項目のチェックを外そうとすると、すでに外れていると知らせる`() = runTest {
+    fun `ほかのメンバーがチェックした項目は、チェックを外さずに理由を知らせる`() = runTest {
+        val id = store.addItem(newItem(listId, "牛乳"))
         actor = UserId("hanako")
-        val id = store.addItem(newItem(listId, "ケーキ"))
         store.completeItem(id, clock.instant())
         actor = UserId("taro")
         val item = store.observeListItems(listId, Instant.EPOCH).first().single()
-        actor = UserId("hanako")
+        viewModel.messages.test {
+            viewModel.uncheck(item)
+            assertThat(awaitItem()).isEqualTo(DetailMessage.CheckedByOther("山田 花子"))
+        }
+        val purchase = store.observePurchases(Instant.EPOCH).first().single()
+        assertThat(purchase.active).isTrue()
+        assertThat(purchase.purchasedBy).isEqualTo(UserId("hanako"))
+    }
+
+    @Test
+    fun `自分がチェックした項目でも、購入履歴から削除したあとに外そうとすると、すでに外れていると知らせる`() = runTest {
+        val id = store.addItem(newItem(listId, "ケーキ"))
+        store.completeItem(id, clock.instant())
+        val item = store.observeListItems(listId, Instant.EPOCH).first().single()
         store.deletePurchase(id)
-        actor = UserId("taro")
         viewModel.messages.test {
             viewModel.uncheck(item)
             assertThat(awaitItem()).isEqualTo(DetailMessage.AlreadyOpen)

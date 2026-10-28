@@ -39,6 +39,8 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.cheesecomer.cartmate.data.memory.InMemoryStore
 import com.cheesecomer.cartmate.domain.model.ItemId
 import com.cheesecomer.cartmate.domain.model.ListId
+import com.cheesecomer.cartmate.domain.model.Member
+import com.cheesecomer.cartmate.domain.model.MemberRole
 import com.cheesecomer.cartmate.domain.model.NewItem
 import com.cheesecomer.cartmate.domain.model.NewList
 import com.cheesecomer.cartmate.domain.model.UserId
@@ -64,7 +66,9 @@ class ListDetailScreenTest {
     val composeRule = createAndroidComposeRule<ComponentActivity>()
 
     private val clock = Clock.systemUTC()
-    private val store = InMemoryStore(clock) { UserId("taro") }
+    /** store を操作している人。ほかのメンバーの操作を再現するときに切り替える */
+    private var actor = UserId("taro")
+    private val store = InMemoryStore(clock) { actor }
     private var listId = runBlocking { store.createList(NewList("スーパー", null, Visibility.SHARED)) }
 
     private val openedEntries = mutableListOf<Triple<String, Double?, String?>>()
@@ -80,7 +84,7 @@ class ListDetailScreenTest {
             lastVisibility = LastVisibilityStore(),
             clock = clock,
             currentUser = { UserId("taro") },
-            memberDirectory = { flowOf(emptyList()) },
+            memberDirectory = { flowOf(listOf(Member(UserId("hanako"), MemberRole.MEMBER, "花子", null, Instant.EPOCH))) },
             suggestionSource = SuggestionSource(store, store, store, clock) { flowOf(NormalizationDictionary.EMPTY) },
         )
         // アプリと同じく、キーボードの高さを画面側で受け取る（シートはキーボードが出てから表示する）
@@ -409,6 +413,42 @@ class ListDetailScreenTest {
 
         composeRule.waitUntil { openItemNames() == listOf("牛乳") }
         assertThat(activePurchaseCount()).isEqualTo(0)
+    }
+
+    @Test
+    fun 自分がチェックした項目にも_購入の削除ボタンは出さない() {
+        val itemId = addItem("牛乳")
+        runBlocking { store.completeItem(itemId, Instant.now()) }
+        setContent()
+
+        composeRule.onNodeWithContentDescription("牛乳のチェックを外す").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("牛乳の購入を削除").assertDoesNotExist()
+    }
+
+    /** チェックを外せるのは、チェックした本人だけ。ほかのメンバーの購入の記録を予測から外させない */
+    @Test
+    fun ほかのメンバーがチェックした項目は_タップしてもスワイプしてもチェックが外れず_理由を表示する() {
+        val itemId = addItem("牛乳")
+        actor = UserId("hanako")
+        runBlocking { store.completeItem(itemId, Instant.now()) }
+        actor = UserId("taro")
+        setContent()
+
+        composeRule.onNodeWithContentDescription("牛乳のチェックを外す").assertDoesNotExist()
+        composeRule.onNodeWithText("牛乳").performTouchInput { swipeLeft() }
+        composeRule.waitForIdle()
+        assertThat(openItemNames()).isEmpty()
+        composeRule.onNodeWithText("牛乳").performClick()
+        composeRule.waitUntil {
+            runCatching { composeRule.onNodeWithText("花子さんがチェックしたため、チェックを外せません").assertIsDisplayed() }.isSuccess
+        }
+
+        // 画面が落ち着いたあとも、チェック済みのまま
+        composeRule.waitForIdle()
+        assertThat(openItemNames()).isEmpty()
+        val purchases = runBlocking { store.observePurchases(Instant.EPOCH).first() }
+        assertThat(purchases.map { it.active to it.purchasedBy }).containsExactly(true to UserId("hanako"))
+        composeRule.onNodeWithText("牛乳").assertIsDisplayed()
     }
 
     @Test

@@ -363,7 +363,13 @@ describe("チェックと Undo", () => {
   it("チェックを外すと購入の記録が無効になる", async () => {
     await seedOpenItem();
     await complete(as("taro"), "taro", "i1");
-    await assertSucceeds(reopen(as("hanako"), "hanako", "i1"));
+    await assertSucceeds(reopen(as("taro"), "taro", "i1"));
+  });
+
+  it("ほかの人がチェックした項目は、チェックを外せない", async () => {
+    await seedOpenItem();
+    await complete(as("taro"), "taro", "i1");
+    await assertFails(reopen(as("hanako"), "hanako", "i1"));
   });
 
   it("購入の記録を無効にせずにチェックを外せない", async () => {

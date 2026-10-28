@@ -122,13 +122,15 @@ fun ListDetailScreen(
                     is DetailMessage.CheckNotApplied ->
                         resources.getString(R.string.detail_check_not_applied, message.itemName) to null
                     DetailMessage.AlreadyOpen -> resources.getString(R.string.detail_already_open) to null
+                    is DetailMessage.CheckedByOther ->
+                        (message.checkerName?.let { resources.getString(R.string.detail_checked_by_other, it) }
+                            ?: resources.getString(R.string.detail_checked_by_former)) to null
                     is DetailMessage.CannotDeleteCompleted ->
                         resources.getString(R.string.detail_cannot_delete_completed, message.item.inputName) to null
                     DetailMessage.CannotEditCompleted -> resources.getString(R.string.detail_cannot_edit_completed) to null
                     DetailMessage.EditedItemNotFound -> resources.getString(R.string.detail_edited_item_not_found) to null
                     DetailMessage.CannotDeleteList -> resources.getString(R.string.detail_cannot_delete_list) to null
                     DetailMessage.Failed -> resources.getString(R.string.detail_operation_failed) to null
-                    is DetailMessage.PurchaseDeleted -> resources.getString(R.string.purchase_deleted, message.itemName) to null
                 }
                 val result = snackbarHostState.showSnackbar(
                     message = text,
@@ -165,7 +167,6 @@ fun ListDetailScreen(
         onUncheck = viewModel::uncheck,
         onEdit = { onEditItem(it.id) },
         onDelete = viewModel::delete,
-        onDeletePurchase = viewModel::deletePurchase,
         onMove = viewModel::move,
         onUpdateList = viewModel::updateList,
         onRequestDeleteList = viewModel::canDeleteList,
@@ -190,11 +191,8 @@ fun ListDetailContent(
     /** 削除できるなら true。できなければ理由を伝えて false */
     onRequestDeleteList: () -> Boolean,
     onDeleteList: () -> Unit,
-    /** 自分がチェックした購入を項目ごと削除する（確認ダイアログを経る） */
-    onDeletePurchase: (Item) -> Unit = {},
 ) {
     var showEditDialog by rememberSaveable { mutableStateOf(false) }
-    var deletingPurchase by remember { mutableStateOf<Item?>(null) }
     var showDeleteDialog by rememberSaveable { mutableStateOf(false) }
 
     // サジェストのシートは画面の上に重ねて表示する
@@ -244,7 +242,6 @@ fun ListDetailContent(
                 onUncheck = onUncheck,
                 onEdit = onEdit,
                 onDelete = onDelete,
-                onDeletePurchase = { deletingPurchase = it },
                 onMove = onMove,
             )
         }
@@ -270,16 +267,6 @@ fun ListDetailContent(
                 showEditDialog = false
             },
             onDismiss = { showEditDialog = false },
-        )
-    }
-    deletingPurchase?.let { item ->
-        PurchaseDeleteDialog(
-            itemName = item.inputName,
-            onConfirm = {
-                deletingPurchase = null
-                onDeletePurchase(item)
-            },
-            onDismiss = { deletingPurchase = null },
         )
     }
     if (showDeleteDialog) {
@@ -309,7 +296,6 @@ private fun ItemList(
     onEdit: (Item) -> Unit,
     onDelete: (Item) -> Unit,
     onMove: (ItemId, previous: ItemId?, next: ItemId?) -> Unit,
-    onDeletePurchase: (Item) -> Unit,
 ) {
     val lazyListState = rememberLazyListState()
     val order = rememberDraggableOrder(state.items) { it.id.value }
@@ -378,9 +364,8 @@ private fun ItemList(
                             item = item,
                             checkerName = state.checkerName(item) ?: stringResource(R.string.former_member),
                             showLock = showLock,
+                            canUncheck = state.canUncheck(item),
                             onUncheck = { onUncheck(item) },
-                            // 自分がチェックした項目だけ、購入を削除できる
-                            onDeletePurchase = { onDeletePurchase(item) }.takeIf { item.completedBy != null && item.completedBy == state.me },
                             drag = drag,
                         )
                 }
@@ -577,20 +562,4 @@ private fun Resources.othersCheckedText(message: DetailMessage.OthersChecked): S
     } else {
         getString(R.string.detail_others_checked_many, checker, message.firstItemName, message.othersCount)
     }
-}
-
-/** 購入の削除の確認。家族の画面からも消え、元に戻せないことを伝える（購入履歴の画面でも使う） */
-@Composable
-fun PurchaseDeleteDialog(itemName: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.purchase_delete_title, itemName)) },
-        text = { Text(stringResource(R.string.purchase_delete_message)) },
-        confirmButton = {
-            TextButton(onClick = onConfirm) { Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error) }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
-        },
-    )
 }

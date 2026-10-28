@@ -208,8 +208,10 @@ service cloud.firestore {
         function isReordering() {
           return changed().hasOnly(['sortKey']) && request.resource.data.sortKey is number;
         }
+        // チェックを外せるのは、チェックした本人だけ（ほかの人の購入の記録を予測から外させない）
         function isReopening() {
           return resource.data.status == 'completed'
+            && resource.data.completedBy == me()
             && request.resource.data.status == 'open'
             && changed().hasOnly(['status','completedAt','completedBy','checkedAt'])
             && request.resource.data.completedAt == null

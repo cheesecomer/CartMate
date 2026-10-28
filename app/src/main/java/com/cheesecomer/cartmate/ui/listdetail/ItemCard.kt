@@ -120,7 +120,8 @@ fun OpenItemCard(
 
 /**
  * チェック済みの項目のカード。背景を薄い色にし、商品名を打ち消し線と薄い文字で示す。
- * タップか ← か「元に戻す」でチェックを外す。2行目に、チェックした人と時刻（「✓ 花子 10:02」）を表示する
+ * タップか ← か「元に戻す」でチェックを外す。2行目に、チェックした人と時刻（「✓ 花子 10:02」）を表示する。
+ * ほかのメンバーがチェックした項目（[canUncheck] が false）は、← と「元に戻す」を出さない。タップは [onUncheck] に渡し、外せない理由を知らせる
  */
 @Composable
 fun CompletedItemCard(
@@ -128,14 +129,14 @@ fun CompletedItemCard(
     /** チェックした人の名前（家族にいない人は「退会したメンバー」） */
     checkerName: String,
     showLock: Boolean,
+    canUncheck: Boolean,
     onUncheck: () -> Unit,
     modifier: Modifier = Modifier,
     drag: RowDrag = RowDrag(),
-    /** 自分がチェックした項目だけ渡す。購入を項目ごと削除する */
-    onDeletePurchase: (() -> Unit)? = null,
 ) {
     SwipeableCard(
         enableStartToEnd = false,
+        enableEndToStart = canUncheck,
         onStartToEnd = {},
         onEndToStart = onUncheck,
         endToStartIcon = R.drawable.ic_undo,
@@ -145,7 +146,7 @@ fun CompletedItemCard(
     ) {
         CardBody(
             background = MaterialTheme.colorScheme.surfaceContainerLow,
-            onClickLabel = stringResource(R.string.detail_uncheck),
+            onClickLabel = stringResource(R.string.detail_uncheck).takeIf { canUncheck },
             onClick = onUncheck,
             drag = drag,
             headline = {
@@ -178,9 +179,7 @@ fun CompletedItemCard(
                 }
             },
             trailing = {
-                onDeletePurchase?.let {
-                    CardIconButton(R.drawable.ic_delete, stringResource(R.string.detail_delete_purchase, item.inputName), it)
-                }
+                if (!canUncheck) return@CardBody
                 val uncheckLabel = stringResource(R.string.detail_uncheck_item, item.inputName)
                 OutlinedButton(
                     onClick = onUncheck,
@@ -203,7 +202,7 @@ fun CompletedItemCard(
 @Composable
 private fun CardBody(
     background: Color,
-    onClickLabel: String,
+    onClickLabel: String?,
     onClick: () -> Unit,
     drag: RowDrag,
     headline: @Composable RowScope.() -> Unit,
@@ -271,6 +270,7 @@ private data class SwipeColors(val container: Color, val content: Color)
 @Composable
 private fun SwipeableCard(
     enableStartToEnd: Boolean,
+    enableEndToStart: Boolean = true,
     onStartToEnd: () -> Unit,
     onEndToStart: () -> Unit,
     endToStartIcon: Int,
@@ -305,7 +305,7 @@ private fun SwipeableCard(
         // スワイプ中の背景もカードと同じ角丸にする
         modifier = modifier.cardSlot().cardFrame(elevation = if (dragging) DraggingElevation else 0.dp),
         enableDismissFromStartToEnd = enableStartToEnd,
-        enableDismissFromEndToStart = true,
+        enableDismissFromEndToStart = enableEndToStart,
         onDismiss = onDismiss,
         backgroundContent = {
             when (state.dismissDirection) {

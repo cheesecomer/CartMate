@@ -61,6 +61,8 @@
     <string name="detail_check_not_applied">%1$sのチェックを反映できませんでした</string>
     <string name="former_member">退会したメンバー</string>
     <string name="detail_already_open">すでにチェックが外されています</string>
+    <string name="detail_checked_by_other">%1$sさんがチェックしたため、チェックを外せません</string>
+    <string name="detail_checked_by_former">退会したメンバーがチェックしたため、チェックを外せません</string>
     <string name="detail_cannot_delete_completed">%1$s はチェック済みのため削除できません</string>
     <string name="detail_cannot_edit_completed">編集していた商品はチェック済みのため変更できません</string>
     <string name="detail_edited_item_not_found">編集していた商品は削除されています</string>
@@ -246,8 +248,6 @@
     <string name="purchase_history_empty">購入の記録はありません</string>
     <string name="purchase_delete_title">「%1$s」の購入を削除しますか？</string>
     <string name="purchase_delete_message">チェック済みの項目と購入の記録を削除します。家族の画面からも消え、元に戻せません。</string>
-    <string name="purchase_deleted">「%1$s」の購入を削除しました</string>
-    <string name="detail_delete_purchase">%1$sの購入を削除</string>
     <string name="purchase_history_delete">%1$sの購入を削除</string>
     <string name="purchase_history_excluded">除外: %1$s・%2$s</string>
     <string name="product_detail_rename">商品名を変更する</string>
