@@ -71,7 +71,15 @@ android {
     }
 
     buildTypes {
+        debug {
+            // -PfirebaseEmulator=<ホスト> を付けてビルドすると、Firebase のエミュレータ（Auth と Firestore）につなぐ。
+            // 値を省くと Android Emulator から見たホストの PC（10.0.2.2）。テストデータで画面を確かめるとき（docs/testing.md）
+            val emulatorHost = project.findProperty("firebaseEmulator")?.toString()?.let { it.ifBlank { "10.0.2.2" } }.orEmpty()
+                .let { if (it == "true") "10.0.2.2" else it }
+            buildConfigField("String", "FIREBASE_EMULATOR_HOST", "\"$emulatorHost\"")
+        }
         release {
+            buildConfigField("String", "FIREBASE_EMULATOR_HOST", "\"\"")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
@@ -85,6 +93,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     testOptions {

@@ -16,5 +16,6 @@ class CartMateApplication : Application() {
         super.onCreate()
         // Firebase へのアクセスより先に登録する
         AppCheckSetup.install()
+        FirebaseEmulator.install()
     }
 }

@@ -108,6 +108,7 @@
 
     <!-- ログイン -->
     <string name="signin_tagline">家族で買い物リストを共有</string>
+    <string name="signin_test_user" translatable="false">エミュレータのテスト用ユーザーでログイン</string>
     <string name="signin_google">Google でログイン</string>
     <string name="signin_failed">ログインできませんでした。通信状態を確かめて、もう一度お試しください</string>
 

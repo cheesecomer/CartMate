@@ -24,7 +24,8 @@ class ProductResolver(products: Collection<Product>, private val dictionary: Nor
             }
             return Resolution(ResolvedKey.OfProduct(root), reason)
         }
-        // 既定の同義語（お茶 → 緑茶）は確定ではないので、備考を使う判定ができるまで自動ではまとめない
+        // 既定の同義語（お茶 → 緑茶）は確定ではないので、ここではまとめない。予測とサジェストの集計（SuggestionEngine）で、
+        // 商品名と備考に品目の語がないときだけまとめる
         val alias = dictionary.lookup(product.normalizedName)?.takeIf { it.match != NormalizationDictionary.Match.DEFAULT }
         return when {
             alias != null -> Resolution(

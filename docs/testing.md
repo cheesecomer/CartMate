@@ -122,6 +122,29 @@ npx firebase emulators:exec --only firestore,auth --project demo-cartmate \
 - 端末からは、ホストの PC を `10.0.2.2` で参照します（Android Emulator）。実機で実行するときは `adb reverse tcp:8085 tcp:8085` と `adb reverse tcp:9099 tcp:9099` を実行し、`-PemulatorHost=127.0.0.1` を付けます。
 - Auth のエミュレータは HTTP なので、debug 版だけ、エミュレータのホストへの平文の通信を許しています（`app/src/debug/res/xml/network_security_config.xml`）。
 
+## テストデータ
+
+予測は過去の購入の記録がないと出ないので、Firebase のエミュレータにテストデータを入れて画面で確かめます。過去の日付の購入は、ルール（購入日時はサーバーの時刻）があるのでアプリからも本番にも入れられません。スクリプトは、エミュレータに管理者として（ルールを通さずに）書き、本番のデータには触れません。
+
+1. エミュレータを起動する: `cd firebase && npx --prefix rules-test firebase emulators:start --only firestore,auth --project cartmate-cheesecomer`
+2. テストデータを入れる（前に入れたデータは消す）: `python3 tools/testdata/seed.py`
+3. エミュレータにつなぐデバッグ版を、Android Emulator にだけ入れる: `ANDROID_SERIAL=emulator-5554 ./gradlew :app:installDebug -PfirebaseEmulator`（ホストは 10.0.2.2。実機では `adb reverse tcp:8085 tcp:8085`・`adb reverse tcp:9099 tcp:9099` のうえ `-PfirebaseEmulator=127.0.0.1`）
+4. ログイン画面の「エミュレータのテスト用ユーザーでログイン」でログインする（taro@example.com）。
+
+入るデータと、スーパーのシートに出るもの（今日を基準にした日付）:
+
+| 商品 | 購入 | 時期が近い商品 |
+|---|---|---|
+| 牛乳 | 7日ごと・最後は6日前 | 出る（約7日ごと・最後は6日前） |
+| 食パン | 4日ごと・最後は4日前 | 出る |
+| 麦茶（備考 2L） | 9日ごと・最後は9日前 | 「麦茶（2L）」で出る |
+| 卵 | 2日だけ（29日前・19日前） | 出ない。`python3 tools/testdata/seed.py --third` で3回目（9日前）を足すと「約10日ごと・最後は9日前」で出る |
+| 緑茶（備考 茶葉） | 30日ごと・最後は10日前 | 出ない（経過率 0.33）。入力すると早すぎる再購入の注意 |
+| ティッシュペーパー | 20日ごと・最後は70日前 | 出ない（経過率 3.5。買うのをやめたとみなす） |
+| 洗濯用洗剤（薬局） | 30日ごと・最後は25日前 | 薬局でだけ出る |
+
+- エミュレータにつなぐデバッグ版は、本番には接続しません。確かめたあとは、`./gradlew :app:installDebug`（`-PfirebaseEmulator` なし）で入れ直します。
+
 ## キーボードのタイミングに依存するテスト
 
 シートとソフトキーボードの表示の順番を確かめるテスト（`AddItemSheetKeyboardTest`、`CreateListSheetKeyboardTest`）には `@KeyboardTimingTest` を付け、通常の `connectedDebugAndroidTest` からは外しています。キーボードの起動が遅い端末（起動したばかりのエミュレータや、テストを続けて実行して遅くなったエミュレータ）では、アプリがキーボードを待つ上限を過ぎてシートを先に出すため、アプリに問題がなくても失敗することがあるためです。

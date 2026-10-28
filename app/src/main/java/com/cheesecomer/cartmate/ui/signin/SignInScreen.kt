@@ -38,6 +38,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.material3.TextButton
+import com.cheesecomer.cartmate.FirebaseEmulator
 import com.cheesecomer.cartmate.R
 import com.cheesecomer.cartmate.ui.theme.CartMateSpacing
 import com.cheesecomer.cartmate.ui.theme.CartMateTheme
@@ -54,11 +56,17 @@ fun SignInScreen(viewModel: SignInViewModel = hiltViewModel()) {
             viewModel.onStart()
             scope.launch { viewModel.onResult(GoogleSignIn.requestIdToken(context)) }
         },
+        // エミュレータにつないだデバッグ版だけ（Google のログインはエミュレータでは使えない）
+        onSignInTestUser = if (FirebaseEmulator.enabled) {
+            { scope.launch { FirebaseEmulator.signInTestUser() } }
+        } else {
+            null
+        },
     )
 }
 
 @Composable
-fun SignInContent(state: SignInUiState, onSignIn: () -> Unit) {
+fun SignInContent(state: SignInUiState, onSignIn: () -> Unit, onSignInTestUser: (() -> Unit)? = null) {
     Surface(color = MaterialTheme.colorScheme.surface, modifier = Modifier.fillMaxSize()) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -110,6 +118,10 @@ fun SignInContent(state: SignInUiState, onSignIn: () -> Unit) {
                 Image(painterResource(R.drawable.ic_google), contentDescription = null, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(CartMateSpacing.medium))
                 Text(stringResource(R.string.signin_google), style = MaterialTheme.typography.titleMedium)
+            }
+            onSignInTestUser?.let {
+                Spacer(Modifier.height(CartMateSpacing.medium))
+                TextButton(onClick = it) { Text(stringResource(R.string.signin_test_user)) }
             }
             if (state.failed) {
                 Spacer(Modifier.height(CartMateSpacing.large))
