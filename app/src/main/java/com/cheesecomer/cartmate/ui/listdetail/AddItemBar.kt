@@ -9,6 +9,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
@@ -60,6 +63,8 @@ import com.cheesecomer.cartmate.domain.model.Visibility
 
 object AddItemTags {
     const val FIELD = "add_item_field"
+    /** 画面下部の商品追加欄の背景 */
+    const val BAR = "add_item_bar"
     const val SHEET_INPUT = "add_item_sheet_input"
     const val SUGGESTION = "add_item_suggestion"
 }
@@ -71,8 +76,10 @@ object AddItemTags {
 @Composable
 fun AddItemField(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val colors = MaterialTheme.colorScheme
-    Surface(modifier = modifier.fillMaxWidth(), color = colors.surface) {
-        Column {
+    // 背景はナビゲーションバーの下まで伸ばし、入力欄はナビゲーションバーの上に置く（画面の端まで描いているので、
+    // 余白を背景の外に付けると、そこから一覧のカードが透けて見える）
+    Surface(modifier = modifier.fillMaxWidth().testTag(AddItemTags.BAR), color = colors.surface) {
+        Column(Modifier.windowInsetsPadding(WindowInsets.navigationBars)) {
             HorizontalDivider(color = colors.outlineVariant)
             Row(
                 modifier = Modifier

@@ -16,9 +16,13 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.swipeUp
+import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performCustomAccessibilityActionWithLabel
@@ -120,6 +124,59 @@ class ListDetailScreenTest {
 
     private fun activePurchaseCount() =
         runBlocking { store.observePurchases(Instant.EPOCH).first().count { it.active } }
+
+    /**
+     * 項目が多いとき、一覧のカードが商品追加欄の下（ナビゲーションバーの部分）から透けて見えない（フィードバック #009）。
+     * 商品追加欄の背景は画面の下端まで覆い、一番下までスクロールすると最後の項目が商品追加欄より上に全部見える。
+     * スクロールが止まったあとの位置で確かめる
+     */
+    @Test
+    fun 項目が多くても_商品追加欄の下からカードが透けず_最後の項目は商品追加欄より上に見える() {
+        repeat(30) { addItem("商品${it + 1}") }
+        setContent()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            runCatching { composeRule.onNodeWithText("商品1").assertIsDisplayed() }.isSuccess
+        }
+
+        // 背景（商品追加欄）が、ナビゲーションバーの下まで画面の下端を覆う
+        val root = composeRule.onRoot().getUnclippedBoundsInRoot()
+        val bar = composeRule.onNodeWithTag(AddItemTags.BAR).getUnclippedBoundsInRoot()
+        assertThat(bar.bottom.value).isEqualTo(root.bottom.value)
+
+        // 一覧の端まで送る。指は一覧の中央から動かす（下端は商品追加欄に当たる）
+        composeRule.onNode(hasScrollAction()).performScrollToNode(hasText("商品30"))
+        repeat(3) { composeRule.onNode(hasScrollAction()).performTouchInput { swipeUp(startY = centerY, endY = top) } }
+        composeRule.waitForIdle()
+        val last = composeRule.onNodeWithText("商品30").getUnclippedBoundsInRoot()
+        val field = composeRule.onNodeWithTag(AddItemTags.FIELD).getUnclippedBoundsInRoot()
+        assertThat(last.bottom.value).isAtMost(field.top.value)
+    }
+
+    @Test
+    fun 項目が0件でも1件でも_商品追加欄の背景が画面の下端を覆い_中身が商品追加欄に隠れない() {
+        setContent()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            runCatching { composeRule.onNodeWithText("購入予定の商品はありません").assertIsDisplayed() }.isSuccess
+        }
+        assertBarCoversBottom()
+        assertAboveField(composeRule.onNodeWithText("購入予定の商品はありません").getUnclippedBoundsInRoot().bottom.value)
+
+        addItem("牛乳")
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            runCatching { composeRule.onNodeWithText("牛乳").assertIsDisplayed() }.isSuccess
+        }
+        assertBarCoversBottom()
+        assertAboveField(composeRule.onNodeWithText("牛乳").getUnclippedBoundsInRoot().bottom.value)
+    }
+
+    private fun assertBarCoversBottom() {
+        val root = composeRule.onRoot().getUnclippedBoundsInRoot()
+        assertThat(composeRule.onNodeWithTag(AddItemTags.BAR).getUnclippedBoundsInRoot().bottom.value).isEqualTo(root.bottom.value)
+    }
+
+    private fun assertAboveField(bottom: Float) {
+        assertThat(bottom).isAtMost(composeRule.onNodeWithTag(AddItemTags.FIELD).getUnclippedBoundsInRoot().top.value)
+    }
 
     @Test
     fun 商品追加欄をタップするとシートが開き_Enterで数量1単位個で追加され_シートは開いたまま入力欄が空になる() {

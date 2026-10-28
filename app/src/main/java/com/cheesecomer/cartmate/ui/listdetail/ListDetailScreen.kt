@@ -224,7 +224,6 @@ fun ListDetailContent(
                 AddItemField(
                     text = state.addItem.text,
                     onClick = { onAddItemEvent(AddItemEvent.FieldFocused) },
-                    modifier = Modifier.windowInsetsPadding(WindowInsets.navigationBars),
                 )
             },
         ) { innerPadding ->
