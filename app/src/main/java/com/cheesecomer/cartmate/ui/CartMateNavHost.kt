@@ -94,8 +94,13 @@ fun CartMateNavHost(pending: PendingNavigation, onDeleteAccount: () -> Unit) {
         composable<PurchaseHistoryRoute> {
             PurchaseHistoryScreen(
                 onBack = { navController.popBackStack() },
-                // 最後の購入を削除したら、商品の画面を経由せず商品名の管理まで戻る
-                onEmptied = { navController.popBackStack<ProductNamesRoute>(inclusive = false) },
+                // 最後の購入を削除したら、商品の画面を経由せず商品名の管理まで戻る。リスト詳細のサジェストから開いた場合は
+                // 商品名の管理がないので、商品の画面を開く前の画面（リスト詳細）まで戻る
+                onEmptied = {
+                    if (!navController.popBackStack<ProductNamesRoute>(inclusive = false)) {
+                        navController.popBackStack<ProductDetailRoute>(inclusive = true)
+                    }
+                },
             )
         }
         composable<MergeProductsRoute> { backStackEntry ->
@@ -115,6 +120,7 @@ fun CartMateNavHost(pending: PendingNavigation, onDeleteAccount: () -> Unit) {
                 onOpenEntry = { name, quantity, unit -> navController.navigate(newEntryRoute(listId, name, quantity, unit)) },
                 onEditItem = { navController.navigate(editEntryRoute(listId, it)) },
                 entryResults = rememberEntryResults(backStackEntry),
+                onOpenProduct = { navController.navigate(ProductDetailRoute(it.value)) },
             )
         }
         composable<ItemEntryRoute> { backStackEntry ->

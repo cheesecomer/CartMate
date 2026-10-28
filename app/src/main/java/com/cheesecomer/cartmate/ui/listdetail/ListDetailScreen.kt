@@ -1,5 +1,7 @@
 package com.cheesecomer.cartmate.ui.listdetail
 
+import androidx.lifecycle.compose.LifecycleResumeEffect
+import com.cheesecomer.cartmate.domain.model.ProductId
 import android.content.res.Resources
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -95,6 +97,8 @@ fun ListDetailScreen(
     onOpenEntry: (name: String, quantity: Double?, unit: String?) -> Unit,
     onEditItem: (ItemId) -> Unit,
     entryResults: Flow<ItemEntryResult> = emptyFlow(),
+    /** 候補の長押しで、商品の画面（商品名の管理）を開く */
+    onOpenProduct: (ProductId) -> Unit = {},
     viewModel: ListDetailViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -140,10 +144,16 @@ fun ListDetailScreen(
             when (navigation) {
                 is DetailNavigation.OpenEntry -> onOpenEntry(navigation.name, navigation.quantity, navigation.unit)
                 DetailNavigation.ListDeleted -> onBack()
+                is DetailNavigation.OpenProduct -> onOpenProduct(navigation.productId)
             }
         }
     }
     LaunchedEffect(viewModel, entryResults) { entryResults.collect(viewModel::onEntryResult) }
+    // 商品の画面から戻ったら、サジェストのシートを開き直す
+    LifecycleResumeEffect(viewModel) {
+        viewModel.onResumed()
+        onPauseOrDispose { }
+    }
 
     ListDetailContent(
         state = state,

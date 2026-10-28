@@ -289,9 +289,19 @@ class SuggestionEngineTest {
         assertThat(completion).isEmpty()
         val single = engine(listOf(milk), purchases, today = 22, openItems = listOf(openItem(milk))).complete("牛", "スーパー").single()
         assertThat(single.alreadyAdded).isTrue()
+        assertThat(single.addedListIds).containsExactly(ListId("スーパー"))
         assertThat(single.lastQuantity).isEqualTo(2.0)
         assertThat(single.lastUnit).isEqualTo("本")
         assertThat(single.early).isEqualTo(EarlyPurchaseNotice(day0.plusDays(20), typicalIntervalDays = 10))
+    }
+
+    @Test
+    fun `追加済みの商品は、未購入の項目があるリストを持つ（どのリストに入っているか分かるように）`() {
+        val milk = product("牛乳")
+        val opens = listOf(openItem(milk, list = "スーパー"), openItem(milk, list = "薬局"))
+        val single = engine(listOf(milk), bought(milk, 0), today = 10, openItems = opens).complete("牛", "スーパー").single()
+        assertThat(single.addedListIds).containsExactly(ListId("スーパー"), ListId("薬局"))
+        assertThat(engine(listOf(milk), bought(milk, 0), today = 10).complete("牛", "スーパー").single().addedListIds).isEmpty()
     }
 
     @Test

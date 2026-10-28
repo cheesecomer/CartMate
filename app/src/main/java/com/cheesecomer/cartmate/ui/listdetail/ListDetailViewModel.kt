@@ -1,5 +1,6 @@
 package com.cheesecomer.cartmate.ui.listdetail
 
+import com.cheesecomer.cartmate.domain.model.ProductId
 import com.cheesecomer.cartmate.domain.model.UserId
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -113,6 +114,9 @@ sealed interface DetailNavigation {
     data class OpenEntry(val name: String, val quantity: Double?, val unit: String?) : DetailNavigation
     /** リストを削除したので一覧に戻る */
     data object ListDeleted : DetailNavigation
+
+    /** 候補の長押しで、商品の画面（商品名の管理）を開く */
+    data class OpenProduct(val productId: ProductId) : DetailNavigation
 }
 
 @HiltViewModel
@@ -201,8 +205,8 @@ class ListDetailViewModel @Inject constructor(
     private fun suggestions(source: SuggestionSource): Flow<SheetSuggestions> = combine(
         source.observe(),
         addItemState.map { it.text }.distinctUntilChanged(),
-        listRepository.observeLists().map { lists -> lists.firstOrNull { it.id == listId }?.name.orEmpty() }.distinctUntilChanged(),
-    ) { engine, text, listName -> SheetSuggestions.of(engine, text, listName) }
+        listRepository.observeLists().map { lists -> lists.associate { it.id to it.name } }.distinctUntilChanged(),
+    ) { engine, text, listNames -> SheetSuggestions.of(engine, text, listNames[listId].orEmpty(), listId, listNames) }
         .flowOn(source.dispatcher)
 
     /** サジェストのシートで公開範囲を切り替える。そのリストの次の追加の初期値になる（docs/requirements.md §3.4） */
@@ -221,9 +225,16 @@ class ListDetailViewModel @Inject constructor(
                 itemRepository.addItem(NewItem(listId, effect.name, effect.quantity, effect.unit, effect.memo, visibility))
             }
             is AddItemEffect.OpenEntry -> _navigation.trySend(DetailNavigation.OpenEntry(effect.name, effect.quantity, effect.unit))
+            is AddItemEffect.OpenProduct -> _navigation.trySend(DetailNavigation.OpenProduct(effect.productId))
             null -> Unit
         }
     }
+
+    /**
+     * リスト詳細が再び前面に出た。候補の長押しで開いた商品の画面から戻ったなら、シートを開き直す。
+     * 候補は商品の変更（まとめる・非表示）を購読して作り直しているので、開き直したシートは変更後の候補になる
+     */
+    fun onResumed() = onAddItemEvent(AddItemEvent.ProductClosed)
 
     /** 商品詳細入力画面から戻った */
     fun onEntryResult(result: ItemEntryResult) {

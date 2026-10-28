@@ -30,6 +30,7 @@ import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.swipeRight
 import androidx.lifecycle.SavedStateHandle
@@ -66,6 +67,7 @@ class ListDetailScreenTest {
 
     private val openedEntries = mutableListOf<Triple<String, Double?, String?>>()
     private val editedItems = mutableListOf<ItemId>()
+    private val openedProducts = mutableListOf<com.cheesecomer.cartmate.domain.model.ProductId>()
     private var backCount = 0
 
     private fun setContent() {
@@ -90,6 +92,7 @@ class ListDetailScreenTest {
                     onBack = { backCount++ },
                     onOpenEntry = { name, quantity, unit -> openedEntries += Triple(name, quantity, unit) },
                     onEditItem = { editedItems += it },
+                    onOpenProduct = { openedProducts += it },
                     viewModel = viewModel,
                 )
             }
@@ -223,6 +226,31 @@ class ListDetailScreenTest {
         composeRule.onNodeWithTag(AddItemTags.SHEET_INPUT).performTextInput("豆乳")
 
         composeRule.onNodeWithText("数量を設定して追加").assertIsDisplayed()
+    }
+
+    /** 候補の長押しで商品の画面を開く。補完の「追加済み」には、どのリストに入っているかを添える */
+    @Test
+    fun 補完の候補には追加済みのリスト名が出て_長押しで商品の画面を開く() {
+        val drugstore = runBlocking { store.createList(NewList("薬局", null, Visibility.SHARED)) }
+        val bought = addItem("牛乳")
+        runBlocking { store.completeItem(bought, clock.instant()) }
+        addItem("牛乳", listId = drugstore)
+        setContent()
+
+        openSheet()
+        composeRule.onNodeWithTag(AddItemTags.SHEET_INPUT).performTextInput("牛")
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            runCatching { composeRule.onNodeWithText("追加済み（薬局）").assertIsDisplayed() }.isSuccess
+        }
+
+        composeRule.onNodeWithText("追加済み（薬局）").performTouchInput { longClick() }
+        composeRule.waitForIdle()
+
+        val milk = runBlocking { store.observeProducts().first().single { it.displayName == "牛乳" }.id }
+        assertThat(openedProducts).containsExactly(milk)
+        // 商品詳細入力画面は開かず、何も追加しない
+        assertThat(openedEntries).isEmpty()
+        assertThat(openItemNames()).containsExactly("牛乳")
     }
 
     @Test

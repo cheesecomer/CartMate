@@ -1,6 +1,7 @@
 package com.cheesecomer.cartmate.domain.suggest
 
 import com.cheesecomer.cartmate.domain.model.Item
+import com.cheesecomer.cartmate.domain.model.ListId
 import com.cheesecomer.cartmate.domain.model.Product
 import com.cheesecomer.cartmate.domain.model.ProductId
 import com.cheesecomer.cartmate.domain.model.Purchase
@@ -120,6 +121,11 @@ class SuggestionEngine(
     /** 家族のいずれかのリストに未購入である商品（統合先で比較）。属性が違っても、同じ商品があれば出さない */
     private val openRecords: List<Record> = openItems.mapNotNull { it.record() }
     private val openKeys: Set<ResolvedKey> = openRecords.map { it.key }.toSet()
+    /** 未購入の項目があるリスト（「追加済み（スーパー）」）。商品（統合先）ごとに */
+    private val openListsByKey: Map<ResolvedKey, Set<ListId>> = openItems
+        .mapNotNull { item -> item.record()?.let { it.key to item.listId } }
+        .groupBy({ it.first }, { it.second })
+        .mapValues { (_, ids) -> ids.toSet() }
     private val openCycles: Set<CycleKey> = openRecords.map { it.group.cycle }.toSet()
 
     /**
@@ -258,13 +264,16 @@ class SuggestionEngine(
         val reason: MatchReason,
         /** 直近365日の購入回数（予測に使う記録） */
         val purchaseCount: Int,
-        /** 家族のいずれかのリストに未購入である（「追加済み」）。追加はできる */
-        val alreadyAdded: Boolean,
+        /** 未購入の項目があるリスト（「追加済み（スーパー）」）。空でなければ追加済み。追加はできる */
+        val addedListIds: Set<ListId>,
         /** 早すぎる再購入 */
         val early: EarlyPurchaseNotice?,
         val lastQuantity: Double?,
         val lastUnit: String?,
-    )
+    ) {
+        /** 家族のいずれかのリストに未購入である（「追加済み」） */
+        val alreadyAdded: Boolean get() = addedListIds.isNotEmpty()
+    }
 
     /**
      * [query] の補完。候補の生成元は購入履歴（自分に見える項目と購入の記録）だけで、辞書は照合を助けるだけ。
@@ -310,7 +319,7 @@ class SuggestionEngine(
                 product = product,
                 reason = reason,
                 purchaseCount = count,
-                alreadyAdded = resolved in openKeys,
+                addedListIds = openListsByKey[resolved].orEmpty(),
                 // 補完は名前で選ぶので、属性を指定していない記録の周期で判定する
                 early = EarlyPurchaseDetector.detect(estimate(Group(cycleOf(resolved), emptySet())), today, params),
                 lastQuantity = last?.quantity,

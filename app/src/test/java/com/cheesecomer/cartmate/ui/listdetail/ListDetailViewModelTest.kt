@@ -573,5 +573,55 @@ class ListDetailViewModelTest {
             assertThat(awaitItem()).isEqualTo(DetailMessage.AlreadyOpen)
         }
     }
-}
 
+    @Test
+    fun `候補を長押しすると商品の画面を開き、そこで非表示にして戻ると、シートを開き直して変更後の候補を出す`() = runTest {
+        bought("牛乳", times = 3, intervalDays = 10)
+        clock.advance(java.time.Duration.ofDays(9))
+        turbineScope {
+            val states = viewModel.uiState.testIn(backgroundScope)
+            val navigation = viewModel.navigation.testIn(backgroundScope)
+            viewModel.onAddItemEvent(AddItemEvent.FieldFocused)
+            val row = (states.awaitUntil { (it.suggestions as? SheetSuggestions.Items)?.rows?.isNotEmpty() == true }.suggestions as SheetSuggestions.Items)
+                .rows.single()
+            val milk = store.observeProducts().first().single { it.displayName == "牛乳" }.id
+            assertThat(row.suggestion.productId).isEqualTo(milk)
+
+            viewModel.onAddItemEvent(AddItemEvent.SuggestionLongPressed(row.suggestion))
+            assertThat(navigation.awaitItem()).isEqualTo(DetailNavigation.OpenProduct(milk))
+            states.awaitUntil { it.addItem == AddItemState.Managing("") }
+
+            // 商品の画面で「一時的に非表示」にした
+            store.applyMergeChanges(listOf(com.cheesecomer.cartmate.domain.product.ProductMerge.Change.Hide(milk)))
+            viewModel.onResumed()
+
+            states.awaitUntil { it.addItem == AddItemState.Open("") && it.suggestions == SheetSuggestions.Hint }
+            navigation.cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `シートを開いていないときにリスト詳細に戻っても、シートは開かない`() = runTest {
+        viewModel.uiState.test {
+            awaitUntil { it.addItem == AddItemState.Idle("") }
+            viewModel.onResumed()
+            expectNoEvents()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `追加済みの補完には、未購入の項目があるリストの名前を、開いているリストを先に添える`() = runTest {
+        bought("牛乳", times = 1, intervalDays = 0)
+        store.addItem(newItem(otherListId, "牛乳"))
+        store.addItem(newItem(listId, "牛乳"))
+        viewModel.uiState.test {
+            viewModel.onAddItemEvent(AddItemEvent.FieldFocused)
+            viewModel.onAddItemEvent(AddItemEvent.TextChanged("牛"))
+            val row = (awaitUntil { (it.suggestions as? SheetSuggestions.Items)?.rows?.isNotEmpty() == true }.suggestions as SheetSuggestions.Items)
+                .rows.single()
+            assertThat(row.note).isEqualTo(SuggestionNote.Completion(alreadyAdded = true, early = null, addedLists = listOf("スーパー", "薬局")))
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+}

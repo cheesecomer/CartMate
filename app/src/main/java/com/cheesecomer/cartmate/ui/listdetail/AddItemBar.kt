@@ -1,5 +1,6 @@
 package com.cheesecomer.cartmate.ui.listdetail
 
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -210,6 +211,7 @@ internal fun AddItemSheetContent(
                             row = row,
                             onOpen = { onEvent(AddItemEvent.SuggestionOpened(row.suggestion)) },
                             onAdd = { onEvent(AddItemEvent.SuggestionAdded(row.suggestion)) },
+                            onLongPress = { onEvent(AddItemEvent.SuggestionLongPressed(row.suggestion)) },
                         )
                     }
                 }
@@ -224,9 +226,12 @@ private val SUGGESTIONS_MAX_HEIGHT = 300.dp
 /** 「10/18」 */
 private val NOTE_DATE: DateTimeFormatter = DateTimeFormatter.ofPattern("M/d")
 
-/** 候補の1行。名前のタップで商品詳細入力画面、右端の「＋」で前回の数量・単位のまますぐ追加する */
+/**
+ * 候補の1行。名前のタップで商品詳細入力画面、右端の「＋」で前回の数量・単位のまますぐ追加する。
+ * 名前の長押しで商品の画面（まとめる・非表示など）を開く
+ */
 @Composable
-private fun SuggestionRowView(row: SuggestionRow, onOpen: () -> Unit, onAdd: () -> Unit) {
+private fun SuggestionRowView(row: SuggestionRow, onOpen: () -> Unit, onAdd: () -> Unit, onLongPress: () -> Unit) {
     val colors = MaterialTheme.colorScheme
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -240,7 +245,12 @@ private fun SuggestionRowView(row: SuggestionRow, onOpen: () -> Unit, onAdd: () 
             Modifier
                 .weight(1f)
                 .clip(MaterialTheme.shapes.medium)
-                .clickable(role = Role.Button, onClick = onOpen)
+                .combinedClickable(
+                    role = Role.Button,
+                    onClick = onOpen,
+                    onLongClick = onLongPress.takeIf { row.suggestion.productId != null },
+                    onLongClickLabel = stringResource(R.string.add_item_open_product),
+                )
                 .padding(horizontal = CartMateSpacing.small, vertical = CartMateSpacing.small),
         ) {
             Text(row.label, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -264,7 +274,12 @@ private fun SuggestionRowView(row: SuggestionRow, onOpen: () -> Unit, onAdd: () 
 private fun noteText(note: SuggestionNote): String? = when (note) {
     is SuggestionNote.Due -> stringResource(R.string.add_item_note_due, note.intervalDays, note.daysSinceLast.toInt())
     is SuggestionNote.Completion -> listOfNotNull(
-        stringResource(R.string.add_item_note_added).takeIf { note.alreadyAdded },
+        // どのリストに入っているか分かるように、リストの名前を添える
+        when {
+            !note.alreadyAdded -> null
+            note.addedLists.isEmpty() -> stringResource(R.string.add_item_note_added)
+            else -> stringResource(R.string.add_item_note_added_in, note.addedLists.joinToString("・"))
+        },
         note.early?.let { stringResource(R.string.add_item_note_early, NOTE_DATE.format(it.lastPurchase), it.typicalIntervalDays) },
     ).joinToString("・").ifEmpty { null }
 }
