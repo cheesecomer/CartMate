@@ -1,5 +1,7 @@
 package com.cheesecomer.cartmate.ui.products
 
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -208,6 +210,15 @@ fun ProductDetailScreen(
             }
         }
     }
+    // 表示していた商品が一覧から外れたら、商品名の管理に戻って知らせる
+    val context = LocalContext.current
+    (state as? ProductDetailViewModel.State.Gone)?.let { gone ->
+        val message = stringResource(R.string.product_detail_gone, gone.name)
+        LaunchedEffect(gone) {
+            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+            onBack()
+        }
+    }
     val title = when (val current = state) {
         is ProductDetailViewModel.State.Loaded -> when (val detail = current.detail) {
             is ProductMerge.Detail.Target -> detail.entry.product.displayName
@@ -217,7 +228,7 @@ fun ProductDetailScreen(
     }
     ProductScaffold(title = title, onBack = onBack) {
         when (val current = state) {
-            ProductDetailViewModel.State.Loading -> Unit
+            ProductDetailViewModel.State.Loading, is ProductDetailViewModel.State.Gone -> Unit
             ProductDetailViewModel.State.NotFound -> Empty(stringResource(R.string.product_detail_not_found))
             is ProductDetailViewModel.State.Loaded -> when (val detail = current.detail) {
                 is ProductMerge.Detail.Target -> TargetDetail(

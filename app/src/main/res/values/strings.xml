@@ -207,6 +207,7 @@
     <string name="product_detail_dictionary">辞書で「%1$s」として、次の名前をまとめています：%2$s</string>
     <string name="product_detail_opted_out">この商品は辞書でまとめていません</string>
     <string name="product_detail_not_found">この商品は見つかりません</string>
+    <string name="product_detail_gone">「%1$s」は購入の記録がなくなったため、商品名の管理から外れました</string>
     <string name="product_names_hidden">非表示の商品（%1$d件）</string>
     <string name="product_detail_other_section">名前の訂正</string>
     <string name="product_detail_prediction_section">予測</string>

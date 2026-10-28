@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -57,15 +58,30 @@ class ProductDetailViewModel @Inject constructor(
 
     sealed interface State {
         data object Loading : State
-        /** 見えない商品や、なくなった商品 */
+        /** 開いたときから見えない商品 */
         data object NotFound : State
         data class Loaded(val detail: ProductMerge.Detail) : State
+
+        /**
+         * 表示していた商品が一覧から外れた（購入の記録がすべて削除された など）。「見つかりません」は見せず、
+         * 商品名の管理に戻って知らせる
+         */
+        data class Gone(val name: String) : State
     }
 
     val state: StateFlow<State> = catalog.observe()
         .map { snapshot ->
             ProductMerge.detail(productId, snapshot.products, snapshot.visibleIds, snapshot.dictionary, snapshot.hidden)
                 ?.let(State::Loaded) ?: State.NotFound
+        }
+        // 一度表示できた商品が見つからなくなったら、外れたものとして区別する
+        .scan<State, State>(State.Loading) { previous, next ->
+            when {
+                next != State.NotFound -> next
+                previous is State.Loaded -> State.Gone(previous.detail.productName())
+                previous is State.Gone -> previous
+                else -> next
+            }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), State.Loading)
 
@@ -204,4 +220,10 @@ class MergeProductsViewModel @Inject constructor(
             _events.send(Event.Done)
         }
     }
+}
+
+/** 商品の画面の商品名 */
+private fun ProductMerge.Detail.productName(): String = when (this) {
+    is ProductMerge.Detail.Target -> entry.product.displayName
+    is ProductMerge.Detail.Merged -> product.displayName
 }
