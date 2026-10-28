@@ -47,6 +47,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -59,6 +60,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.cheesecomer.cartmate.R
+import com.cheesecomer.cartmate.ui.PRIVACY_POLICY_URL
 import com.cheesecomer.cartmate.domain.family.DisplayName
 import com.cheesecomer.cartmate.domain.family.InviteCode
 import com.cheesecomer.cartmate.domain.model.Account
@@ -146,6 +148,7 @@ fun FamilyContent(
     var aliasing by remember { mutableStateOf<Member?>(null) }
     var confirmLeave by rememberSaveable { mutableStateOf(false) }
     var confirmDelete by rememberSaveable { mutableStateOf(false) }
+    val uriHandler = LocalUriHandler.current
 
     Scaffold(
         topBar = {
@@ -271,6 +274,7 @@ fun FamilyContent(
             }
             BottomAction(stringResource(R.string.action_sign_out), destructive = false, onClick = onSignOut)
             BottomAction(stringResource(R.string.family_delete_account), destructive = true) { confirmDelete = true }
+            BottomAction(stringResource(R.string.privacy_policy), destructive = false) { uriHandler.openUri(PRIVACY_POLICY_URL) }
             Spacer(Modifier.height(CartMateSpacing.xLarge))
         }
     }

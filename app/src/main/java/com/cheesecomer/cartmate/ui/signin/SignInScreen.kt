@@ -29,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -41,6 +42,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.material3.TextButton
 import com.cheesecomer.cartmate.FirebaseEmulator
 import com.cheesecomer.cartmate.R
+import com.cheesecomer.cartmate.ui.PRIVACY_POLICY_URL
 import com.cheesecomer.cartmate.ui.theme.CartMateSpacing
 import com.cheesecomer.cartmate.ui.theme.CartMateTheme
 import kotlinx.coroutines.launch
@@ -67,6 +69,7 @@ fun SignInScreen(viewModel: SignInViewModel = hiltViewModel()) {
 
 @Composable
 fun SignInContent(state: SignInUiState, onSignIn: () -> Unit, onSignInTestUser: (() -> Unit)? = null) {
+    val uriHandler = LocalUriHandler.current
     Surface(color = MaterialTheme.colorScheme.surface, modifier = Modifier.fillMaxSize()) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -130,6 +133,15 @@ fun SignInContent(state: SignInUiState, onSignIn: () -> Unit, onSignInTestUser: 
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.error,
                     textAlign = TextAlign.Center,
+                )
+            }
+            // ログインする前に読めるようにする（docs/requirements.md §3.5「プライバシーポリシー」）
+            Spacer(Modifier.height(CartMateSpacing.large))
+            TextButton(onClick = { uriHandler.openUri(PRIVACY_POLICY_URL) }) {
+                Text(
+                    text = stringResource(R.string.privacy_policy),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
