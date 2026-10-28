@@ -118,6 +118,10 @@ class SuggestionEngine(
         CycleEstimator.estimate(factsByGroup[group].orEmpty().map { it.date() }, params)
     }
 
+    /** 周期が分からないときの早すぎる再購入の判定にも、周期と同じ記録を使う */
+    private fun early(group: Group): EarlyPurchaseNotice? =
+        EarlyPurchaseDetector.detect(estimate(group), factsByGroup[group]?.maxOf { it.date() }, today, params)
+
     /** 家族のいずれかのリストに未購入である商品（統合先で比較）。属性が違っても、同じ商品があれば出さない */
     private val openRecords: List<Record> = openItems.mapNotNull { it.record() }
     private val openKeys: Set<ResolvedKey> = openRecords.map { it.key }.toSet()
@@ -321,7 +325,7 @@ class SuggestionEngine(
                 purchaseCount = count,
                 addedListIds = openListsByKey[resolved].orEmpty(),
                 // 補完は名前で選ぶので、属性を指定していない記録の周期で判定する
-                early = EarlyPurchaseDetector.detect(estimate(Group(cycleOf(resolved), emptySet())), today, params),
+                early = early(Group(cycleOf(resolved), emptySet())),
                 lastQuantity = last?.quantity,
                 lastUnit = last?.unit,
             ) to (relevance[resolved] ?: 0.0)
@@ -353,14 +357,14 @@ class SuggestionEngine(
     fun previous(name: String): PreviousPurchase? {
         val resolved = keyOfName(name)
         val last = latest(activePurchases.filter { records.getValue(it).key == resolved }) ?: return null
-        val estimate = estimate(records.getValue(last).group)
+        val group = records.getValue(last).group
         return PreviousPurchase(
             quantity = last.quantity,
             unit = last.unit,
             date = last.date(),
-            typicalIntervalDays = estimate?.typicalIntervalDays,
+            typicalIntervalDays = estimate(group)?.typicalIntervalDays,
             // 常に非表示の商品には、早すぎる再購入の注意も出さない
-            early = EarlyPurchaseDetector.detect(estimate, today, params).takeIf { !alwaysHidden(rootOf(last.productId!!)) },
+            early = early(group).takeIf { !alwaysHidden(rootOf(last.productId!!)) },
         )
     }
 

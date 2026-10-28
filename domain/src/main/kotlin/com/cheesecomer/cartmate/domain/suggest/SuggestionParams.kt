@@ -19,6 +19,8 @@ data class SuggestionParams(
     val earlyRatio: Double = 0.5,
     /** 中央絶対偏差 / 中央値 がこれを超えたら、周期が不安定（時期が近い商品にも、早すぎる再購入の注意にも使わない） */
     val maxDispersion: Double = 0.5,
+    /** 周期が分からないか不安定な商品で、早すぎる再購入として知らせる前回の購入からの日数 */
+    val recentPurchaseDays: Long = 3,
     /** 類似度を計算するリストの最小の商品数 */
     val minProfileSize: Int = 5,
     val minIntersection: Int = 3,

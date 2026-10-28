@@ -127,6 +127,7 @@ data class SuggestionParams(
     val overduePeakRatio: Double = 1.5,  // 時期が近い商品の順位がいちばん高い経過率。超えた分だけ順位を下げる
     val earlyRatio: Double = 0.5,        // 早すぎる再購入の閾値
     val maxDispersion: Double = 0.5,     // MAD/中央値 がこれを超えたら周期が不安定
+    val recentPurchaseDays: Long = 3,    // 周期が使えない商品で、早すぎる再購入として知らせる前回の購入からの日数
     val minProfileSize: Int = 5,         // 類似度を計算するリストの最小商品数
     val minIntersection: Int = 3,
     val minOverlap: Double = 0.5,        // 重複係数の閾値
@@ -190,18 +191,19 @@ fun relevance(target: ListKey, profiles: Map<ListKey, Set<ProductId>>, p: Sugges
 - 各候補は、一致の理由（前方一致・部分一致・辞書の別名・購入回数）を持ち、順位と表示の補足に使います。
 - 候補は統合先（名寄せの解決のまとめる先）ごとに1つにまとめ、どこにもまとめられていない商品のうち家族が最近使ったものの名前を出します。選択されたらその product を使います。
 - 未購入リストにすでにある商品には「追加済み」ラベルを付け、未購入の項目があるリストの名前を添えます（「追加済み（スーパー）」。`Completion.addedListIds`）。追加はできます（追加するたびに新しい項目を作る）。
-- 早すぎる再購入（下記）に当たる商品には、補足として「前回 10/18 に購入・いつもは約14日ごと」を表示します。
+- 早すぎる再購入（下記）に当たる商品には、補足として「前回 10/18 に購入・いつもは約14日ごと」（周期が使えなければ「前回 10/28 に購入」）を表示します。
 - 各候補には、「＋」と商品詳細入力画面で使う前回の数量・単位（その product の直近の購入）を持たせます。
 
 ## 早すぎる再購入の検知
 
 ```kotlin
-data class EarlyPurchaseNotice(val lastPurchase: LocalDate, val typicalIntervalDays: Int)
-fun detect(estimate: CycleEstimate?, today: LocalDate, p: SuggestionParams): EarlyPurchaseNotice?
+data class EarlyPurchaseNotice(val lastPurchase: LocalDate, val typicalIntervalDays: Int?)
+fun detect(estimate: CycleEstimate?, lastPurchase: LocalDate?, today: LocalDate, p: SuggestionParams): EarlyPurchaseNotice?
 ```
 
-- 推定が `null`（購入日が3日未満）、または `dispersion > maxDispersion`（周期が不安定）なら `null` を返します。
-- `ratio < earlyRatio` のときに通知を返します。補完候補の補足と商品詳細入力画面に「前回 10/18 に購入・いつもは約14日ごと」と控えめに表示するだけで、追加の操作は妨げません。
+- 周期が使える（推定があり、`dispersion <= maxDispersion`）ときは、`ratio < earlyRatio` のときに通知を返します。補完候補の補足と商品詳細入力画面に「前回 10/18 に購入・いつもは約14日ごと」と控えめに表示するだけで、追加の操作は妨げません。
+- 周期が使えない（推定が `null`＝購入日が3日未満、または周期が不安定）ときは、前回の購入 `lastPurchase` から `recentPurchaseDays`（3日）以内なら、周期なし（`typicalIntervalDays == null`）の通知を返します。補完候補には「前回 10/28 に購入」、商品詳細入力画面には「最近購入したばかりです」と表示します。家族がもう買ってきたのに気づかず、また追加するのを防ぐためです。
+- `lastPurchase` には、周期の推定と同じ記録（同じ周期のグループと属性の、予測に使う記録）の最新の購入日を使います。
 
 ## 備考の候補
 

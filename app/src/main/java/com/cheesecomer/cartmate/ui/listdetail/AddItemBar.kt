@@ -280,7 +280,12 @@ private fun noteText(note: SuggestionNote): String? = when (note) {
             note.addedLists.isEmpty() -> stringResource(R.string.add_item_note_added)
             else -> stringResource(R.string.add_item_note_added_in, note.addedLists.joinToString("・"))
         },
-        note.early?.let { stringResource(R.string.add_item_note_early, NOTE_DATE.format(it.lastPurchase), it.typicalIntervalDays) },
+        note.early?.let { early ->
+            val date = NOTE_DATE.format(early.lastPurchase)
+            early.typicalIntervalDays
+                ?.let { stringResource(R.string.add_item_note_early, date, it) }
+                ?: stringResource(R.string.add_item_note_recent, date)
+        },
     ).joinToString("・").ifEmpty { null }
 }
 

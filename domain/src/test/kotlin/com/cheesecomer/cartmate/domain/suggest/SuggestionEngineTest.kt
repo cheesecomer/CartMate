@@ -296,6 +296,23 @@ class SuggestionEngineTest {
     }
 
     @Test
+    fun `周期が分からない商品でも、今日買っていれば補完と前回の購入で周期なしで知らせる`() {
+        val onion = product("玉ねぎ")
+        val engine = engine(listOf(onion), bought(onion, 0, 10), today = 10)
+        val notice = EarlyPurchaseNotice(day0.plusDays(10), typicalIntervalDays = null)
+        assertThat(engine.complete("玉", "スーパー").single().early).isEqualTo(notice)
+        assertThat(engine.previous("玉ねぎ")!!.early).isEqualTo(notice)
+    }
+
+    @Test
+    fun `周期が分からない商品は、買ってから4日たっていれば知らせない`() {
+        val onion = product("玉ねぎ")
+        val engine = engine(listOf(onion), bought(onion, 0, 10), today = 14)
+        assertThat(engine.complete("玉", "スーパー").single().early).isNull()
+        assertThat(engine.previous("玉ねぎ")!!.early).isNull()
+    }
+
+    @Test
     fun `追加済みの商品は、未購入の項目があるリストを持つ（どのリストに入っているか分かるように）`() {
         val milk = product("牛乳")
         val opens = listOf(openItem(milk, list = "スーパー"), openItem(milk, list = "薬局"))

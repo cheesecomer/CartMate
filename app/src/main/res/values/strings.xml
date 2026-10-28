@@ -77,6 +77,7 @@
     <string name="add_item_note_added_in">追加済み（%1$s）</string>
     <string name="add_item_open_product">商品の設定を開く</string>
     <string name="add_item_note_early">前回 %1$s に購入・いつもは約%2$d日ごと</string>
+    <string name="add_item_note_recent">前回 %1$s に購入</string>
 
     <!-- 商品詳細入力 -->
     <string name="entry_title_new">商品の詳細入力</string>
@@ -103,6 +104,7 @@
     <string name="entry_previous">前回: %1$s（%2$s 購入）</string>
     <string name="entry_previous_with_cycle">前回: %1$s（%2$s 購入・約%3$d日ごと）</string>
     <string name="entry_early">いつもより早い再購入です（いつもは約%1$d日ごと）</string>
+    <string name="entry_recent">最近購入したばかりです</string>
     <string name="entry_memo_placeholder">メモ（例: 特売品なら2個、賞味期限が長いものなど）</string>
     <string name="entry_add">リストに追加する</string>
     <string name="entry_merge_chip">「%1$s」と同じ商品として記録する</string>

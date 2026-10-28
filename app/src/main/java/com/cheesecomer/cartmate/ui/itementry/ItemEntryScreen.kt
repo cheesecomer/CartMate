@@ -456,9 +456,9 @@ private fun PreviousPurchaseText(previous: SuggestionEngine.PreviousPurchase) {
         Spacer(Modifier.width(CartMateSpacing.xSmall))
         Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
-    previous.early?.let {
+    previous.early?.let { early ->
         Text(
-            stringResource(R.string.entry_early, it.typicalIntervalDays),
+            early.typicalIntervalDays?.let { stringResource(R.string.entry_early, it) } ?: stringResource(R.string.entry_recent),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.tertiary,
             modifier = Modifier.padding(top = CartMateSpacing.xSmall),

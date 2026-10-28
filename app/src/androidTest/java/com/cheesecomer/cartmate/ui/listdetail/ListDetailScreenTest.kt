@@ -53,6 +53,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import java.time.Clock
 import java.time.Instant
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.flow.flowOf
 
 @RunWith(AndroidJUnit4::class)
@@ -228,7 +230,10 @@ class ListDetailScreenTest {
         composeRule.onNodeWithText("数量を設定して追加").assertIsDisplayed()
     }
 
-    /** 候補の長押しで商品の画面を開く。補完の「追加済み」には、どのリストに入っているかを添える */
+    /**
+     * 候補の長押しで商品の画面を開く。補完の「追加済み」には、どのリストに入っているかを添える。
+     * 今日買ったばかりなので、周期が分からなくても前回の購入日を添える
+     */
     @Test
     fun 補完の候補には追加済みのリスト名が出て_長押しで商品の画面を開く() {
         val drugstore = runBlocking { store.createList(NewList("薬局", null, Visibility.SHARED)) }
@@ -239,11 +244,12 @@ class ListDetailScreenTest {
 
         openSheet()
         composeRule.onNodeWithTag(AddItemTags.SHEET_INPUT).performTextInput("牛")
+        val note = "追加済み（薬局）・前回 ${DateTimeFormatter.ofPattern("M/d").format(LocalDate.now(clock))} に購入"
         composeRule.waitUntil(timeoutMillis = 5_000) {
-            runCatching { composeRule.onNodeWithText("追加済み（薬局）").assertIsDisplayed() }.isSuccess
+            runCatching { composeRule.onNodeWithText(note).assertIsDisplayed() }.isSuccess
         }
 
-        composeRule.onNodeWithText("追加済み（薬局）").performTouchInput { longClick() }
+        composeRule.onNodeWithText(note).performTouchInput { longClick() }
         composeRule.waitForIdle()
 
         val milk = runBlocking { store.observeProducts().first().single { it.displayName == "牛乳" }.id }

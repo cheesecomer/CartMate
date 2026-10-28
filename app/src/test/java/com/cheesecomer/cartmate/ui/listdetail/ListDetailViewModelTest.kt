@@ -31,11 +31,13 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
 import java.time.Duration
 import java.time.Instant
+import java.time.LocalDate
 import kotlinx.coroutines.flow.flowOf
 import com.cheesecomer.cartmate.domain.model.Member
 import com.cheesecomer.cartmate.domain.model.MemberRole
 import com.cheesecomer.cartmate.domain.repository.ItemRepository
 import com.cheesecomer.cartmate.domain.repository.RejectedCheck
+import com.cheesecomer.cartmate.domain.suggest.EarlyPurchaseNotice
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -518,7 +520,8 @@ class ListDetailViewModelTest {
             viewModel.onAddItemEvent(AddItemEvent.TextChanged("牛"))
             val row = (awaitUntil { (it.suggestions as? SheetSuggestions.Items)?.rows?.isNotEmpty() == true }.suggestions as SheetSuggestions.Items)
                 .rows.single()
-            assertThat(row.note).isEqualTo(SuggestionNote.Completion(alreadyAdded = false, early = null))
+            // 今日買ったばかりなので、周期が分からなくても前回の購入日を添える
+            assertThat(row.note).isEqualTo(SuggestionNote.Completion(alreadyAdded = false, early = EarlyPurchaseNotice(LocalDate.now(clock), null)))
 
             viewModel.onAddItemEvent(AddItemEvent.SuggestionAdded(row.suggestion))
             val added = awaitUntil { state -> state.items.any { it.status == com.cheesecomer.cartmate.domain.model.ItemStatus.OPEN } }
@@ -620,7 +623,7 @@ class ListDetailViewModelTest {
             viewModel.onAddItemEvent(AddItemEvent.TextChanged("牛"))
             val row = (awaitUntil { (it.suggestions as? SheetSuggestions.Items)?.rows?.isNotEmpty() == true }.suggestions as SheetSuggestions.Items)
                 .rows.single()
-            assertThat(row.note).isEqualTo(SuggestionNote.Completion(alreadyAdded = true, early = null, addedLists = listOf("スーパー", "薬局")))
+            assertThat(row.note).isEqualTo(SuggestionNote.Completion(alreadyAdded = true, early = EarlyPurchaseNotice(LocalDate.now(clock), null), addedLists = listOf("スーパー", "薬局")))
             cancelAndIgnoreRemainingEvents()
         }
     }
