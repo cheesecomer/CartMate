@@ -1,5 +1,6 @@
 package com.cheesecomer.cartmate.ui.products
 
+import com.cheesecomer.cartmate.domain.repository.MemberDirectory
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -25,19 +26,23 @@ private const val STOP_TIMEOUT_MILLIS = 5_000L
 
 /** 「商品名の管理」の一覧（docs/requirements.md §3.5「商品名の管理」）。未統合の商品を並べる */
 @HiltViewModel
-class ProductNamesViewModel @Inject constructor(catalog: ProductCatalog) : ViewModel() {
+class ProductNamesViewModel @Inject constructor(catalog: ProductCatalog, memberDirectory: MemberDirectory) : ViewModel() {
 
-    data class Lists(val entries: List<ProductMerge.Entry>, val hidden: List<ProductMerge.Entry>)
+    /** 非表示の商品と、非表示にした人（家族にいない人は null） */
+    data class HiddenEntry(val entry: ProductMerge.Entry, val byName: String?)
 
-    /** 一覧と、一番下の「非表示の商品」。読み込み中は null */
-    val lists: StateFlow<Lists?> = catalog.observe()
-        .map {
-            Lists(
-                entries = ProductMerge.entries(it.products, it.visibleIds, it.dictionary, it.hidden),
-                hidden = ProductMerge.hiddenEntries(it.products, it.visibleIds, it.dictionary, it.hidden),
-            )
-        }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), null)
+    data class Lists(val entries: List<ProductMerge.Entry>, val hidden: List<HiddenEntry>)
+
+    /** 一覧と、一番下の「非表示の商品」（一時的に非表示と常に非表示）。読み込み中は null */
+    val lists: StateFlow<Lists?> = combine(catalog.observe(), memberDirectory.observeNames()) { snapshot, names ->
+        Lists(
+            entries = ProductMerge.entries(snapshot.products, snapshot.visibleIds, snapshot.dictionary, snapshot.hidden),
+            hidden = ProductMerge.hiddenEntries(snapshot.products, snapshot.visibleIds, snapshot.dictionary, snapshot.hidden).map { entry ->
+                val by = if (entry.mode == ProductMerge.SuggestionMode.ALWAYS_HIDDEN) entry.product.suggestionExcludedBy else entry.product.hiddenBy
+                HiddenEntry(entry, by?.let(names::of))
+            },
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), null)
 }
 
 /** 商品を開いた画面。まとめている商品と個別の解除、辞書の名寄せ。統合されている商品なら、統合先と解除 */
@@ -84,15 +89,32 @@ class ProductDetailViewModel @Inject constructor(
     }
 
     /** 家族全員の一覧・候補・予測に出さない。記録は消さない */
-    fun hide() {
+    /**
+     * サジェストへの出し方を変える（docs/requirements.md §4.3）。一時的に非表示（再購入で戻る）と常に非表示（戻らない）は
+     * どちらか一方にする。家族で共有し、オフラインでも行える
+     */
+    fun setMode(mode: ProductMerge.SuggestionMode) {
         viewModelScope.launch {
-            ProductMerge.hideChanges(productId, catalog.observe().first().products)?.let { productRepository.applyMergeChanges(it) }
+            val snapshot = catalog.observe().first()
+            val product = snapshot.products.find { it.id == productId } ?: return@launch
+            val current = ProductMerge.modeOf(product, snapshot.hidden)
+            if (mode == current) return@launch
+            if (product.suggestionExcluded != (mode == ProductMerge.SuggestionMode.ALWAYS_HIDDEN)) {
+                productRepository.setSuggestionExcluded(productId, mode == ProductMerge.SuggestionMode.ALWAYS_HIDDEN)
+            }
+            when {
+                mode == ProductMerge.SuggestionMode.TEMPORARILY_HIDDEN ->
+                    ProductMerge.hideChanges(productId, snapshot.products)?.let { productRepository.applyMergeChanges(it) }
+                product.hiddenAt != null -> productRepository.applyMergeChanges(listOf(ProductMerge.Change.Show(productId)))
+            }
         }
     }
 
-    fun show() {
-        viewModelScope.launch { productRepository.applyMergeChanges(listOf(ProductMerge.Change.Show(productId))) }
-    }
+    fun show() = setMode(ProductMerge.SuggestionMode.NORMAL)
+
+    /** [name] に訂正したときにまとめる先（既にある商品）。設定がその商品のものになることを、確認の画面で伝える */
+    suspend fun renameTarget(name: String): com.cheesecomer.cartmate.domain.model.Product? =
+        ProductMerge.renameTarget(productId, name.trim(), catalog.observe().first().products)
 
     /** [id] の統合を解除する。[id] にまとまっていた商品は、元の統合先に残す */
     fun unmerge(id: ProductId) {
@@ -100,11 +122,6 @@ class ProductDetailViewModel @Inject constructor(
             val products = catalog.observe().first().products
             ProductMerge.unmergeChanges(id, products)?.let { productRepository.applyMergeChanges(it) }
         }
-    }
-
-    /** 時期が近い商品の提案に出さない（[excluded] が false なら出す）。補完には出す */
-    fun setSuggestionExcluded(excluded: Boolean) {
-        viewModelScope.launch { productRepository.setSuggestionExcluded(productId, excluded) }
     }
 
     fun setDictionaryOptOut(optOut: Boolean) {

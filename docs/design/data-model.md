@@ -43,7 +43,7 @@ households/{hid}/products/{productId}        # productId = 正規化名から決
   mergedAt?, mergedBy?,                      # 最初に統合した日時と人。付け替えでは変えない。解除で消す
   mergeUpdatedAt?, mergeUpdatedBy?,          # 最後に統合関係（統合・付け替え・解除）を変えた日時と人
   dictionaryOptOut?: bool                    # 名寄せ辞書でまとめない（手動の分離）。辞書を更新しても元に戻らない
-  suggestionExcluded?: bool                  # 時期が近い商品の提案から除外する（フェーズ4）
+  suggestionExcluded?: bool, suggestionExcludedAt?, suggestionExcludedBy?   # 常に非表示（再購入しても戻らない）と、設定した日時と人。統合先の設定が効く
   hiddenAt?, hiddenBy?                       # 非表示にした日時と人。統合先だけに付ける。「表示する」で消す
 
 households/{hid}/purchases/{purchaseId}      # purchaseId = itemId

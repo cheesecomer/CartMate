@@ -323,25 +323,48 @@ describe("商品の非表示", () => {
   });
 });
 
-describe("提案から除外", () => {
-  it("メンバーは時期が近い商品の提案から除外して、戻せる", async () => {
+describe("常に非表示", () => {
+  const excluding = (uid: string) => ({ suggestionExcluded: true, suggestionExcludedAt: serverTimestamp(), suggestionExcludedBy: uid });
+  const including = { suggestionExcluded: false, suggestionExcludedAt: deleteField(), suggestionExcludedBy: deleteField() };
+
+  it("メンバーは常に非表示にして、解除できる", async () => {
     await seedHousehold(HID, "taro", "hanako");
     await seedProduct("n_milk");
-    await assertSucceeds(updateDoc(doc(as("hanako"), path("n_milk")), { suggestionExcluded: true }));
-    await assertSucceeds(updateDoc(doc(as("taro"), path("n_milk")), { suggestionExcluded: false }));
+    await assertSucceeds(updateDoc(doc(as("hanako"), path("n_milk")), excluding("hanako")));
+    await assertSucceeds(updateDoc(doc(as("taro"), path("n_milk")), including));
   });
 
-  it("真偽値だけで、ほかのフィールドと一緒には変えられない", async () => {
+  it("設定した人と時刻は偽れず、解除するときは消さなければならない", async () => {
+    await seedHousehold(HID, "taro", "hanako");
+    await seedProduct("n_milk");
+    await assertFails(updateDoc(doc(as("hanako"), path("n_milk")), excluding("taro")));
+    await assertFails(updateDoc(doc(as("hanako"), path("n_milk")), { suggestionExcluded: true }));
+    await updateDoc(doc(as("hanako"), path("n_milk")), excluding("hanako"));
+    await assertFails(updateDoc(doc(as("hanako"), path("n_milk")), { suggestionExcluded: false }));
+  });
+
+  it("ほかのフィールドと一緒には変えられない", async () => {
     await seedHousehold(HID, "taro");
     await seedProduct("n_milk");
-    await assertFails(updateDoc(doc(as("taro"), path("n_milk")), { suggestionExcluded: "yes" }));
-    await assertFails(updateDoc(doc(as("taro"), path("n_milk")), { suggestionExcluded: true, displayName: "別" }));
+    await assertFails(updateDoc(doc(as("taro"), path("n_milk")), { ...excluding("taro"), displayName: "別" }));
   });
 
   it("メンバーでなければ変えられない", async () => {
     await seedHousehold(HID, "taro");
     await seedProduct("n_milk");
-    await assertFails(updateDoc(doc(as("jiro"), path("n_milk")), { suggestionExcluded: true }));
+    await assertFails(updateDoc(doc(as("jiro"), path("n_milk")), excluding("jiro")));
+  });
+
+  it("名前の訂正で作る商品は、常に非表示を引き継いで作れる", async () => {
+    await seedHousehold(HID, "taro");
+    await seedProduct("n_vague", { suggestionExcluded: true, suggestionExcludedBy: "taro", suggestionExcludedAt: new Date() });
+    const db = as("taro");
+    await assertSucceeds(
+      writeBatch(db)
+        .set(doc(db, path("n_hook")), { ...product("taro"), ...excluding("taro") })
+        .update(doc(db, path("n_vague")), merging("taro", "n_hook"))
+        .commit(),
+    );
+    await assertFails(setDoc(doc(db, path("n_other")), { ...product("taro"), ...excluding("hanako") }));
   });
 });
-

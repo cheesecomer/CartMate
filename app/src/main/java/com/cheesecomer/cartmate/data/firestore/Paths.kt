@@ -82,6 +82,8 @@ object F {
     const val HIDDEN_AT = "hiddenAt"
     const val HIDDEN_BY = "hiddenBy"
     const val SUGGESTION_EXCLUDED = "suggestionExcluded"
+    const val SUGGESTION_EXCLUDED_AT = "suggestionExcludedAt"
+    const val SUGGESTION_EXCLUDED_BY = "suggestionExcludedBy"
     const val EXCLUDED_FROM_PREDICTION = "excludedFromPrediction"
     const val EXCLUDED_AT = "excludedAt"
     const val EXCLUDED_BY = "excludedBy"

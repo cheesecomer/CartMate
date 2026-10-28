@@ -16,6 +16,18 @@ object ProductMerge {
      */
     const val MAX_SELECTION = 18
 
+    /** サジェストへの出し方（docs/requirements.md §4.3） */
+    enum class SuggestionMode {
+        /** 通常どおり表示 */
+        NORMAL,
+
+        /** 一時的に非表示（再購入すると候補に戻る） */
+        TEMPORARILY_HIDDEN,
+
+        /** 常に非表示（再購入しても候補に戻らない） */
+        ALWAYS_HIDDEN,
+    }
+
     /** 未統合の商品（統合先）と、それにまとめている商品 */
     data class Entry(
         val product: Product,
@@ -23,6 +35,7 @@ object ProductMerge {
         val members: List<Product>,
         /** 辞書の名寄せ。辞書でまとめていなければ null */
         val dictionary: DictionaryGroup?,
+        val mode: SuggestionMode = SuggestionMode.NORMAL,
     )
 
     /** 辞書でまとめている品目と、そこにまとまっている自分に見える名前（統合先の名前） */
@@ -56,8 +69,11 @@ object ProductMerge {
         /** 統合を解除する */
         data class Unmerge(override val id: ProductId) : Change
 
-        /** [name] の商品を作る（名前の訂正で、正しい名前の商品がまだないとき）。ID は名前から決まる */
-        data class Create(override val id: ProductId, val name: String) : Change
+        /**
+         * [name] の商品を作る（名前の訂正で、正しい名前の商品がまだないとき）。ID は名前から決まる。
+         * [alwaysHidden] は訂正する前の商品の「常に非表示」を引き継ぐ（訂正で勝手に解除しない）
+         */
+        data class Create(override val id: ProductId, val name: String, val alwaysHidden: Boolean = false) : Change
 
         /** 非表示にする */
         data class Hide(override val id: ProductId) : Change
@@ -75,17 +91,29 @@ object ProductMerge {
         visibleIds: Set<ProductId>,
         dictionary: NormalizationDictionary,
         hidden: Set<ProductId> = emptySet(),
-    ): List<Entry> = allEntries(products, visibleIds, dictionary).filter { it.product.id !in hidden }
+    ): List<Entry> = allEntries(products, visibleIds, dictionary, hidden).filter { it.mode == SuggestionMode.NORMAL }
 
-    /** 非表示にした統合先。「非表示の商品」に、名前の順に並べる */
+    /** 一時的に非表示か常に非表示の統合先。「非表示の商品」に、名前の順に並べる */
     fun hiddenEntries(
         products: Collection<Product>,
         visibleIds: Set<ProductId>,
         dictionary: NormalizationDictionary,
         hidden: Set<ProductId>,
-    ): List<Entry> = allEntries(products, visibleIds, dictionary).filter { it.product.id in hidden }
+    ): List<Entry> = allEntries(products, visibleIds, dictionary, hidden).filter { it.mode != SuggestionMode.NORMAL }
 
-    private fun allEntries(products: Collection<Product>, visibleIds: Set<ProductId>, dictionary: NormalizationDictionary): List<Entry> {
+    /** [product]（統合先）の出し方。常に非表示は、一時的な非表示より優先する */
+    fun modeOf(product: Product, hidden: Set<ProductId>): SuggestionMode = when {
+        product.suggestionExcluded -> SuggestionMode.ALWAYS_HIDDEN
+        product.id in hidden -> SuggestionMode.TEMPORARILY_HIDDEN
+        else -> SuggestionMode.NORMAL
+    }
+
+    private fun allEntries(
+        products: Collection<Product>,
+        visibleIds: Set<ProductId>,
+        dictionary: NormalizationDictionary,
+        hidden: Set<ProductId> = emptySet(),
+    ): List<Entry> {
         val graph = ProductGraph(products)
         val byId = products.associateBy { it.id }
         // 統合先がない（読めていない）商品は、自分を統合先として扱う
@@ -108,6 +136,7 @@ object ProductMerge {
                 dictionary = canonicalOf[root.id]?.let { canonical ->
                     DictionaryGroup(dictionary.canonicalNames[canonical] ?: root.displayName, namesByCanonical.getValue(canonical))
                 },
+                mode = modeOf(root, hidden),
             )
         }.sortedBy { it.product.searchKey }
     }
@@ -124,13 +153,13 @@ object ProductMerge {
         val product = byId[id] ?: return null
         val root = byId[ProductGraph(products).resolve(id)]
         if (root != null && root.id != id) return Detail.Merged(product, root).takeIf { id in visibleIds }
-        val entry = allEntries(products, visibleIds, dictionary).find { it.product.id == id } ?: return null
+        val entry = allEntries(products, visibleIds, dictionary, hidden).find { it.product.id == id } ?: return null
         return if (id in hidden) Detail.Hidden(entry) else Detail.Target(entry)
     }
 
     /**
      * [target] にまとめられる商品。ほかの未統合の商品（すでに [target] にまとまっている商品は、統合済みなので入らない）。
-     * 非表示の商品は出さない
+     * 一時的に非表示・常に非表示の商品は出さない
      */
     fun candidates(
         target: ProductId,
@@ -170,7 +199,8 @@ object ProductMerge {
      * [id] の統合先の商品の名前を [name] に訂正する変更（誤字のまま完了した記録の訂正）。購入の記録は書き換えず、
      * 正しい名前の商品に [id] をまとめる。正しい名前の商品がなければ作る。[id] にまとまっていた商品も一緒に移す。
      * 正しい名前の商品が [id] にまとめられていれば、その商品を統合先にして入れ替える。
-     * 正しい名前の商品（の統合先）が非表示なら、また表示する。
+     * 正しい名前の商品（の統合先）が一時的に非表示なら、また表示する。常に非表示などの設定は、新しく作る商品には引き継ぎ、
+     * 既にある商品にまとめるときはその商品（統合先）の設定に従う（[renameTarget] で確認の画面に出す）。
      * [id] が統合されている、名前が [id] と同じ（正規化すると同じ）、名前が空なら null
      */
     fun renameChanges(id: ProductId, name: String, products: Collection<Product>, hidden: Set<ProductId> = emptySet()): List<Change>? {
@@ -182,7 +212,8 @@ object ProductMerge {
         if (newId == id) return null
         val children = products.filter { it.mergedInto == id }
         if (newId !in byId) {
-            return listOf(Change.Create(newId, name), Change.Merge(id, newId)) + children.map { Change.Repoint(it.id, newId) }
+            return listOf(Change.Create(newId, name, alwaysHidden = product.suggestionExcluded), Change.Merge(id, newId)) +
+                children.map { Change.Repoint(it.id, newId) }
         }
         val root = ProductGraph(products).resolve(newId)
         if (root == id) {
@@ -197,4 +228,17 @@ object ProductMerge {
     /** [id] を非表示にする変更。統合されている商品は、統合先を非表示にする（ここでは null） */
     fun hideChanges(id: ProductId, products: Collection<Product>): List<Change>? =
         products.find { it.id == id }?.takeIf { it.mergedInto == null }?.let { listOf(Change.Hide(id)) }
+
+    /**
+     * [id] の名前を [name] に訂正したときにまとめる先（既にある商品の統合先）。新しく作るときや、訂正できないときは null。
+     * 設定が統合先のものに変わることを、確認の画面で伝えるために使う
+     */
+    fun renameTarget(id: ProductId, name: String, products: Collection<Product>): Product? {
+        if (name.isBlank()) return null
+        val newId = ProductId(NameNormalizer.productId(name))
+        val byId = products.associateBy { it.id }
+        if (newId == id || newId !in byId) return null
+        val root = ProductGraph(products).resolve(newId)
+        return byId[root]?.takeIf { root != id }
+    }
 }

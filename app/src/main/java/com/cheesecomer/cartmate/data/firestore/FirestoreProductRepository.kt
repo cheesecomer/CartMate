@@ -62,7 +62,7 @@ class FirestoreProductRepository @Inject constructor(
         val batch = db.batch()
         for (change in changes) {
             val ref = products.document(change.id.value)
-            if (change is ProductMerge.Change.Create) batch.set(ref, newProduct(change.name, scope.uid))
+            if (change is ProductMerge.Change.Create) batch.set(ref, newProduct(change.name, scope.uid, change.alwaysHidden))
             else batch.update(ref, fieldsOf(change, scope.uid))
         }
         // アプリを終了している間に拒否された場合に、次の起動で確かめられるよう、期待する統合先を残しておく
@@ -106,18 +106,30 @@ class FirestoreProductRepository @Inject constructor(
 
     override suspend fun setSuggestionExcluded(id: ProductId, excluded: Boolean) {
         val scope = session.requireScope()
-        Paths.products(db, scope.householdId).document(id.value).update(F.SUGGESTION_EXCLUDED, excluded).logFailure("setSuggestionExcluded")
+        // 常に非表示にした人と時刻を書き、戻すときは消す
+        val ref = Paths.products(db, scope.householdId).document(id.value)
+        val task = if (excluded) {
+            ref.update(F.SUGGESTION_EXCLUDED, true, F.SUGGESTION_EXCLUDED_AT, FieldValue.serverTimestamp(), F.SUGGESTION_EXCLUDED_BY, scope.uid)
+        } else {
+            ref.update(F.SUGGESTION_EXCLUDED, false, F.SUGGESTION_EXCLUDED_AT, FieldValue.delete(), F.SUGGESTION_EXCLUDED_BY, FieldValue.delete())
+        }
+        task.logFailure("setSuggestionExcluded")
     }
 
     /** 名前の訂正で作る商品（FirestoreShoppingStore で項目と一緒に作る商品と同じ形） */
-    private fun newProduct(name: String, uid: String): Map<String, Any?> = mapOf(
+    private fun newProduct(name: String, uid: String, alwaysHidden: Boolean): Map<String, Any?> = mapOf(
         F.DISPLAY_NAME to NameNormalizer.displayName(name),
         F.NORMALIZED_NAME to NameNormalizer.normalizedName(name),
         F.SEARCH_KEY to NameNormalizer.searchKey(name),
         F.CREATED_BY to uid,
         F.CREATED_AT to FieldValue.serverTimestamp(),
         F.MERGED_INTO to null,
-    )
+    ) + if (alwaysHidden) {
+        // 訂正する前の商品の「常に非表示」を引き継ぐ
+        mapOf(F.SUGGESTION_EXCLUDED to true, F.SUGGESTION_EXCLUDED_AT to FieldValue.serverTimestamp(), F.SUGGESTION_EXCLUDED_BY to uid)
+    } else {
+        emptyMap()
+    }
 
     /**
      * 統合は最初に統合した人と時刻を書き、付け替えは書き換えない。解除は消す。どれも、最後に変えた人と時刻を書く。

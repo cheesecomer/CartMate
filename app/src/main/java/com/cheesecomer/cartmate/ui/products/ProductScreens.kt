@@ -66,6 +66,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.material3.Switch
 import java.time.format.DateTimeFormatter
 import com.cheesecomer.cartmate.domain.input.formatQuantity
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.material3.RadioButton
 import com.cheesecomer.cartmate.R
 import com.cheesecomer.cartmate.domain.model.Product
 import com.cheesecomer.cartmate.domain.model.ProductId
@@ -132,8 +135,8 @@ fun ProductNamesScreen(onBack: () -> Unit, onOpen: (ProductId) -> Unit, viewMode
                     }
                 }
                 if (showHidden) {
-                    items(loaded.hidden, key = { "hidden-" + it.product.id.value }) { entry ->
-                        HiddenEntryRow(entry, onOpen)
+                    items(loaded.hidden, key = { "hidden-" + it.entry.product.id.value }) { hidden ->
+                        HiddenEntryRow(hidden, onOpen)
                     }
                 }
                 item(key = "hidden-bottom") { Spacer(Modifier.height(CartMateSpacing.xLarge)) }
@@ -142,19 +145,27 @@ fun ProductNamesScreen(onBack: () -> Unit, onOpen: (ProductId) -> Unit, viewMode
     }
 }
 
-/** 非表示の商品の行。一覧の行より小さく、薄い色で出す */
+/** 非表示の商品の行。一覧の行より小さく、薄い色で出す。どちらの非表示かと、非表示にした人を添える */
 @Composable
-private fun HiddenEntryRow(entry: ProductMerge.Entry, onOpen: (ProductId) -> Unit) {
-    Text(
-        entry.product.displayName,
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier
+private fun HiddenEntryRow(hidden: ProductNamesViewModel.HiddenEntry, onOpen: (ProductId) -> Unit) {
+    val entry = hidden.entry
+    val mode = stringResource(
+        if (entry.mode == ProductMerge.SuggestionMode.ALWAYS_HIDDEN) R.string.suggestion_mode_always else R.string.suggestion_mode_temporary,
+    )
+    Column(
+        Modifier
             .fillMaxWidth()
             .clickable(role = Role.Button) { onOpen(entry.product.id) }
             .heightIn(min = 40.dp)
             .padding(horizontal = CartMateSpacing.xLarge, vertical = CartMateSpacing.small),
-    )
+    ) {
+        Text(entry.product.displayName, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            listOf(mode, hidden.byName ?: stringResource(R.string.former_member)).joinToString("・"),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
 }
 
 @Composable
@@ -217,16 +228,16 @@ fun ProductDetailScreen(
                     onMerge = { onMerge(detail.entry.product.id) },
                     onDictionaryOptOut = viewModel::setDictionaryOptOut,
                     onRename = { renaming = true },
-                    onHide = { confirmHide = true },
                     onOpenHistory = { onOpenHistory(detail.entry.product.id) },
-                    onSuggestionExcluded = viewModel::setSuggestionExcluded,
+                    // 一時的に非表示は、一覧からも消えるので確認する
+                    onMode = { if (it == ProductMerge.SuggestionMode.TEMPORARILY_HIDDEN) confirmHide = true else viewModel.setMode(it) },
                 )
                 is ProductMerge.Detail.Merged -> MergedDetail(
                     target = detail.target,
                     onUnmerge = { viewModel.unmerge(detail.product.id) },
                     onOpenTarget = { onOpen(detail.target.id) },
                 )
-                is ProductMerge.Detail.Hidden -> HiddenDetail(entry = detail.entry, onShow = viewModel::show)
+                is ProductMerge.Detail.Hidden -> HiddenDetail(entry = detail.entry, onMode = viewModel::setMode)
             }
         }
     }
@@ -235,6 +246,8 @@ fun ProductDetailScreen(
     if (renaming && loaded != null) {
         RenameDialog(
             initial = loaded.entry.product.displayName,
+            alwaysHidden = loaded.entry.product.suggestionExcluded,
+            findTarget = viewModel::renameTarget,
             onConfirm = {
                 renaming = false
                 viewModel.rename(it)
@@ -250,7 +263,7 @@ fun ProductDetailScreen(
             confirmButton = {
                 TextButton(onClick = {
                     confirmHide = false
-                    viewModel.hide()
+                    viewModel.setMode(ProductMerge.SuggestionMode.TEMPORARILY_HIDDEN)
                 }) { Text(stringResource(R.string.product_detail_hide_confirm)) }
             },
             dismissButton = {
@@ -260,22 +273,40 @@ fun ProductDetailScreen(
     }
 }
 
-/** 名前の訂正。正しい名前を入力する。今の名前と同じ（正規化すると同じ）なら確定できない */
+/**
+ * 名前の訂正。正しい名前を入力する。今の名前と同じ（正規化すると同じ）なら確定できない。
+ * 既にある商品にまとめることになり、常に非表示の設定が変わる場合は、そのことを伝える
+ */
 @Composable
-private fun RenameDialog(initial: String, onConfirm: (String) -> Unit, onDismiss: () -> Unit) {
+private fun RenameDialog(
+    initial: String,
+    /** 今の商品が常に非表示か */
+    alwaysHidden: Boolean,
+    findTarget: suspend (String) -> Product?,
+    onConfirm: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
     var name by rememberSaveable { mutableStateOf(initial) }
     val changed = name.isNotBlank() && NameNormalizer.productId(name) != NameNormalizer.productId(initial)
+    var target by remember { mutableStateOf<Product?>(null) }
+    LaunchedEffect(name) { target = if (changed) findTarget(name) else null }
+    val notice = target?.takeIf { it.suggestionExcluded != alwaysHidden }?.let {
+        stringResource(if (it.suggestionExcluded) R.string.rename_notice_always else R.string.rename_notice_normal, it.displayName)
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.product_detail_rename)) },
         text = {
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it.take(Item.MAX_NAME_LENGTH) },
-                supportingText = { Text(stringResource(R.string.product_detail_rename_hint)) },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(CartMateSpacing.small)) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it.take(Item.MAX_NAME_LENGTH) },
+                    supportingText = { Text(stringResource(R.string.product_detail_rename_hint)) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                )
+                notice?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.tertiary) }
+            }
         },
         confirmButton = {
             TextButton(onClick = { onConfirm(name) }, enabled = changed) { Text(stringResource(R.string.product_detail_rename_confirm)) }
@@ -294,9 +325,8 @@ private fun TargetDetail(
     onMerge: () -> Unit,
     onDictionaryOptOut: (Boolean) -> Unit,
     onRename: () -> Unit,
-    onHide: () -> Unit,
     onOpenHistory: () -> Unit,
-    onSuggestionExcluded: (Boolean) -> Unit,
+    onMode: (ProductMerge.SuggestionMode) -> Unit,
 ) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         SectionLabel(stringResource(R.string.product_detail_members, entry.members.size))
@@ -336,7 +366,7 @@ private fun TargetDetail(
             }
         }
 
-        // 予測。購入履歴（1件ずつ予測に使わないにできる）と、時期が近い商品の提案に出すかどうか
+        // 予測。購入履歴（1件ずつ予測に使わないにできる）と、サジェストへの出し方
         SectionLabel(stringResource(R.string.product_detail_prediction_section))
         ListItem(
             headlineContent = { Text(stringResource(R.string.product_detail_history)) },
@@ -344,44 +374,52 @@ private fun TargetDetail(
             colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface),
             modifier = Modifier.clickable(role = Role.Button, onClick = onOpenHistory),
         )
-        ListItem(
-            headlineContent = { Text(stringResource(R.string.product_detail_suggest)) },
-            supportingContent = { Text(stringResource(R.string.product_detail_suggest_description)) },
-            trailingContent = {
-                Switch(checked = !entry.product.suggestionExcluded, onCheckedChange = null)
-            },
-            colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface),
-            modifier = Modifier.toggleable(
-                value = !entry.product.suggestionExcluded,
-                role = Role.Switch,
-                onValueChange = { suggest -> onSuggestionExcluded(!suggest) },
-            ),
-        )
+        ModeSelector(entry.mode, onMode)
 
         SectionLabel(stringResource(R.string.product_detail_other_section))
         Column(Modifier.padding(horizontal = CartMateSpacing.large)) {
             TextButton(onClick = onRename) { Text(stringResource(R.string.product_detail_rename)) }
             Text(stringResource(R.string.product_detail_rename_description), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.height(CartMateSpacing.medium))
-            TextButton(onClick = onHide) { Text(stringResource(R.string.product_detail_hide)) }
-            Text(stringResource(R.string.product_detail_hide_description), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Spacer(Modifier.height(CartMateSpacing.xLarge))
     }
 }
 
+/** 一時的に非表示の商品。まとめている商品と、サジェストへの出し方 */
 @Composable
-private fun HiddenDetail(entry: ProductMerge.Entry, onShow: () -> Unit) {
-    Column(Modifier.fillMaxSize().padding(CartMateSpacing.large), verticalArrangement = Arrangement.spacedBy(CartMateSpacing.medium)) {
-        Text(stringResource(R.string.product_detail_hidden), style = MaterialTheme.typography.titleMedium)
-        if (entry.members.isNotEmpty()) {
-            Text(
-                stringResource(R.string.product_detail_hidden_members, entry.members.joinToString("、") { it.displayName }),
-                style = MaterialTheme.typography.bodyMedium,
+private fun HiddenDetail(entry: ProductMerge.Entry, onMode: (ProductMerge.SuggestionMode) -> Unit) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+        Column(Modifier.padding(CartMateSpacing.large), verticalArrangement = Arrangement.spacedBy(CartMateSpacing.medium)) {
+            Text(stringResource(R.string.product_detail_hidden), style = MaterialTheme.typography.titleMedium)
+            if (entry.members.isNotEmpty()) {
+                Text(
+                    stringResource(R.string.product_detail_hidden_members, entry.members.joinToString("、") { it.displayName }),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+            Text(stringResource(R.string.product_detail_hidden_hint), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        ModeSelector(entry.mode, onMode)
+    }
+}
+
+/** サジェストへの出し方（docs/requirements.md §4.3）。通常どおり表示・一時的に非表示・常に非表示から選ぶ */
+@Composable
+private fun ModeSelector(mode: ProductMerge.SuggestionMode, onSelect: (ProductMerge.SuggestionMode) -> Unit) {
+    Column(Modifier.selectableGroup()) {
+        listOf(
+            Triple(ProductMerge.SuggestionMode.NORMAL, R.string.suggestion_mode_normal, R.string.suggestion_mode_normal_description),
+            Triple(ProductMerge.SuggestionMode.TEMPORARILY_HIDDEN, R.string.suggestion_mode_temporary, R.string.suggestion_mode_temporary_description),
+            Triple(ProductMerge.SuggestionMode.ALWAYS_HIDDEN, R.string.suggestion_mode_always, R.string.suggestion_mode_always_description),
+        ).forEach { (value, title, description) ->
+            ListItem(
+                headlineContent = { Text(stringResource(title)) },
+                supportingContent = { Text(stringResource(description)) },
+                leadingContent = { RadioButton(selected = mode == value, onClick = null) },
+                colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface),
+                modifier = Modifier.selectable(selected = mode == value, role = Role.RadioButton, onClick = { onSelect(value) }),
             )
         }
-        Text(stringResource(R.string.product_detail_hidden_hint), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        OutlinedButton(onClick = onShow, shape = CircleShape) { Text(stringResource(R.string.product_detail_show)) }
     }
 }
 
@@ -509,6 +547,10 @@ fun MergeProductsScreen(onBack: () -> Unit, onDone: () -> Unit, viewModel: Merge
                         // 選んだ商品にまとまっている商品も、一緒に移ることを伝える
                         selected.filter { it.members.isNotEmpty() }.forEach {
                             Text(stringResource(R.string.merge_products_confirm_members, it.product.displayName, it.members.size))
+                        }
+                        // まとめた商品は統合先の設定に従う。統合先が常に非表示なら、そのことを伝える
+                        if (target.product.suggestionExcluded) {
+                            Text(stringResource(R.string.merge_products_confirm_always_hidden, target.product.displayName))
                         }
                     }
                 },

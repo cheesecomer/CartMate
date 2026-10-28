@@ -48,7 +48,7 @@ class ProductNamesViewModelTest {
         add("豚バラ肉", "豚ばら肉", "豚バラ")
         val target = productId("豚バラ肉")
         store.applyMergeChanges(ProductMerge.mergeChanges(target, listOf(productId("豚ばら肉")), store.observeProducts().first())!!)
-        ProductNamesViewModel(catalog).lists.test {
+        ProductNamesViewModel(catalog) { flowOf(emptyList()) }.lists.test {
             val entries = awaitUntil { it != null && it.entries.size == 2 }!!.entries
             assertThat(entries.map { it.product.displayName }).containsExactly("豚バラ", "豚バラ肉")
             assertThat(entries.first { it.product.id == target }.members.map { it.displayName }).containsExactly("豚ばら肉")
@@ -157,13 +157,13 @@ class ProductNamesViewModelTest {
     fun `非表示にすると一覧から外れて非表示の商品に移り、同じ名前をまた追加すると一覧に戻る`() = runTest {
         add("牛乳", "テスト")
         val test = productId("テスト")
-        val names = ProductNamesViewModel(catalog)
+        val names = ProductNamesViewModel(catalog) { flowOf(emptyList()) }
         names.lists.test {
             awaitUntil { it != null && it.entries.size == 2 }
-            detail(test).hide()
+            detail(test).setMode(ProductMerge.SuggestionMode.TEMPORARILY_HIDDEN)
             val hidden = awaitUntil { it != null && it.hidden.isNotEmpty() }!!
             assertThat(hidden.entries.map { it.product.displayName }).containsExactly("牛乳")
-            assertThat(hidden.hidden.map { it.product.displayName }).containsExactly("テスト")
+            assertThat(hidden.hidden.map { it.entry.product.displayName }).containsExactly("テスト")
 
             // 非表示にしたあとに、同じ名前をまた追加した
             clock.advance(java.time.Duration.ofMinutes(1))
@@ -181,7 +181,7 @@ class ProductNamesViewModelTest {
         val viewModel = detail(test)
         viewModel.state.test {
             awaitUntil { (it as? ProductDetailViewModel.State.Loaded)?.detail is ProductMerge.Detail.Target }
-            viewModel.hide()
+            viewModel.setMode(ProductMerge.SuggestionMode.TEMPORARILY_HIDDEN)
             awaitUntil { (it as? ProductDetailViewModel.State.Loaded)?.detail is ProductMerge.Detail.Hidden }
             viewModel.show()
             awaitUntil { (it as? ProductDetailViewModel.State.Loaded)?.detail is ProductMerge.Detail.Target }
@@ -204,7 +204,7 @@ class ProductNamesViewModelTest {
             assertThat(renamed.target).isEqualTo(productId("牛乳"))
         }
         assertThat(mergedInto("牛入")).isEqualTo(productId("牛乳"))
-        ProductNamesViewModel(catalog).lists.test {
+        ProductNamesViewModel(catalog) { flowOf(emptyList()) }.lists.test {
             val entries = awaitUntil { it != null && it.entries.isNotEmpty() }!!.entries
             assertThat(entries.map { it.product.displayName }).containsExactly("牛乳")
             assertThat(entries.single().members.map { it.displayName }).containsExactly("牛入")
@@ -213,18 +213,63 @@ class ProductNamesViewModelTest {
     }
 
     @Test
-    fun `時期が近い商品の提案に出さないようにして、戻せる`() = runTest {
-        add("牛乳")
-        val milk = productId("牛乳")
-        val viewModel = detail(milk)
-        viewModel.state.test {
-            awaitUntil { it is ProductDetailViewModel.State.Loaded }
-            viewModel.setSuggestionExcluded(true)
-            awaitUntil { ((it as? ProductDetailViewModel.State.Loaded)?.detail as? ProductMerge.Detail.Target)?.entry?.product?.suggestionExcluded == true }
-            viewModel.setSuggestionExcluded(false)
-            awaitUntil { ((it as? ProductDetailViewModel.State.Loaded)?.detail as? ProductMerge.Detail.Target)?.entry?.product?.suggestionExcluded == false }
+    fun `常に非表示は再購入しても戻らず、一時的な非表示は再購入で戻り、どちらも通常どおり表示に戻せる`() = runTest {
+        add("カーテンフック", "パテ")
+        val curtain = productId("カーテンフック")
+        val putty = productId("パテ")
+        detail(curtain).setMode(ProductMerge.SuggestionMode.ALWAYS_HIDDEN)
+        detail(putty).setMode(ProductMerge.SuggestionMode.TEMPORARILY_HIDDEN)
+        val names = ProductNamesViewModel(catalog) { flowOf(emptyList()) }
+        names.lists.test {
+            val hidden = awaitUntil { it != null && it.hidden.size == 2 }!!.hidden
+            assertThat(hidden.associate { it.entry.product.displayName to it.entry.mode }).containsExactly(
+                "カーテンフック", ProductMerge.SuggestionMode.ALWAYS_HIDDEN,
+                "パテ", ProductMerge.SuggestionMode.TEMPORARILY_HIDDEN,
+            )
+
+            // どちらも再購入した
+            clock.advance(java.time.Duration.ofMinutes(1))
+            add("カーテンフック", "パテ")
+            val after = awaitUntil { it != null && it.hidden.size == 1 }!!
+            assertThat(after.hidden.single().entry.product.displayName).isEqualTo("カーテンフック")
+            assertThat(after.entries.map { it.product.displayName }).containsExactly("パテ")
+
+            detail(curtain).setMode(ProductMerge.SuggestionMode.NORMAL)
+            awaitUntil { it != null && it.hidden.isEmpty() }
             cancelAndIgnoreRemainingEvents()
         }
+        // 常に非表示を解除したら、設定した人も消える
+        assertThat(store.observeProducts().first().first { it.id == curtain }.suggestionExcludedBy).isNull()
+    }
+
+    @Test
+    fun `一時的に非表示から常に非表示に変えると、再購入しても戻らない`() = runTest {
+        add("パテ")
+        val putty = productId("パテ")
+        detail(putty).setMode(ProductMerge.SuggestionMode.TEMPORARILY_HIDDEN)
+        detail(putty).setMode(ProductMerge.SuggestionMode.ALWAYS_HIDDEN)
+        clock.advance(java.time.Duration.ofMinutes(1))
+        add("パテ")
+        val product = store.observeProducts().first().first { it.id == putty }
+        assertThat(product.suggestionExcluded).isTrue()
+        assertThat(product.hiddenAt).isNull()
+    }
+
+    @Test
+    fun `常に非表示の商品の名前を訂正して新しく作る商品は、常に非表示を引き継ぐ`() = runTest {
+        add("カーテンに引っ掛けるやつ")
+        val vague = productId("カーテンに引っ掛けるやつ")
+        detail(vague).setMode(ProductMerge.SuggestionMode.ALWAYS_HIDDEN)
+        val viewModel = detail(vague)
+        viewModel.events.test {
+            viewModel.state.test {
+                awaitUntil { it is ProductDetailViewModel.State.Loaded }
+                viewModel.rename("カーテンフック")
+                cancelAndIgnoreRemainingEvents()
+            }
+            awaitItem()
+        }
+        assertThat(store.observeProducts().first().first { it.displayName == "カーテンフック" }.suggestionExcluded).isTrue()
     }
 }
 

@@ -150,9 +150,37 @@ class SuggestionEngineTest {
     }
 
     @Test
-    fun `提案から除外した商品は出さない`() {
-        val milk = product("牛乳", suggestionExcluded = true)
-        assertThat(engine(listOf(milk), bought(milk, 0, 10, 20), today = 29).dueNames()).isEmpty()
+    fun `常に非表示の商品は、時期が近い商品にも補完にも出さず、再購入しても戻らない`() {
+        val curtain = product("カーテンフック", suggestionExcluded = true)
+        val purchases = bought(curtain, 0, 10, 20)
+        val engine = engine(listOf(curtain), purchases, today = 29)
+        assertThat(engine.dueNames()).isEmpty()
+        assertThat(engine.complete("カーテン", "スーパー")).isEmpty()
+        // 再購入しても常に非表示のまま（一時的な非表示と違い、時刻で戻らない）
+        val again = engine(listOf(curtain), purchases + bought(curtain, 30), today = 39)
+        assertThat(again.dueNames()).isEmpty()
+        assertThat(again.complete("カーテン", "スーパー")).isEmpty()
+    }
+
+    @Test
+    fun `常に非表示の商品は、前回の購入は返すが早すぎる再購入の注意は出さない`() {
+        val curtain = product("カーテンフック", suggestionExcluded = true)
+        val previous = engine(listOf(curtain), bought(curtain, 0, 10, 20), today = 21).previous("カーテンフック")!!
+        assertThat(previous.typicalIntervalDays).isEqualTo(10)
+        assertThat(previous.early).isNull()
+    }
+
+    @Test
+    fun `辞書で同じ商品でも、常に非表示にしていない名前は候補に出す`() {
+        val egg = product("卵")
+        val kana = product("たまご", suggestionExcluded = true)
+        val dictionary = NormalizationDictionary(
+            version = "test",
+            canonicalNames = mapOf(CanonicalId("egg") to "卵"),
+            aliases = mapOf("卵" to Alias(CanonicalId("egg"), Match.EXACT), "たまご" to Alias(CanonicalId("egg"), Match.PREFIX)),
+        )
+        val purchases = bought(egg, 0, 10) + bought(kana, 20)
+        assertThat(engine(listOf(egg, kana), purchases, today = 28, dictionary = dictionary).dueNames()).containsExactly("卵")
     }
 
     @Test

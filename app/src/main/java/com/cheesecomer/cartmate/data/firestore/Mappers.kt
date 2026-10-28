@@ -64,7 +64,9 @@ fun DocumentSnapshot.toProduct(): Product? = Product(
     mergedInto = getString(F.MERGED_INTO)?.let(::ProductId),
     dictionaryOptOut = getBoolean(F.DICTIONARY_OPT_OUT) ?: false,
     hiddenAt = instant(F.HIDDEN_AT),
+    hiddenBy = getString(F.HIDDEN_BY)?.let(::UserId),
     suggestionExcluded = getBoolean(F.SUGGESTION_EXCLUDED) ?: false,
+    suggestionExcludedBy = getString(F.SUGGESTION_EXCLUDED_BY)?.let(::UserId),
 )
 
 fun DocumentSnapshot.toPurchase(): Purchase? = Purchase(

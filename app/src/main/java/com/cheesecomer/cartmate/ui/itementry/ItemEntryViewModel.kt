@@ -37,6 +37,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import com.cheesecomer.cartmate.domain.model.ProductId
 import com.cheesecomer.cartmate.domain.product.MergeCandidates
+import com.cheesecomer.cartmate.domain.product.ProductGraph
 import com.cheesecomer.cartmate.domain.product.ProductHiding
 import com.cheesecomer.cartmate.domain.product.ProductUsage
 import com.cheesecomer.cartmate.domain.repository.ProductRepository
@@ -121,7 +122,12 @@ class ItemEntryViewModel @Inject constructor(
         val entry = state.entry?.takeIf { it.editing == null } ?: return@combine null
         // 非表示の商品は候補にしない
         val hidden = ProductHiding.hiddenRoots(products, usage)
-        val visible = products.filter { it.id in usage.visibleIds && !ProductHiding.isHidden(it.id, products, hidden) }
+        // 常に非表示の商品（統合先の設定）も候補にしない
+        val graph = ProductGraph(products)
+        val byId = products.associateBy { it.id }
+        val visible = products.filter {
+            it.id in usage.visibleIds && !ProductHiding.isHidden(it.id, products, hidden) && byId[graph.resolve(it.id)]?.suggestionExcluded != true
+        }
         val candidate = MergeCandidates.find(entry.name, visible, products, dictionary)
             ?: return@combine null
         MergeChip(candidate.id, candidate.displayName, selected = selected == candidate.id)

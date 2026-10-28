@@ -124,6 +124,19 @@ class ItemEntryViewModelTest {
     }
 
     @Test
+    fun `常に非表示の商品は、表記ゆれのチップの候補にしない`() = runTest {
+        store.addItem(newItem(listId, "牛乳"))
+        store.setSuggestionExcluded(store.observeProducts().first().single().id, true)
+        val viewModel = viewModel(name = "牛乳 1L")
+        viewModel.mergeChip.test {
+            assertThat(awaitItem()).isNull()
+            // 入力欄と候補の計算が落ち着いても、候補は出ない
+            this@runTest.testScheduler.advanceUntilIdle()
+            expectNoEvents()
+        }
+    }
+
+    @Test
     fun `チップを選んで追加すると、新しい商品を似た名前の商品に統合して記録する`() = runTest {
         store.addItem(newItem(listId, "牛乳"))
         val viewModel = viewModel(name = "牛乳 1L")

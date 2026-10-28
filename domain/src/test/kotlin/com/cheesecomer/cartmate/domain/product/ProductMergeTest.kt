@@ -251,4 +251,37 @@ class ProductMergeTest {
         assertThat(ProductMerge.renameChanges(milk.id, "  ", products)).isNull()
         assertThat(ProductMerge.renameChanges(kana.id, "牛にゅう", products)).isNull()
     }
+
+    @Test
+    fun `常に非表示の商品は一覧から外れて非表示の商品に出て、一時的な非表示より優先する`() {
+        val milk = product("牛乳")
+        val curtain = product("カーテンフック").copy(suggestionExcluded = true)
+        val putty = product("パテ", hiddenAt = Instant.EPOCH)
+        val all = listOf(milk, curtain, putty)
+        val visible = ids(milk, curtain, putty)
+        val hidden = setOf(putty.id)
+        assertThat(ProductMerge.entries(all, visible, dictionary, hidden).map { it.product }).containsExactly(milk)
+        assertThat(ProductMerge.hiddenEntries(all, visible, dictionary, hidden).associate { it.product.displayName to it.mode })
+            .containsExactly("カーテンフック", ProductMerge.SuggestionMode.ALWAYS_HIDDEN, "パテ", ProductMerge.SuggestionMode.TEMPORARILY_HIDDEN)
+        assertThat(ProductMerge.candidates(milk.id, all, visible, dictionary, hidden)).isEmpty()
+        // 常に非表示の商品を開くと、設定を変えられる統合先の画面
+        assertThat(ProductMerge.detail(curtain.id, all, visible, dictionary, hidden)).isInstanceOf(ProductMerge.Detail.Target::class.java)
+    }
+
+    @Test
+    fun `名前の訂正で新しく作る商品には、常に非表示を引き継ぐ`() {
+        val vague = product("カーテンに引っ掛けるやつ").copy(suggestionExcluded = true)
+        val hookId = ProductId(NameNormalizer.productId("カーテンフック"))
+        assertThat(ProductMerge.renameChanges(vague.id, "カーテンフック", listOf(vague)))
+            .contains(Change.Create(hookId, "カーテンフック", alwaysHidden = true))
+        assertThat(ProductMerge.renameTarget(vague.id, "カーテンフック", listOf(vague))).isNull()
+    }
+
+    @Test
+    fun `名前の訂正で既にある商品にまとめるときは、その統合先を返す（設定が統合先のものになる）`() {
+        val hook = product("カーテンフック")
+        val vague = product("カーテンに引っ掛けるやつ").copy(suggestionExcluded = true)
+        assertThat(ProductMerge.renameTarget(vague.id, "カーテンフック", listOf(hook, vague))).isEqualTo(hook)
+    }
 }
+

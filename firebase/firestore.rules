@@ -264,8 +264,11 @@ service cloud.firestore {
         allow create: if isImport('products', pid, me(), []);   // 合流
         allow create: if isMember(hid)
           && request.resource.data.keys().hasOnly(['displayName','normalizedName','searchKey','createdBy','createdAt',
-                'mergedInto','mergedAt','mergedBy','mergeUpdatedAt','mergeUpdatedBy'])
+                'mergedInto','mergedAt','mergedBy','mergeUpdatedAt','mergeUpdatedBy',
+                'suggestionExcluded','suggestionExcludedAt','suggestionExcludedBy'])
           && str(request.resource.data.displayName, 60)
+          // 名前の訂正で作る商品は、訂正する前の商品の「常に非表示」を引き継げる。作った人と時刻を書く
+          && (request.resource.data.get('suggestionExcluded', null) == null || isExcludedByMe())
           && str(request.resource.data.normalizedName, 60)
           && str(request.resource.data.searchKey, 60)
           && (request.resource.data.mergedInto == null || isCreatedMerged());
@@ -341,9 +344,17 @@ service cloud.firestore {
             && request.resource.data.get('hiddenAt', null) == null
             && request.resource.data.get('hiddenBy', null) == null;
         }
-        // 時期が近い商品の提案から除外する（補完には出す）とその取り消し
+        // 常に非表示（再購入しても戻らない）とその解除。設定した人と時刻を書き、解除するときは消す
         function isSuggestionExclusion() {
-          return changed().hasOnly(['suggestionExcluded']) && request.resource.data.suggestionExcluded is bool;
+          let d = request.resource.data;
+          return changed().hasOnly(['suggestionExcluded','suggestionExcludedAt','suggestionExcludedBy'])
+            && (isExcludedByMe()
+                || (d.suggestionExcluded == false
+                    && d.get('suggestionExcludedAt', null) == null && d.get('suggestionExcludedBy', null) == null));
+        }
+        function isExcludedByMe() {
+          let d = request.resource.data;
+          return d.suggestionExcluded == true && d.suggestionExcludedBy == me() && d.suggestionExcludedAt == request.time;
         }
         // 名寄せ辞書でまとめない（「別の商品として扱う」）とその取り消し
         function isDictionaryOptOut() {

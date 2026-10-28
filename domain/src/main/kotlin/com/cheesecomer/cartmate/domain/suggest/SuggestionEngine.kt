@@ -128,9 +128,13 @@ class SuggestionEngine(
      */
     private val rootsByKey: Map<ResolvedKey, Set<ProductId>> = usage.visibleIds
         .map(::rootOf)
-        .filter { it in byId && it !in hidden }
+        // 一時的に非表示と常に非表示の商品は、候補に名前を出さない（docs/requirements.md §4.3）
+        .filter { it in byId && it !in hidden && !alwaysHidden(it) }
         .groupBy(::keyOf)
         .mapValues { (_, roots) -> roots.toSet() }
+
+    /** 常に非表示（統合先の設定）。購入の記録は残り、周期も数えるが、候補と注意には出さない */
+    private fun alwaysHidden(root: ProductId): Boolean = byId[root]?.suggestionExcluded == true
 
     /** 統合先ごとの、最後に使った時刻（まとめている商品の項目と購入を含む） */
     private val lastUsedByRoot: Map<ProductId, Instant> = HashMap<ProductId, Instant>().apply {
@@ -195,13 +199,14 @@ class SuggestionEngine(
             val purchases = factsByGroup.getValue(group)
             val keys = purchases.map { records.getValue(it).key }.toSet()
             if (keys.any { it in openKeys }) return@mapNotNull null
-            if (keys.flatMap { rootsByKey[it].orEmpty() }.any { byId[it]?.suggestionExcluded == true }) return@mapNotNull null
             val score = keys.maxOf { relevance[it] ?: 0.0 }
             if (score <= 0.0) return@mapNotNull null
             val last = latest(purchases)!!
             val record = records.getValue(last)
             // まとめる先に名前を出せる商品がなければ（「お茶」＋備考「麦茶」だけで買っている場合など）、前回買った商品の名前
-            val product = representative(record.key) ?: byId[rootOf(last.productId!!)]?.takeIf { it.id !in hidden } ?: return@mapNotNull null
+            val product = representative(record.key)
+                ?: byId[rootOf(last.productId!!)]?.takeIf { it.id !in hidden && !alwaysHidden(it.id) }
+                ?: return@mapNotNull null
             val memoItemNames = record.attributes.memoItems.map { dictionary.canonicalNames[it] ?: it.value }
             DueSuggestion(
                 product = product,
@@ -335,7 +340,8 @@ class SuggestionEngine(
             unit = last.unit,
             date = last.date(),
             typicalIntervalDays = estimate?.typicalIntervalDays,
-            early = EarlyPurchaseDetector.detect(estimate, today, params),
+            // 常に非表示の商品には、早すぎる再購入の注意も出さない
+            early = EarlyPurchaseDetector.detect(estimate, today, params).takeIf { !alwaysHidden(rootOf(last.productId!!)) },
         )
     }
 
