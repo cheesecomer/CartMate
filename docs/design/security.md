@@ -51,9 +51,10 @@
 
 | ファイル | 内容 |
 |---|---|
-| `firebase/hosting/.well-known/assetlinks.json` | パッケージ名と署名証明書の SHA-256 フィンガープリント（デバッグ用、アップロード鍵、Play App Signing の鍵） |
+| `firebase/hosting/.well-known/assetlinks.json` | パッケージ名と署名証明書の SHA-256 フィンガープリント。上から順に、デバッグ用（`F0:69:…`）、アップロード鍵（`88:C4:…`）、Play App Signing の鍵（`DA:B0:…`） |
 | `firebase/hosting/join/index.html` | フォールバックページ（`/join/**` をこのページに rewrite する） |
 | `firebase/hosting/account-deletion/index.html` | アカウント削除の案内ページ（Play Console のデータ削除の URL に登録する） |
+| `firebase/hosting/privacy/index.html` | プライバシーポリシー（Play Console のストアの掲載情報とアプリ内から開く。[release.md](../release.md#データセーフティ)） |
 
 ## メンバー管理
 
@@ -96,7 +97,7 @@ Google Play は、アカウントを作るアプリに、アプリ内とアプ�
 
 Firebase App Check（Play Integrity）を導入します。招待コードの総当たりや、改造したクライアントからのアクセスを、少ない手間で抑えられます。
 
-- リリース版は Play Integrity、デバッグ版はデバッグ用のプロバイダを使います（`app/src/release`、`app/src/debug` の `AppCheckSetup`）。デバッグ版は、起動時に Logcat（`DebugAppCheckProvider`）に出るトークンを Firebase コンソールの App Check に登録します。
+- リリース版は Play Integrity、デバッグ版はデバッグ用のプロバイダを使います（`app/src/release`、`app/src/debug` の `AppCheckSetup`）。デバッグ版は、起動時に Logcat に出るトークン（「App Check debug token」）を Firebase コンソールの App Check に登録します（[release.md](../release.md#app-check-の強制)）。
 - Firestore での App Check の強制は、Play Console にアプリを登録して Play Integrity を Firebase とつないでから有効にします。それまでは強制しません（強制すると、登録のない端末から読み書きできなくなるため）。
 
 ## リポジトリに含めないもの

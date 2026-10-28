@@ -17,5 +17,6 @@
 | [design/suggestions.md](design/suggestions.md) | 商品の同一性、購入周期の推定、リスト類似度、サジェスト |
 | [testing.md](testing.md) | テスト戦略 |
 | [roadmap.md](roadmap.md) | 実装フェーズ |
+| [release.md](release.md) | Play Console への登録、署名、データセーフティ、App Check の強制の手順 |
 
 振る舞いを変える場合は、まず requirements.md を更新し、それから該当する設計資料を更新します。デザインの資料どうしで食い違う場合の優先順位は [design/ui.md](design/ui.md#見た目の基準) にあります。
