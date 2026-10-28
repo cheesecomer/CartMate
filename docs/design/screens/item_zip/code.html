@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+
+<html lang="ja"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
+<meta content="mobile_stack" name="shell-type"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Epilogue:wght@600;700&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+    @layer base {
+      html, body {
+        width: 100vw;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        overscroll-behavior: none;
+      }
+      .pb-safe {
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+      }
+      .pt-safe {
+        padding-top: env(safe-area-inset-top, 0px);
+      }
+    }
+    ::-webkit-scrollbar {
+      display: none;
+    }
+  </style>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            surface: "#FFF7FF",
+            background: "#FFF7FF",
+            primary: "#6B4E8C",
+            "primary-container": "#6B4E8C",
+            "on-primary": "#FFFFFF",
+            "on-surface": "#1F1925",
+            "on-surface-variant": "#4A454F",
+            "surface-container-low": "#FBF0FF",
+            "surface-container": "#F6EAFB",
+            "surface-container-high": "#F0E4F5",
+            "surface-container-highest": "#EADFEF",
+            "surface-container-lowest": "#FFFFFF",
+            outline: "#CAC4CF",
+            "outline-variant": "#CAC4CF",
+            "secondary-container": "#DBB9FD",
+            "on-secondary-container": "#624681"
+          },
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            epilogue: ['Epilogue', 'sans-serif']
+          }
+        }
+      }
+    };
+  </script>
+</head>
+<body class="bg-surface font-sans text-on-surface flex flex-col min-h-screen selection:bg-secondary-container">
+<!-- Top App Bar (Back button and title only) -->
+<header class="fixed top-0 inset-x-0 z-50 bg-surface pt-safe border-b border-transparent">
+<div class="h-14 px-4 flex items-center">
+<button aria-label="戻る" class="w-10 h-10 -ml-2 rounded-full flex items-center justify-center text-on-surface active:bg-surface-container-high transition-colors" onclick="history.back()" type="button">
+<span class="material-symbols-outlined text-[24px]">arrow_back</span>
+</button>
+<h1 class="text-[19px] font-bold text-on-surface tracking-tight ml-2">商品をまとめる</h1>
+</div>
+</header>
+<!-- Main Content Area -->
+<main class="flex flex-col relative w-full pt-14 pb-24 bg-surface flex-grow">
+<!-- "残す商品" Section -->
+<div class="px-4 pt-3 pb-2">
+<div class="bg-[#FBF0FF] rounded-2xl p-4">
+<div class="text-[12px] font-medium text-on-surface-variant mb-1">
+          残す商品
+        </div>
+<h2 class="text-[20px] font-bold text-on-surface leading-tight">テスト1</h2>
+<p class="text-[14px] text-on-surface-variant mt-1.5 leading-normal">「テスト1」にまとめる商品を選んでください</p>
+</div>
+</div>
+<!-- Candidate Header -->
+<div class="px-4 flex items-center justify-between pt-3 pb-2">
+<span class="text-[13px] font-medium text-on-surface-variant">候補リスト（タップして選択）</span>
+<button class="text-[13px] font-semibold text-primary hover:opacity-80 active:opacity-60 transition-opacity" id="toggle-select-all" type="button">すべて解除</button>
+</div>
+<!-- Product Selection List -->
+<div class="px-4">
+<div class="bg-surface-container-lowest rounded-2xl p-2 flex flex-col gap-0.5" id="item-list">
+<!-- Item 1: かぶor大根 (Unchecked) -->
+<label class="group select-item flex items-center h-12 px-3 rounded-xl cursor-pointer transition-colors duration-150 active:bg-surface-container-low">
+<input class="sr-only" name="merge_product" type="checkbox" value="かぶor大根"/>
+<div class="check-box w-6 h-6 rounded-md bg-[#EADFEF] flex items-center justify-center transition-all duration-200"></div>
+<span class="product-name ml-3.5 text-[15px] text-on-surface font-normal select-none">かぶor大根</span>
+</label>
+<!-- Item 2: サラダ (Unchecked) -->
+<label class="group select-item flex items-center h-12 px-3 rounded-xl cursor-pointer transition-colors duration-150 active:bg-surface-container-low">
+<input class="sr-only" name="merge_product" type="checkbox" value="サラダ"/>
+<div class="check-box w-6 h-6 rounded-md bg-[#EADFEF] flex items-center justify-center transition-all duration-200"></div>
+<span class="product-name ml-3.5 text-[15px] text-on-surface font-normal select-none">サラダ</span>
+</label>
+<!-- Item 3: サラダ油 (Unchecked) -->
+<label class="group select-item flex items-center h-12 px-3 rounded-xl cursor-pointer transition-colors duration-150 active:bg-surface-container-low">
+<input class="sr-only" name="merge_product" type="checkbox" value="サラダ油"/>
+<div class="check-box w-6 h-6 rounded-md bg-[#EADFEF] flex items-center justify-center transition-all duration-200"></div>
+<span class="product-name ml-3.5 text-[15px] text-on-surface font-normal select-none">サラダ油</span>
+</label>
+<!-- Item 4: じゃがいも (Unchecked) -->
+<label class="group select-item flex items-center h-12 px-3 rounded-xl cursor-pointer transition-colors duration-150 active:bg-surface-container-low">
+<input class="sr-only" name="merge_product" type="checkbox" value="じゃがいも"/>
+<div class="check-box w-6 h-6 rounded-md bg-[#EADFEF] flex items-center justify-center transition-all duration-200"></div>
+<span class="product-name ml-3.5 text-[15px] text-on-surface font-normal select-none">じゃがいも</span>
+</label>
+<!-- Item 5: てすと (Checked) -->
+<label class="group select-item flex items-center h-12 px-3 rounded-xl cursor-pointer transition-colors duration-150 active:bg-surface-container-low">
+<input checked="" class="sr-only" name="merge_product" type="checkbox" value="てすと"/>
+<div class="check-box w-6 h-6 rounded-md bg-[#6B4E8C] flex items-center justify-center transition-all duration-200"></div>
+<span class="product-name ml-3.5 text-[15px] text-on-surface font-normal select-none">てすと</span>
+</label>
+<!-- Item 6: テスト2 (Checked) -->
+<label class="group select-item flex items-center h-12 px-3 rounded-xl cursor-pointer transition-colors duration-150 active:bg-surface-container-low">
+<input checked="" class="sr-only" name="merge_product" type="checkbox" value="テスト2"/>
+<div class="check-box w-6 h-6 rounded-md bg-[#6B4E8C] flex items-center justify-center transition-all duration-200"></div>
+<span class="product-name ml-3.5 text-[15px] text-on-surface font-normal select-none">テスト2</span>
+</label>
+<!-- Item 7: テスト3 (Checked) -->
+<label class="group select-item flex items-center h-12 px-3 rounded-xl cursor-pointer transition-colors duration-150 active:bg-surface-container-low">
+<input checked="" class="sr-only" name="merge_product" type="checkbox" value="テスト3"/>
+<div class="check-box w-6 h-6 rounded-md bg-[#6B4E8C] flex items-center justify-center transition-all duration-200"></div>
+<span class="product-name ml-3.5 text-[15px] text-on-surface font-normal select-none">テスト3</span>
+</label>
+<!-- Item 8: ベーコン (Unchecked) -->
+<label class="group select-item flex items-center h-12 px-3 rounded-xl cursor-pointer transition-colors duration-150 active:bg-surface-container-low">
+<input class="sr-only" name="merge_product" type="checkbox" value="ベーコン"/>
+<div class="check-box w-6 h-6 rounded-md bg-[#EADFEF] flex items-center justify-center transition-all duration-200"></div>
+<span class="product-name ml-3.5 text-[15px] text-on-surface font-normal select-none">ベーコン</span>
+</label>
+<!-- Item 9: ポテトサラダ (Unchecked) -->
+<label class="group select-item flex items-center h-12 px-3 rounded-xl cursor-pointer transition-colors duration-150 active:bg-surface-container-low">
+<input class="sr-only" name="merge_product" type="checkbox" value="ポテトサラダ"/>
+<div class="check-box w-6 h-6 rounded-md bg-[#EADFEF] flex items-center justify-center transition-all duration-200"></div>
+<span class="product-name ml-3.5 text-[15px] text-on-surface font-normal select-none">ポテトサラダ</span>
+</label>
+<!-- Item 10: 三角コーナーネット (Unchecked) -->
+<label class="group select-item flex items-center h-12 px-3 rounded-xl cursor-pointer transition-colors duration-150 active:bg-surface-container-low">
+<input class="sr-only" name="merge_product" type="checkbox" value="三角コーナーネット"/>
+<div class="check-box w-6 h-6 rounded-md bg-[#EADFEF] flex items-center justify-center transition-all duration-200"></div>
+<span class="product-name ml-3.5 text-[15px] text-on-surface font-normal select-none">三角コーナーネット</span>
+</label>
+</div>
+</div>
+</main>
+<!-- Bottom Floating Confirmation Dock -->
+<div class="fixed bottom-0 inset-x-0 z-40 bg-[#F6EAFB] pb-safe">
+<div class="h-20 px-4 flex items-center justify-between max-w-screen-md mx-auto">
+<!-- Left side: merge icon and selection text -->
+<div class="flex items-center gap-3">
+<div class="w-9 h-9 rounded-full bg-[#DBB9FD] flex items-center justify-center text-[#624681] flex-shrink-0">
+<span class="material-symbols-outlined text-[20px]">merge_type</span>
+</div>
+<div class="flex flex-col justify-center">
+<div class="text-[15px] font-bold text-on-surface leading-tight">
+<span id="selected-count">3</span> 件を選択中
+          </div>
+<span class="text-[11px] text-on-surface-variant mt-0.5">「テスト1」に統合されます</span>
+</div>
+</div>
+<!-- Right side: Purple pill button "まとめる" without arrow icon -->
+<button class="h-11 px-7 rounded-full bg-[#6B4E8C] text-white font-medium text-[15px] flex items-center justify-center active:scale-95 transition-all shadow-none" id="merge-btn" type="button">
+        まとめる
+      </button>
+</div>
+</div>
+<script>
+    (() => {
+      const checkboxes = document.querySelectorAll('input[name="merge_product"]');
+      const countDisplay = document.getElementById('selected-count');
+      const mergeBtn = document.getElementById('merge-btn');
+      const toggleAllBtn = document.getElementById('toggle-select-all');
+
+      function updateState() {
+        const checkedBoxes = Array.from(checkboxes).filter(cb => cb.checked);
+        const count = checkedBoxes.length;
+
+        if (countDisplay) {
+          countDisplay.textContent = count;
+        }
+
+        checkboxes.forEach(cb => {
+          const row = cb.closest('.select-item');
+          const checkDiv = row.querySelector('.check-box');
+          const nameSpan = row.querySelector('.product-name');
+
+          if (cb.checked) {
+            checkDiv.classList.remove('bg-[#EADFEF]');
+            checkDiv.classList.add('bg-[#6B4E8C]');
+          } else {
+            checkDiv.classList.remove('bg-[#6B4E8C]');
+            checkDiv.classList.add('bg-[#EADFEF]');
+          }
+        });
+
+        if (mergeBtn) {
+          if (count === 0) {
+            mergeBtn.setAttribute('disabled', 'true');
+            mergeBtn.classList.add('opacity-40', 'pointer-events-none');
+          } else {
+            mergeBtn.removeAttribute('disabled');
+            mergeBtn.classList.remove('opacity-40', 'pointer-events-none');
+          }
+        }
+
+        if (toggleAllBtn) {
+          toggleAllBtn.textContent = count === 0 ? 'すべて選択' : 'すべて解除';
+        }
+      }
+
+      checkboxes.forEach(cb => {
+        cb.addEventListener('change', updateState);
+      });
+
+      if (toggleAllBtn) {
+        toggleAllBtn.addEventListener('click', () => {
+          const hasChecked = Array.from(checkboxes).some(cb => cb.checked);
+          checkboxes.forEach(cb => {
+            cb.checked = !hasChecked;
+          });
+          updateState();
+        });
+      }
+
+      if (mergeBtn) {
+        mergeBtn.addEventListener('click', () => {
+          const count = Array.from(checkboxes).filter(cb => cb.checked).length;
+          if (count > 0) {
+            mergeBtn.textContent = '処理中...';
+            setTimeout(() => {
+              history.back();
+            }, 300);
+          }
+        });
+      }
+
+      updateState();
+    })();
+  </script>
+</body></html>

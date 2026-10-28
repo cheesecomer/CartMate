@@ -47,7 +47,7 @@ class ProductDetailScreenTest {
     private fun setContent(name: String) {
         val productId = runBlocking { store.observeProducts().first().first { it.displayName == name }.id }
         val catalog = ProductCatalog(store, store, store, clock) { flowOf(NormalizationDictionary.EMPTY) }
-        val viewModel = ProductDetailViewModel(SavedStateHandle(mapOf("productId" to productId.value)), catalog, store, store) { UserId("taro") }
+        val viewModel = ProductDetailViewModel(SavedStateHandle(mapOf("productId" to productId.value)), catalog, store, store, { UserId("taro") }, clock)
         composeRule.setContent {
             CartMateTheme {
                 ProductDetailScreen(

@@ -43,7 +43,7 @@ class ProductNamesViewModelTest {
         MergeProductsViewModel(SavedStateHandle(mapOf("targetId" to target.value)), catalog, store)
 
     private fun detail(id: ProductId) =
-        ProductDetailViewModel(SavedStateHandle(mapOf("productId" to id.value)), catalog, store, store) { UserId("taro") }
+        ProductDetailViewModel(SavedStateHandle(mapOf("productId" to id.value)), catalog, store, store, { UserId("taro") }, clock)
 
     @Test
     fun `一覧には未統合の商品を出し、まとめている商品の件数を添える`() = runTest {
@@ -58,6 +58,9 @@ class ProductNamesViewModelTest {
         }
     }
 
+    /** 候補の中の [name] の行 */
+    private fun MergeProductsViewModel.State.choice(name: String) = choices.first { it.product.displayName == name }
+
     @Test
     fun `統合先に複数の商品を選んで一度にまとめ、統合先の画面に戻る`() = runTest {
         add("豚バラ肉", "豚ばら肉", "豚バラ", "牛乳")
@@ -65,11 +68,11 @@ class ProductNamesViewModelTest {
         val viewModel = merging(target)
         viewModel.events.test {
             viewModel.state.test {
-                awaitUntil { it.candidates.size == 3 }
-                viewModel.toggle(productId("豚ばら肉"))
-                viewModel.toggle(productId("豚バラ"))
-                assertThat(awaitUntil { it.selected.size == 2 }.canMerge).isTrue()
-                viewModel.merge()
+                val state = awaitUntil { it.choices.size == 3 }
+                viewModel.toggle(state.choice("豚ばら肉"))
+                viewModel.toggle(state.choice("豚バラ"))
+                assertThat(awaitUntil { it.selectedCount == 2 }.canSubmit).isTrue()
+                viewModel.submit()
                 cancelAndIgnoreRemainingEvents()
             }
             assertThat(awaitItem()).isEqualTo(MergeProductsViewModel.Event.Done)
@@ -87,10 +90,9 @@ class ProductNamesViewModelTest {
         val target = productId("豚バラ肉")
         val viewModel = merging(target)
         viewModel.state.test {
-            awaitUntil { it.candidates.size == 1 }
-            viewModel.toggle(middle)
-            awaitUntil { it.selected.size == 1 }
-            viewModel.merge()
+            viewModel.toggle(awaitUntil { it.choices.size == 1 }.choice("豚ばら肉"))
+            awaitUntil { it.selectedCount == 1 }
+            viewModel.submit()
             awaitUntil { it.submitted }
             cancelAndIgnoreRemainingEvents()
         }
@@ -99,17 +101,90 @@ class ProductNamesViewModelTest {
     }
 
     @Test
-    fun `18件を超えては選べない`() = runTest {
-        add("統合先", *(1..19).map { "商品$it" }.toTypedArray())
-        val viewModel = merging(productId("統合先"))
-        viewModel.events.test {
-            viewModel.state.test {
-                val candidates = awaitUntil { it.candidates.size == 19 }.candidates
-                candidates.forEach { viewModel.toggle(it.product.id) }
-                assertThat(awaitUntil { it.selected.size == ProductMerge.MAX_SELECTION }.selected).hasSize(ProductMerge.MAX_SELECTION)
-                cancelAndIgnoreRemainingEvents()
-            }
-            assertThat(awaitItem()).isEqualTo(MergeProductsViewModel.Event.TooMany)
+    fun `今まとめている商品はチェックした状態で並び、外してまとめると解除し、新しく選んだ商品はまとめる`() = runTest {
+        add("豚バラ肉", "豚ばら肉", "豚バラ", "ぶたばら")
+        val target = productId("豚バラ肉")
+        store.applyMergeChanges(ProductMerge.mergeChanges(target, listOf(productId("豚ばら肉"), productId("豚バラ")), store.observeProducts().first())!!)
+        val viewModel = merging(target)
+        viewModel.state.test {
+            val state = awaitUntil { it.choices.size == 3 }
+            assertThat(state.isChecked(state.choice("豚ばら肉"))).isTrue()
+            assertThat(state.isChecked(state.choice("ぶたばら"))).isFalse()
+            assertThat(state.selectedCount).isEqualTo(2)
+            assertThat(state.canSubmit).isFalse()
+
+            viewModel.toggle(state.choice("豚バラ"))
+            viewModel.toggle(state.choice("ぶたばら"))
+            val edited = awaitUntil { it.removed.size == 1 && it.added.size == 1 }
+            assertThat(edited.selectedCount).isEqualTo(2)
+            viewModel.submit()
+            awaitUntil { it.submitted }
+            cancelAndIgnoreRemainingEvents()
+        }
+        assertThat(mergedInto("豚ばら肉")).isEqualTo(target)
+        assertThat(mergedInto("豚バラ")).isNull()
+        assertThat(mergedInto("ぶたばら")).isEqualTo(target)
+    }
+
+    @Test
+    fun `すべて解除は、今まとめている商品も含めてチェックを外す`() = runTest {
+        add("豚バラ肉", "豚ばら肉", "豚バラ")
+        val target = productId("豚バラ肉")
+        store.applyMergeChanges(ProductMerge.mergeChanges(target, listOf(productId("豚ばら肉")), store.observeProducts().first())!!)
+        val viewModel = merging(target)
+        viewModel.state.test {
+            val state = awaitUntil { it.choices.size == 2 }
+            viewModel.toggle(state.choice("豚バラ"))
+            awaitUntil { it.selectedCount == 2 }
+            viewModel.clearAll()
+            val cleared = awaitUntil { it.selectedCount == 0 }
+            assertThat(cleared.added).isEmpty()
+            assertThat(cleared.removed).containsExactly(productId("豚ばら肉"))
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `件数に上限はなく、19件より多くても一度にまとめられる`() = runTest {
+        add("統合先", *(1..25).map { "商品$it" }.toTypedArray())
+        val target = productId("統合先")
+        val viewModel = merging(target)
+        viewModel.state.test {
+            awaitUntil { it.choices.size == 25 }.choices.forEach { viewModel.toggle(it) }
+            awaitUntil { it.selectedCount == 25 }
+            viewModel.submit()
+            awaitUntil { it.submitted }
+            cancelAndIgnoreRemainingEvents()
+        }
+        assertThat(store.observeProducts().first().count { it.mergedInto == target }).isEqualTo(25)
+    }
+
+    @Test
+    fun `検索欄で候補を絞り込んでも、選択は残る`() = runTest {
+        add("豚バラ肉", "豚ばら肉", "牛乳")
+        val viewModel = merging(productId("豚バラ肉"))
+        viewModel.state.test {
+            viewModel.toggle(awaitUntil { it.choices.size == 2 }.choice("牛乳"))
+            viewModel.search("バラ")
+            val filtered = awaitUntil { it.query == "バラ" }
+            assertThat(filtered.shownChoices.map { it.product.displayName }).containsExactly("豚ばら肉")
+            assertThat(filtered.selectedCount).isEqualTo(1)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `商品名の管理は、検索欄の文字で一覧と非表示の商品を絞り込む`() = runTest {
+        add("豚バラ肉", "牛乳")
+        val viewModel = ProductNamesViewModel(catalog) { flowOf(emptyList()) }
+        viewModel.lists.test {
+            awaitUntil { it != null && it.entries.size == 2 }
+            viewModel.search("ぎゅう")
+            val filtered = awaitUntil { it?.query == "ぎゅう" }!!
+            assertThat(filtered.entries).isEmpty()
+            viewModel.search("牛")
+            assertThat(awaitUntil { it?.query == "牛" }!!.entries.map { it.product.displayName }).containsExactly("牛乳")
+            cancelAndIgnoreRemainingEvents()
         }
     }
 
@@ -119,12 +194,11 @@ class ProductNamesViewModelTest {
         val viewModel = merging(productId("豚バラ肉"))
         viewModel.events.test {
             viewModel.state.test {
-                awaitUntil { it.candidates.size == 1 }
-                viewModel.toggle(productId("豚ばら肉"))
-                awaitUntil { it.selected.size == 1 }
-                viewModel.merge()
-                assertThat(awaitUntil { it.submitted }.canMerge).isFalse()
-                viewModel.merge()
+                viewModel.toggle(awaitUntil { it.choices.size == 1 }.choice("豚ばら肉"))
+                awaitUntil { it.selectedCount == 1 }
+                viewModel.submit()
+                assertThat(awaitUntil { it.submitted }.canSubmit).isFalse()
+                viewModel.submit()
                 cancelAndIgnoreRemainingEvents()
             }
             assertThat(awaitItem()).isEqualTo(MergeProductsViewModel.Event.Done)

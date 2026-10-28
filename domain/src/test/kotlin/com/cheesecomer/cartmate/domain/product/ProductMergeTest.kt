@@ -144,6 +144,96 @@ class ProductMergeTest {
     }
 
     @Test
+    fun `まとめる商品の編集では、追加をまとめ、外した商品を解除して、外した商品の下の商品は統合先に残す`() {
+        val target = product("豚バラ肉")
+        val kept = product("豚ばら肉", mergedInto = target)
+        val removed = product("豚バラ", mergedInto = target)
+        val underRemoved = product("ぶたばら", mergedInto = removed)
+        val added = product("ブタバラ")
+        val underAdded = product("ぶた ばら", mergedInto = added)
+        val products = listOf(target, kept, removed, underRemoved, added, underAdded)
+
+        val batches = ProductMerge.editChanges(target.id, add = setOf(added.id), remove = setOf(removed.id), products)
+
+        assertThat(batches).containsExactly(
+            listOf(
+                Change.Unmerge(removed.id),
+                Change.Repoint(underRemoved.id, target.id),
+                Change.Merge(added.id, target.id),
+                Change.Repoint(underAdded.id, target.id),
+            ),
+        )
+    }
+
+    @Test
+    fun `多段の統合で上下の両方を外すと、下から順に、別のバッチで解除する`() {
+        val target = product("A")
+        val middle = product("B", mergedInto = target)
+        val leaf = product("C", mergedInto = middle)
+        val products = listOf(target, middle, leaf)
+
+        val batches = ProductMerge.editChanges(target.id, add = emptySet(), remove = setOf(middle.id, leaf.id), products)
+
+        // 下を先に外すので、中間に付け替える商品は残らない。2件とも書くだけで読まないので、同じバッチに入る
+        assertThat(batches).containsExactly(listOf(Change.Unmerge(leaf.id), Change.Unmerge(middle.id)))
+    }
+
+    @Test
+    fun `中間だけを外すと、下の商品は統合先に残る`() {
+        val target = product("A")
+        val middle = product("B", mergedInto = target)
+        val leaf = product("C", mergedInto = middle)
+        val batches = ProductMerge.editChanges(target.id, add = emptySet(), remove = setOf(middle.id), listOf(target, middle, leaf))
+        assertThat(batches).containsExactly(listOf(Change.Unmerge(middle.id), Change.Repoint(leaf.id, target.id)))
+    }
+
+    @Test
+    fun `件数に上限はなく、ルールが読む商品が18件を超える分は次のバッチに分ける`() {
+        val target = product("統合先")
+        // 19件とも、ほかの商品をまとめている（ルールが1件ずつ読む）
+        val selected = (1..19).map { product("商品$it") }
+        val children = selected.map { product("${it.displayName}の下", mergedInto = it) }
+        val plain = (1..30).map { product("単品$it") }
+        val products = listOf(target) + selected + children + plain
+
+        val batches = ProductMerge.editChanges(target.id, add = (selected + plain).map { it.id }.toSet(), remove = emptySet(), products)!!
+
+        assertThat(batches.flatten().filterIsInstance<Change.Merge>().map { it.id }).containsExactlyElementsIn((selected + plain).map { it.id })
+        assertThat(batches.flatten().filterIsInstance<Change.Repoint>().map { it.id }).containsExactlyElementsIn(children.map { it.id })
+        assertThat(batches.size).isGreaterThan(1)
+        batches.forEach { batch ->
+            // ルールが読むのは、下の商品を付け替える統合の商品
+            val reads = batch.filterIsInstance<Change.Merge>().count { merge -> children.any { it.mergedInto == merge.id } }
+            assertThat(reads).isAtMost(ProductMerge.MAX_READS_PER_BATCH)
+        }
+    }
+
+    @Test
+    fun `まとめる商品が統合済みか統合先そのもの、統合先が統合済みなら編集できない。すでに外れた商品の解除は何もしない`() {
+        val target = product("豚バラ肉")
+        val merged = product("豚ばら肉", mergedInto = target)
+        val other = product("豚バラ")
+        val products = listOf(target, merged, other)
+        assertThat(ProductMerge.editChanges(target.id, setOf(merged.id), emptySet(), products)).isNull()
+        assertThat(ProductMerge.editChanges(target.id, setOf(target.id), emptySet(), products)).isNull()
+        assertThat(ProductMerge.editChanges(merged.id, setOf(other.id), emptySet(), products)).isNull()
+        assertThat(ProductMerge.editChanges(target.id, emptySet(), setOf(other.id), products)).isEmpty()
+    }
+
+    @Test
+    fun `検索は、商品名かまとめている商品の名前に、カタカナとひらがなを区別せずに含まれていれば一致する`() {
+        val target = product("豚バラ肉")
+        val member = product("ぶたばら", mergedInto = target)
+        val entry = ProductMerge.entries(listOf(target, member), ids(target, member), NormalizationDictionary.EMPTY).single()
+        with(ProductMerge) {
+            assertThat(entry.matches("ばら")).isTrue()
+            assertThat(entry.matches("ブタ")).isTrue()
+            assertThat(entry.matches("  ")).isTrue()
+            assertThat(entry.matches("牛")).isFalse()
+        }
+    }
+
+    @Test
     fun `中間の商品を解除すると、その商品だけが外れ、下の商品は元の統合先に残る`() {
         val target = product("豚バラ肉")
         val middle = product("豚ばら肉", mergedInto = target)

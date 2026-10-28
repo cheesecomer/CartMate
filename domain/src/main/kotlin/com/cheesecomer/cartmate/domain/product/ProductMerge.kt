@@ -11,10 +11,14 @@ import com.cheesecomer.cartmate.domain.text.NameNormalizer
 object ProductMerge {
 
     /**
-     * 一度にまとめられる商品の数。ルールが1回の書き込みで読めるドキュメントは20件まで（メンバーの確認と統合先で2件、
-     * ほかの商品をまとめている商品を選ぶと1件ずつ）なので、どの選び方でも収まる数にする（rules-test で確かめている）
+     * 1つのバッチ（1回の書き込み）で、ルールが読む商品の数の上限。ルールが1回の書き込みで読めるドキュメントは20件まで
+     * （メンバーの確認と統合先で2件、ほかの商品をまとめている商品の統合や解除で1件ずつ）なので、18件に収める
+     * （rules-test で確かめている）。「商品をまとめる」では、超える分を次のバッチに分けて送るので、画面には上限がない
      */
-    const val MAX_SELECTION = 18
+    const val MAX_READS_PER_BATCH = 18
+
+    /** 1つのバッチに入れる書き込みの数の上限（Firestore のバッチは500件まで。余裕を持たせる） */
+    private const val MAX_WRITES_PER_BATCH = 400
 
     /** サジェストへの出し方（docs/requirements.md §4.3） */
     enum class SuggestionMode {
@@ -139,6 +143,15 @@ object ProductMerge {
         }.sortedBy { it.product.searchKey }
     }
 
+    /**
+     * 検索欄の [query] に一致するか。商品名か、まとめている商品の名前に、読みをそろえた検索キー（カタカナとひらがなを区別しない）で
+     * 含まれていれば一致する。空なら、すべて一致する
+     */
+    fun Entry.matches(query: String): Boolean {
+        val key = NameNormalizer.searchKey(query).takeIf { query.isNotBlank() } ?: return true
+        return product.searchKey.contains(key) || members.any { it.searchKey.contains(key) }
+    }
+
     /** [id] の商品を開いたときの画面。見えない商品や、ない商品は null */
     fun detail(
         id: ProductId,
@@ -169,19 +182,89 @@ object ProductMerge {
     ): List<Entry> = entries(products, visibleIds, dictionary, hidden).filter { it.product.id != target }
 
     /**
-     * [selected] を [target] にまとめる変更。選んだ商品にまとまっている商品は、同じ統合先に付け替えて1段にする。
-     * 統合先が統合済み、選んだ商品が統合済みか統合先そのもの、選んだ数が 0 か [MAX_SELECTION] を超える場合は null
+     * [selected] を [target] にまとめる変更（1つのバッチ）。選んだ商品にまとまっている商品は、同じ統合先に付け替えて1段にする。
+     * 統合先が統合済み、選んだ商品が統合済みか統合先そのもの、選んだ数が 0 か [MAX_READS_PER_BATCH] を超える場合は null
      */
     fun mergeChanges(target: ProductId, selected: Collection<ProductId>, products: Collection<Product>): List<Change>? {
         val byId = products.associateBy { it.id }
         val ids = selected.toSet()
-        if (ids.isEmpty() || ids.size > MAX_SELECTION) return null
+        if (ids.isEmpty() || ids.size > MAX_READS_PER_BATCH) return null
         if (byId[target]?.mergedInto != null || target !in byId || target in ids) return null
         if (ids.any { byId[it] == null || byId.getValue(it).mergedInto != null }) return null
         return ids.flatMap { id ->
             listOf(Change.Merge(id, target)) +
                 products.filter { it.mergedInto == id }.map { Change.Repoint(it.id, target) }
         }
+    }
+
+    /**
+     * 「商品をまとめる」で、[target] にまとめる商品を編集する変更。[add]（未統合の商品）をまとめ、[remove]（今 [target] に
+     * まとまっている商品）の統合を解除する。件数に上限はなく、ルールが1回の書き込みで読める数に収まるようにバッチに分けて返す。
+     * バッチは順に送る（前のバッチの結果を、次のバッチのルールが読む）。
+     *
+     * - まとめる商品にまとまっている商品は、同じ統合先に付け替えて1段にする（[mergeChanges] と同じ）
+     * - 解除する商品にまとまっている商品は、解除する商品の元の統合先に付け替えて、統合先に残す（[unmergeChanges] と同じ）。
+     *   多段の統合で上下の両方を解除するときは、下から順に解除する
+     * - 同じ商品を書くか読む変更は、同じバッチに入れない（ルールは、バッチの前の状態をもとに付け替えを確かめるため）
+     *
+     * 統合先がない・統合済み、まとめる商品が未統合でないか統合先そのものなら null。
+     * 解除する商品が、ほかの端末の変更ですでに [target] から外れていれば、その商品は何もしない。変更がなければ空
+     */
+    fun editChanges(target: ProductId, add: Set<ProductId>, remove: Set<ProductId>, products: Collection<Product>): List<List<Change>>? {
+        val state = products.associateBy { it.id }.toMutableMap()
+        if (state[target]?.mergedInto != null || target !in state) return null
+        if (add.any { it == target || state[it] == null || state.getValue(it).mergedInto != null }) return null
+
+        // 1件の統合か解除と、それに伴う付け替え。書き込む商品と、ルールが読む商品（統合先を除く）
+        class Group(val changes: List<Change>, val writes: Set<ProductId>, val reads: Set<ProductId>)
+        val groups = mutableListOf<Group>()
+        fun childrenOf(id: ProductId) = state.values.filter { it.mergedInto == id }.map { it.id }
+        fun depthOf(id: ProductId): Int = generateSequence(state[id]?.mergedInto) { state[it]?.mergedInto }.count()
+
+        val graph = ProductGraph(products)
+        for (id in remove.filter { it != target && graph.resolve(it) == target }.sortedByDescending(::depthOf)) {
+            val parent = state[id]?.mergedInto ?: continue
+            val children = childrenOf(id)
+            groups += Group(
+                changes = listOf(Change.Unmerge(id)) + children.map { Change.Repoint(it, parent) },
+                writes = setOf(id) + children,
+                reads = if (children.isEmpty()) emptySet() else setOf(id),
+            )
+            state[id] = state.getValue(id).copy(mergedInto = null)
+            children.forEach { state[it] = state.getValue(it).copy(mergedInto = parent) }
+        }
+        for (id in add) {
+            val children = childrenOf(id)
+            groups += Group(
+                changes = listOf(Change.Merge(id, target)) + children.map { Change.Repoint(it, target) },
+                writes = setOf(id) + children,
+                reads = if (children.isEmpty()) emptySet() else setOf(id),
+            )
+            state[id] = state.getValue(id).copy(mergedInto = target)
+            children.forEach { state[it] = state.getValue(it).copy(mergedInto = target) }
+        }
+
+        val batches = mutableListOf<MutableList<Change>>()
+        val touched = HashSet<ProductId>()
+        val reads = HashSet<ProductId>()
+        var writes = 0
+        for (group in groups) {
+            val fits = batches.isNotEmpty() &&
+                (group.writes + group.reads).none { it in touched } &&
+                (reads + group.reads).size <= MAX_READS_PER_BATCH &&
+                writes + group.writes.size <= MAX_WRITES_PER_BATCH
+            if (!fits) {
+                batches += mutableListOf<Change>()
+                touched.clear()
+                reads.clear()
+                writes = 0
+            }
+            batches.last() += group.changes
+            touched += group.writes + group.reads
+            reads += group.reads
+            writes += group.writes.size
+        }
+        return batches
     }
 
     /**

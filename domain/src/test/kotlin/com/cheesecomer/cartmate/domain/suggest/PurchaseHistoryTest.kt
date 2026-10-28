@@ -68,4 +68,22 @@ class PurchaseHistoryTest {
         val history = PurchaseHistory.of(milk.id, listOf(milk, typo, kana, other), purchases, dictionary)
         assertThat(history.map { it.itemId.value }).containsExactly("c", "b", "a").inOrder()
     }
+
+    @Test
+    fun `前回の購入日と、予測に使う記録から求めた周期を出す。記録が少なければ周期は出さない`() {
+        val milk = product("牛乳")
+        val history = listOf(
+            purchase("a", milk, day = 0),
+            purchase("b", milk, day = 14),
+            purchase("c", milk, day = 28),
+            // 予測に使わない記録は、周期に入れない（前回の購入日には入れる）
+            purchase("d", milk, day = 30, excluded = true),
+        )
+        val summary = PurchaseHistory.summary(history, java.time.ZoneOffset.UTC)!!
+        assertThat(summary.lastPurchase).isEqualTo(java.time.LocalDate.of(1970, 1, 31))
+        assertThat(summary.typicalIntervalDays).isEqualTo(14)
+
+        assertThat(PurchaseHistory.summary(history.take(2), java.time.ZoneOffset.UTC)!!.typicalIntervalDays).isNull()
+        assertThat(PurchaseHistory.summary(emptyList(), java.time.ZoneOffset.UTC)).isNull()
+    }
 }

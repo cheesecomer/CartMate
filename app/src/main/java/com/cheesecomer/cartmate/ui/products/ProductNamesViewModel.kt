@@ -8,7 +8,9 @@ import com.cheesecomer.cartmate.domain.repository.MemberDirectory
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.cheesecomer.cartmate.domain.model.Product
 import com.cheesecomer.cartmate.domain.model.ProductId
+import com.cheesecomer.cartmate.domain.text.NameNormalizer
 import com.cheesecomer.cartmate.domain.product.ProductMerge
 import com.cheesecomer.cartmate.domain.repository.ProductRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -25,29 +27,45 @@ import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.Clock
 import javax.inject.Inject
 
 private const val STOP_TIMEOUT_MILLIS = 5_000L
 
-/** 「商品名の管理」の一覧（docs/requirements.md §3.5「商品名の管理」）。未統合の商品を並べる */
+/** 「商品名の管理」の一覧（docs/requirements.md §3.5「商品名の管理」）。未統合の商品を並べ、検索欄で絞り込む */
 @HiltViewModel
 class ProductNamesViewModel @Inject constructor(catalog: ProductCatalog, memberDirectory: MemberDirectory) : ViewModel() {
 
     /** 非表示の商品と、非表示にした人（家族にいない人は null） */
     data class HiddenEntry(val entry: ProductMerge.Entry, val byName: String?)
 
-    data class Lists(val entries: List<ProductMerge.Entry>, val hidden: List<HiddenEntry>)
+    data class Lists(
+        val entries: List<ProductMerge.Entry>,
+        val hidden: List<HiddenEntry>,
+        /** 検索欄の文字。空なら絞り込まない */
+        val query: String = "",
+    )
 
-    /** 一覧と、一番下の「非表示の商品」（一時的に非表示と常に非表示）。読み込み中は null */
-    val lists: StateFlow<Lists?> = combine(catalog.observe(), memberDirectory.observeNames()) { snapshot, names ->
+    private val query = MutableStateFlow("")
+
+    /** 一覧と、一番下の「非表示の商品」（一時的に非表示と常に非表示）。どちらも検索欄で絞り込む。読み込み中は null */
+    val lists: StateFlow<Lists?> = combine(catalog.observe(), memberDirectory.observeNames(), query) { snapshot, names, query ->
         Lists(
-            entries = ProductMerge.entries(snapshot.products, snapshot.visibleIds, snapshot.dictionary, snapshot.hidden),
-            hidden = ProductMerge.hiddenEntries(snapshot.products, snapshot.visibleIds, snapshot.dictionary, snapshot.hidden).map { entry ->
-                val by = if (entry.mode == ProductMerge.SuggestionMode.ALWAYS_HIDDEN) entry.product.suggestionExcludedBy else entry.product.hiddenBy
-                HiddenEntry(entry, by?.let(names::of))
-            },
+            entries = ProductMerge.entries(snapshot.products, snapshot.visibleIds, snapshot.dictionary, snapshot.hidden)
+                .filter { with(ProductMerge) { it.matches(query) } },
+            hidden = ProductMerge.hiddenEntries(snapshot.products, snapshot.visibleIds, snapshot.dictionary, snapshot.hidden)
+                .filter { with(ProductMerge) { it.matches(query) } }
+                .map { entry ->
+                    val by = if (entry.mode == ProductMerge.SuggestionMode.ALWAYS_HIDDEN) entry.product.suggestionExcludedBy else entry.product.hiddenBy
+                    HiddenEntry(entry, by?.let(names::of))
+                },
+            query = query,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), null)
+
+    fun search(text: String) {
+        query.value = text
+    }
 }
 
 /** 商品を開いた画面。まとめている商品と個別の解除、辞書の名寄せ。統合されている商品なら、統合先と解除 */
@@ -58,6 +76,7 @@ class ProductDetailViewModel @Inject constructor(
     private val productRepository: ProductRepository,
     private val itemRepository: ItemRepository,
     private val currentUser: CurrentUserProvider,
+    private val clock: Clock,
 ) : ViewModel() {
 
     val productId = ProductId(checkNotNull(savedStateHandle.get<String>(ProductDetailRoute::productId.name)))
@@ -72,6 +91,8 @@ class ProductDetailViewModel @Inject constructor(
             val ownPurchases: Int = 0,
             /** ほかのメンバーがチェックした購入の数。削除しても残る */
             val othersPurchases: Int = 0,
+            /** 「前回: 10/18 購入（約14日ごと）」。購入の記録がなければ null */
+            val summary: PurchaseHistory.Summary? = null,
         ) : State
 
         /**
@@ -85,8 +106,9 @@ class ProductDetailViewModel @Inject constructor(
         .map { snapshot ->
             val detail = ProductMerge.detail(productId, snapshot.products, snapshot.visibleIds, snapshot.dictionary, snapshot.hidden)
                 ?: return@map State.NotFound
-            val (own, others) = history(snapshot).partition { it.purchasedBy == currentUser.currentUserId() }
-            State.Loaded(detail, ownPurchases = own.size, othersPurchases = others.size)
+            val history = history(snapshot)
+            val (own, others) = history.partition { it.purchasedBy == currentUser.currentUserId() }
+            State.Loaded(detail, ownPurchases = own.size, othersPurchases = others.size, summary = PurchaseHistory.summary(history, clock.zone))
         }
         // 一度表示できた商品が見つからなくなったら、外れたものとして区別する
         .scan<State, State>(State.Loading) { previous, next ->
@@ -175,7 +197,8 @@ class ProductDetailViewModel @Inject constructor(
 }
 
 /**
- * 「商品をまとめる」。統合先を固定し、ほかの商品を複数選んで一度にまとめる。選んだ商品にまとまっている商品も一緒に移る
+ * 「商品をまとめる」。統合先を固定し、まとめる商品を編集する。今まとめている商品はチェックした状態で並べ、外すと解除する。
+ * ほかの商品を選ぶとまとめ、その商品にまとまっている商品も一緒に移る。件数に上限はない（書き込みは分けて送る）
  */
 @HiltViewModel
 class MergeProductsViewModel @Inject constructor(
@@ -186,66 +209,99 @@ class MergeProductsViewModel @Inject constructor(
 
     private val targetId = ProductId(checkNotNull(savedStateHandle.get<String>(MergeProductsRoute::targetId.name)))
 
+    /** 候補の1行。[member] なら今まとめている商品（[entry] は null）。そうでなければ、ほかの統合先の商品 */
+    data class Choice(val product: Product, val member: Boolean, val entry: ProductMerge.Entry?)
+
     data class State(
         /** 統合先。読み込み中や、統合済み・なくなった場合は null */
         val target: ProductMerge.Entry? = null,
-        val candidates: List<ProductMerge.Entry> = emptyList(),
-        val selected: Set<ProductId> = emptySet(),
+        /** 今まとめている商品と、ほかの統合先の商品を、名前の順に */
+        val choices: List<Choice> = emptyList(),
+        /** 新しくまとめる商品 */
+        val added: Set<ProductId> = emptySet(),
+        /** チェックを外した（解除する）、今まとめている商品 */
+        val removed: Set<ProductId> = emptySet(),
+        val query: String = "",
         val loading: Boolean = true,
         /** まとめる操作を送った。二重に送らない */
         val submitted: Boolean = false,
     ) {
-        val selectedEntries: List<ProductMerge.Entry> get() = candidates.filter { it.product.id in selected }
-        val canMerge: Boolean get() = target != null && selected.isNotEmpty() && !submitted
+        /** チェックしている商品の数（今まとめていて外していない商品と、新しくまとめる商品） */
+        val selectedCount: Int get() = (target?.members.orEmpty().count { it.id !in removed }) + added.size
+        fun isChecked(choice: Choice): Boolean = if (choice.member) choice.product.id !in removed else choice.product.id in added
+        val addedEntries: List<ProductMerge.Entry> get() = choices.mapNotNull { it.entry }.filter { it.product.id in added }
+        val removedProducts: List<Product> get() = target?.members.orEmpty().filter { it.id in removed }
+        val canSubmit: Boolean get() = target != null && (added.isNotEmpty() || removed.isNotEmpty()) && !submitted
+
+        /** 検索欄で絞り込んだ候補。選択は、絞り込みで隠れても残す */
+        val shownChoices: List<Choice> get() {
+            val key = NameNormalizer.searchKey(query).takeIf { query.isNotBlank() } ?: return choices
+            return choices.filter { choice ->
+                choice.product.searchKey.contains(key) || choice.entry?.members.orEmpty().any { it.searchKey.contains(key) }
+            }
+        }
     }
 
     sealed interface Event {
-        /** [ProductMerge.MAX_SELECTION] 件を超えて選ぼうとした */
-        data object TooMany : Event
         /** まとめ終えた（書き込みを送った）。統合先の画面に戻る */
         data object Done : Event
     }
 
-    private val selected = MutableStateFlow(emptySet<ProductId>())
+    private val added = MutableStateFlow(emptySet<ProductId>())
+    private val removed = MutableStateFlow(emptySet<ProductId>())
+    private val query = MutableStateFlow("")
     private val submitted = MutableStateFlow(false)
     private val _events = Channel<Event>(Channel.BUFFERED)
     val events: Flow<Event> = _events.receiveAsFlow()
 
-    val state: StateFlow<State> = combine(catalog.observe(), selected, submitted) { snapshot, selected, submitted ->
-        val entries = ProductMerge.entries(snapshot.products, snapshot.visibleIds, snapshot.dictionary, snapshot.hidden)
-        val candidates = entries.filter { it.product.id != targetId }
+    val state: StateFlow<State> = combine(catalog.observe(), added, removed, query, submitted) { snapshot, added, removed, query, submitted ->
+        val target = ProductMerge.entries(snapshot.products, snapshot.visibleIds, snapshot.dictionary, snapshot.hidden)
+            .find { it.product.id == targetId }
+        val candidates = ProductMerge.candidates(targetId, snapshot.products, snapshot.visibleIds, snapshot.dictionary, snapshot.hidden)
+        val choices = (target?.members.orEmpty().map { Choice(it, member = true, entry = null) } + candidates.map { Choice(it.product, member = false, entry = it) })
+            .sortedBy { it.product.searchKey }
         State(
-            target = entries.find { it.product.id == targetId },
-            candidates = candidates,
-            // ほかの端末の変更で候補から外れた商品は、選択からも外す
-            selected = selected.filterTo(HashSet()) { id -> candidates.any { it.product.id == id } },
+            target = target,
+            choices = choices,
+            // ほかの端末の変更で候補やまとめている商品から外れた商品は、選択からも外す
+            added = added.filterTo(HashSet()) { id -> candidates.any { it.product.id == id } },
+            removed = removed.filterTo(HashSet()) { id -> target?.members.orEmpty().any { it.id == id } },
+            query = query,
             loading = false,
             submitted = submitted,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), State())
 
-    fun toggle(id: ProductId) {
-        val current = state.value.selected
-        if (id !in current && current.size >= ProductMerge.MAX_SELECTION) {
-            _events.trySend(Event.TooMany)
-            return
-        }
-        selected.update { if (id in current) current - id else current + id }
+    fun toggle(choice: Choice) {
+        val id = choice.product.id
+        if (choice.member) removed.update { if (id in it) it - id else it + id }
+        else added.update { if (id in it) it - id else it + id }
     }
 
-    fun merge() {
+    /** 「すべて解除」。今まとめている商品も含めて、すべてのチェックを外す */
+    fun clearAll() {
+        added.value = emptySet()
+        removed.value = state.value.target?.members.orEmpty().mapTo(HashSet()) { it.id }
+    }
+
+    fun search(text: String) {
+        query.value = text
+    }
+
+    fun submit() {
         val current = state.value
-        if (!current.canMerge) return
+        if (!current.canSubmit) return
         submitted.value = true
         viewModelScope.launch {
             val products = catalog.observe().first().products
-            val changes = ProductMerge.mergeChanges(targetId, current.selected, products)
-            if (changes == null) {
+            val batches = ProductMerge.editChanges(targetId, current.added, current.removed, products)
+            if (batches == null) {
                 // 送る前に、ほかの端末の変更で統合先や選んだ商品が統合された
                 submitted.value = false
                 return@launch
             }
-            productRepository.applyMergeChanges(changes)
+            // 順に送る。前のバッチの結果を、次のバッチのルールが読む
+            batches.forEach { productRepository.applyMergeChanges(it) }
             _events.send(Event.Done)
         }
     }

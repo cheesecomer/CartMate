@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+
+<html lang="ja"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>商品設定 - ベーコン | CartMate</title>
+<!-- Google Fonts: Epilogue & Noto Sans JP -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Epilogue:wght@500;600;700&amp;family=Noto+Sans+JP:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS v3 -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Config -->
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            lilac: {
+              background: '#FFF7FF',
+              surface: '#FFFFFF',
+              primary: '#6B4E8C',
+              'primary-hover': '#583D74',
+              'primary-container': '#F2E7FE',
+              outline: '#CAC4CF',
+              divider: '#F5EBF9',
+              'text-primary': '#1D1B20',
+              'text-secondary': '#49454F',
+              'text-muted': '#7A757F',
+              destructive: '#B3261E',
+              'destructive-hover': '#921E17',
+              'destructive-container': '#FFEDEA'
+            }
+          },
+          fontFamily: {
+            sans: ['"Noto Sans JP"', '"Epilogue"', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+<!-- Custom Styles -->
+<style data-purpose="base-styling">
+    body {
+      background-color: #ECE5ED;
+      font-family: 'Noto Sans JP', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+    /* Material flat style overrides */
+    .material-card {
+      background-color: #FFFFFF;
+      border: 1px solid #CAC4CF;
+      border-radius: 16px;
+      box-shadow: none;
+    }
+  </style>
+</head>
+<body class="flex justify-center items-start min-h-screen sm:py-6">
+<!-- BEGIN: MobileFrame -->
+<!-- Container with mobile viewport dimensions matching modern Android/iOS devices -->
+<div class="w-full max-w-[420px] min-h-screen sm:min-h-[880px] bg-lilac-background flex flex-col relative text-lilac-text-primary sm:rounded-[36px] sm:overflow-hidden sm:shadow-2xl">
+<!-- BEGIN: StatusBar -->
+<!-- Android / Mobile Status Bar -->
+<div class="h-10 px-6 pt-2 flex justify-between items-center text-xs font-semibold text-lilac-text-primary select-none z-20">
+<span>09:41</span>
+<div class="flex items-center space-x-2">
+<!-- Signal Icon -->
+<svg class="w-4 h-4 fill-current" viewbox="0 0 24 24">
+<path d="M12 3c-4.97 0-9 4.03-9 9 0 2.12.74 4.07 1.97 5.61L12 22l7.03-4.39C20.26 16.07 21 14.12 21 12c0-4.97-4.03-9-9-9zm0 2c3.87 0 7 3.13 7 7 0 1.5-.47 2.89-1.28 4.04L12 19.38l-5.72-3.34C5.47 14.89 5 13.5 5 12c0-3.87 3.13-7 7-7z"></path>
+</svg>
+<!-- Wi-Fi Icon -->
+<svg class="w-4 h-4 fill-current" viewbox="0 0 24 24">
+<path d="M12 4C7.31 4 3.07 5.9 0 8.98L12 21 24 8.98C20.93 5.9 16.69 4 12 4zm0 3.32c3.41 0 6.54 1.25 8.95 3.31L12 19.14 3.05 10.63C5.46 8.57 8.59 7.32 12 7.32z"></path>
+</svg>
+<!-- Battery Icon -->
+<svg class="w-4 h-4 fill-current" viewbox="0 0 24 24">
+<path d="M16 4h-2V2h-4v2H8c-.55 0-1 .45-1 1v16c0 .55.45 1 1 1h8c.55 0 1-.45 1-1V5c0-.55-.45-1-1-1zm-1 16H9V6h6v14z"></path>
+</svg>
+</div>
+</div>
+<!-- END: StatusBar -->
+<!-- BEGIN: TopAppBar -->
+<!-- App Navigation Bar with 48dp touch back action -->
+<header class="h-14 px-2 flex items-center bg-lilac-background sticky top-0 z-10 border-b border-lilac-divider/60">
+<button aria-label="戻る" class="w-12 h-12 flex items-center justify-center rounded-full hover:bg-lilac-primary/10 active:bg-lilac-primary/20 transition-colors text-lilac-text-primary" type="button">
+<svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" viewbox="0 0 24 24">
+<path d="M19 12H5M12 19l-7-7 7-7"></path>
+</svg>
+</button>
+<h1 class="ml-1 text-[22px] font-semibold text-lilac-text-primary tracking-tight">
+        ベーコン
+      </h1>
+</header>
+<!-- END: TopAppBar -->
+<!-- BEGIN: MainContent -->
+<main class="flex-1 px-4 py-5 space-y-6 overflow-y-auto">
+<!-- BEGIN: MergedItemsSection -->
+<section data-purpose="merged-products">
+<h2 class="text-sm font-medium text-lilac-text-secondary px-1 mb-2 tracking-wide">
+          まとめている商品 (0件)
+        </h2>
+<div class="material-card p-4 flex flex-col">
+<p class="text-[14px] text-lilac-text-secondary">
+            まとめている商品はありません
+          </p>
+<p class="text-xs text-lilac-text-muted mt-1 mb-4 leading-relaxed">
+            異なる表記や類似商品をまとめて、ひとつの商品として管理できます。
+          </p>
+<button class="w-full h-11 border border-lilac-primary text-lilac-primary rounded-full text-sm font-semibold flex items-center justify-center space-x-1 hover:bg-lilac-primary/5 active:bg-lilac-primary/10 transition-colors" type="button">
+<svg class="w-4 h-4 mr-1 stroke-current" fill="none" stroke-linecap="round" stroke-width="2.5" viewbox="0 0 24 24">
+<path d="M12 5v14M5 12h14"></path>
+</svg>
+<span>商品をまとめる</span>
+</button>
+</div>
+</section>
+<!-- END: MergedItemsSection -->
+<!-- BEGIN: DisplaySettingsSection -->
+<section data-purpose="display-settings">
+<h2 class="text-sm font-medium text-lilac-text-secondary px-1 mb-2 tracking-wide">
+          予測・候補の表示設定
+        </h2>
+<div class="material-card overflow-hidden">
+<!-- Radio Option 1: Selected -->
+<label class="flex items-start p-4 cursor-pointer hover:bg-lilac-divider/40 active:bg-lilac-divider/70 transition-colors">
+<div class="pt-0.5 mr-3 flex-shrink-0">
+<div class="w-5 h-5 rounded-full border-2 border-lilac-primary flex items-center justify-center bg-white">
+<div class="w-2.5 h-2.5 rounded-full bg-lilac-primary"></div>
+</div>
+</div>
+<div class="flex-1">
+<div class="text-base font-semibold text-lilac-text-primary leading-tight">
+                通常どおり表示
+              </div>
+<p class="text-[13px] text-lilac-text-secondary mt-1 leading-snug">
+                購入の周期に合わせて候補に出します
+              </p>
+</div>
+</label>
+<!-- Divider -->
+<div class="h-[1px] bg-lilac-divider mx-4"></div>
+<!-- Radio Option 2: Temporary Hidden -->
+<label class="flex items-start p-4 cursor-pointer hover:bg-lilac-divider/40 active:bg-lilac-divider/70 transition-colors">
+<div class="pt-0.5 mr-3 flex-shrink-0">
+<div class="w-5 h-5 rounded-full border-2 border-lilac-text-muted bg-white"></div>
+</div>
+<div class="flex-1">
+<div class="text-base font-semibold text-lilac-text-primary leading-tight">
+                一時的に非表示
+              </div>
+<p class="text-[13px] text-lilac-text-secondary mt-1 leading-snug">
+                再購入すると候補に戻ります。商品名の管理一覧からも外れます
+              </p>
+</div>
+</label>
+<!-- Divider -->
+<div class="h-[1px] bg-lilac-divider mx-4"></div>
+<!-- Radio Option 3: Permanently Hidden -->
+<label class="flex items-start p-4 cursor-pointer hover:bg-lilac-divider/40 active:bg-lilac-divider/70 transition-colors">
+<div class="pt-0.5 mr-3 flex-shrink-0">
+<div class="w-5 h-5 rounded-full border-2 border-lilac-text-muted bg-white"></div>
+</div>
+<div class="flex-1">
+<div class="text-base font-semibold text-lilac-text-primary leading-tight">
+                常に非表示
+              </div>
+<p class="text-[13px] text-lilac-text-secondary mt-1 leading-snug">
+                再購入しても候補に戻りません。購入と購入履歴は今までどおり記録します
+              </p>
+</div>
+</label>
+</div>
+</section>
+<!-- END: DisplaySettingsSection -->
+<!-- BEGIN: PurchaseHistorySection -->
+<section data-purpose="purchase-history">
+<h2 class="text-sm font-medium text-lilac-text-secondary px-1 mb-2 tracking-wide">
+          履歴
+        </h2>
+<button class="material-card w-full p-4 flex items-center justify-between text-left hover:bg-lilac-divider/30 active:bg-lilac-divider/60 transition-colors" type="button">
+<div class="flex items-center space-x-3.5">
+<div class="w-10 h-10 rounded-full bg-lilac-primary-container flex items-center justify-center flex-shrink-0">
+<svg class="w-5 h-5 text-lilac-primary" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24">
+<circle cx="12" cy="12" r="9"></circle>
+<polyline points="12 7 12 12 15 15"></polyline>
+</svg>
+</div>
+<div>
+<span class="text-base font-semibold text-lilac-text-primary block leading-tight">
+                購入履歴を見る
+              </span>
+<span class="text-[13px] text-lilac-text-secondary mt-0.5 block">
+                前回: 10/18 購入（約14日ごと）
+              </span>
+</div>
+</div>
+<svg class="w-5 h-5 text-lilac-text-secondary flex-shrink-0 ml-2" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24">
+<path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+</section>
+<!-- END: PurchaseHistorySection -->
+<!-- BEGIN: ManagementAndDeletionSection -->
+<section class="pb-6" data-purpose="product-maintenance">
+<h2 class="text-sm font-medium text-lilac-text-secondary px-1 mb-2 tracking-wide">
+          商品名の変更と削除
+        </h2>
+<div class="material-card overflow-hidden">
+<!-- Edit Name Row -->
+<button class="w-full p-4 flex items-start justify-between text-left hover:bg-lilac-divider/30 active:bg-lilac-divider/60 transition-colors" type="button">
+<div class="flex items-start space-x-3">
+<div class="pt-0.5">
+<svg class="w-5 h-5 text-lilac-text-primary" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24">
+<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+</svg>
+</div>
+<div>
+<span class="text-[15px] font-medium text-lilac-text-primary block leading-tight">
+                  商品名を変更する
+                </span>
+<p class="text-xs text-lilac-text-muted mt-1 leading-relaxed">
+                  打ち間違えた名前のまま買った場合などに使います。購入記録は引き継がれます。
+                </p>
+</div>
+</div>
+<svg class="w-5 h-5 text-lilac-text-secondary mt-1 flex-shrink-0 ml-2" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24">
+<path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+<!-- Divider -->
+<div class="h-[1px] bg-lilac-divider mx-4"></div>
+<!-- Delete Product Row -->
+<button class="w-full p-4 flex items-start justify-between text-left hover:bg-lilac-destructive-container/40 active:bg-lilac-destructive-container/70 transition-colors" type="button">
+<div class="flex items-start space-x-3">
+<div class="pt-0.5">
+<svg class="w-5 h-5 text-lilac-destructive" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24">
+<path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+<line x1="10" x2="10" y1="11" y2="17"></line>
+<line x1="14" x2="14" y1="11" y2="17"></line>
+</svg>
+</div>
+<div>
+<span class="text-[15px] font-medium text-lilac-destructive block leading-tight">
+                  商品を削除する
+                </span>
+<p class="text-xs text-lilac-text-secondary mt-1 leading-relaxed">
+                  商品リストから完全に削除します。
+                </p>
+</div>
+</div>
+</button>
+</div>
+</section>
+<!-- END: ManagementAndDeletionSection -->
+</main>
+<!-- END: MainContent -->
+<!-- BEGIN: SystemNavigationBar -->
+<!-- Android bottom 3-button navigation bar -->
+<div class="h-12 bg-lilac-background flex justify-around items-center px-12 select-none border-t border-lilac-divider/60">
+<!-- Back (Triangle) -->
+<div class="w-4 h-4 flex items-center justify-center opacity-70">
+<svg class="w-3.5 h-3.5 fill-current text-lilac-text-secondary" viewbox="0 0 24 24">
+<polygon points="6,20 20,12 6,4"></polygon>
+</svg>
+</div>
+<!-- Home (Circle) -->
+<div class="w-4 h-4 flex items-center justify-center opacity-70">
+<div class="w-3.5 h-3.5 rounded-full border-2 border-lilac-text-secondary"></div>
+</div>
+<!-- Recents (Square) -->
+<div class="w-4 h-4 flex items-center justify-center opacity-70">
+<div class="w-3 h-3 rounded-[2px] border-2 border-lilac-text-secondary"></div>
+</div>
+</div>
+<!-- END: SystemNavigationBar -->
+</div>
+<!-- END: MobileFrame -->
+</body></html>
