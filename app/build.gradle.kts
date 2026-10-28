@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -32,6 +34,14 @@ abstract class CopyNormalizationDictionary : DefaultTask() {
 
 val copyNormalizationDictionary = tasks.register<CopyNormalizationDictionary>("copyNormalizationDictionary") {
     sourceDir.set(rootProject.layout.projectDirectory.dir("dictionary"))
+}
+
+/**
+ * リリース版の署名に使うアップロード鍵。リポジトリの外に置いた鍵を、ルートの keystore.properties（コミットしない）で指す。
+ * ファイルがなければ署名しない（CI やほかの人のビルドは未署名のリリース版になる。docs/release.md）
+ */
+val uploadKeystore = rootProject.file("keystore.properties").takeIf { it.exists() }?.let { file ->
+    Properties().apply { file.inputStream().use { load(it) } }
 }
 
 androidComponents {
@@ -70,6 +80,17 @@ android {
         }
     }
 
+    signingConfigs {
+        if (uploadKeystore != null) {
+            create("release") {
+                storeFile = file(uploadKeystore.getProperty("storeFile"))
+                storePassword = uploadKeystore.getProperty("storePassword")
+                keyAlias = uploadKeystore.getProperty("keyAlias")
+                keyPassword = uploadKeystore.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         debug {
             // -PfirebaseEmulator=<ホスト> を付けてビルドすると、Firebase のエミュレータ（Auth と Firestore）につなぐ。
@@ -80,6 +101,7 @@ android {
         }
         release {
             buildConfigField("String", "FIREBASE_EMULATOR_HOST", "\"\"")
+            signingConfig = signingConfigs.findByName("release")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
