@@ -209,7 +209,11 @@
     <string name="product_detail_not_found">この商品は見つかりません</string>
     <string name="product_detail_gone">「%1$s」は購入の記録がなくなったため、商品名の管理から外れました</string>
     <string name="product_names_hidden">非表示の商品（%1$d件）</string>
-    <string name="product_detail_other_section">名前の訂正</string>
+    <string name="product_detail_other_section">名前の訂正と削除</string>
+    <string name="product_delete_mine">自分の購入をすべて削除（%1$d件）</string>
+    <string name="product_delete_mine_description">自分がチェックしたこの商品の購入を、チェック済みの項目ごとまとめて削除します</string>
+    <string name="product_delete_mine_title">「%1$s」の自分の購入%2$d件を削除しますか？</string>
+    <string name="product_delete_mine_others">ほかのメンバーの購入%1$d件は残ります。</string>
     <string name="product_detail_prediction_section">予測</string>
     <string name="suggestion_mode_normal">通常どおり表示</string>
     <string name="suggestion_mode_normal_description">購入の周期に合わせて候補に出します</string>

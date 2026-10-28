@@ -203,6 +203,7 @@ fun ProductDetailScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     var renaming by rememberSaveable { mutableStateOf(false) }
+    var confirmDeleteMine by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(viewModel) {
         viewModel.events.collect { event ->
             when (event) {
@@ -240,6 +241,8 @@ fun ProductDetailScreen(
                     onRename = { renaming = true },
                     onOpenHistory = { onOpenHistory(detail.entry.product.id) },
                     onMode = viewModel::setMode,
+                    ownPurchases = current.ownPurchases,
+                    onDeleteMine = { confirmDeleteMine = true },
                 )
                 is ProductMerge.Detail.Merged -> MergedDetail(
                     target = detail.target,
@@ -250,7 +253,32 @@ fun ProductDetailScreen(
         }
     }
 
-    val loaded = (state as? ProductDetailViewModel.State.Loaded)?.detail as? ProductMerge.Detail.Target
+    val loadedState = state as? ProductDetailViewModel.State.Loaded
+    val loaded = loadedState?.detail as? ProductMerge.Detail.Target
+    if (confirmDeleteMine && loaded != null && loadedState.ownPurchases > 0) {
+        AlertDialog(
+            onDismissRequest = { confirmDeleteMine = false },
+            title = { Text(stringResource(R.string.product_delete_mine_title, loaded.entry.product.displayName, loadedState.ownPurchases)) },
+            text = {
+                Text(
+                    listOfNotNull(
+                        stringResource(R.string.purchase_delete_message),
+                        // ほかのメンバーの購入は消せないので、残ることを伝える
+                        loadedState.othersPurchases.takeIf { it > 0 }?.let { stringResource(R.string.product_delete_mine_others, it) },
+                    ).joinToString("\n"),
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmDeleteMine = false
+                    viewModel.deleteMyPurchases()
+                }) { Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmDeleteMine = false }) { Text(stringResource(R.string.action_cancel)) }
+            },
+        )
+    }
     if (renaming && loaded != null) {
         RenameDialog(
             initial = loaded.entry.product.displayName,
@@ -319,6 +347,9 @@ private fun TargetDetail(
     onRename: () -> Unit,
     onOpenHistory: () -> Unit,
     onMode: (ProductMerge.SuggestionMode) -> Unit,
+    /** 自分がチェックした購入の数。1件以上なら「自分の購入をすべて削除」を出す */
+    ownPurchases: Int = 0,
+    onDeleteMine: () -> Unit = {},
 ) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         SectionLabel(stringResource(R.string.product_detail_members, entry.members.size))
@@ -372,6 +403,17 @@ private fun TargetDetail(
         Column(Modifier.padding(horizontal = CartMateSpacing.large)) {
             TextButton(onClick = onRename) { Text(stringResource(R.string.product_detail_rename)) }
             Text(stringResource(R.string.product_detail_rename_description), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (ownPurchases > 0) {
+                Spacer(Modifier.height(CartMateSpacing.medium))
+                TextButton(onClick = onDeleteMine) {
+                    Text(stringResource(R.string.product_delete_mine, ownPurchases), color = MaterialTheme.colorScheme.error)
+                }
+                Text(
+                    stringResource(R.string.product_delete_mine_description),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
         Spacer(Modifier.height(CartMateSpacing.xLarge))
     }

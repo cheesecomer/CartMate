@@ -1,5 +1,9 @@
 package com.cheesecomer.cartmate.ui.products
 
+import com.cheesecomer.cartmate.domain.suggest.PurchaseHistory
+import com.cheesecomer.cartmate.domain.model.Purchase
+import com.cheesecomer.cartmate.domain.repository.CurrentUserProvider
+import com.cheesecomer.cartmate.domain.repository.ItemRepository
 import com.cheesecomer.cartmate.domain.repository.MemberDirectory
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
@@ -52,6 +56,8 @@ class ProductDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val catalog: ProductCatalog,
     private val productRepository: ProductRepository,
+    private val itemRepository: ItemRepository,
+    private val currentUser: CurrentUserProvider,
 ) : ViewModel() {
 
     val productId = ProductId(checkNotNull(savedStateHandle.get<String>(ProductDetailRoute::productId.name)))
@@ -60,7 +66,13 @@ class ProductDetailViewModel @Inject constructor(
         data object Loading : State
         /** 開いたときから見えない商品 */
         data object NotFound : State
-        data class Loaded(val detail: ProductMerge.Detail) : State
+        data class Loaded(
+            val detail: ProductMerge.Detail,
+            /** この商品（まとめている商品と辞書でまとまる商品を含む）の、自分がチェックした購入の数。まとめて削除できる */
+            val ownPurchases: Int = 0,
+            /** ほかのメンバーがチェックした購入の数。削除しても残る */
+            val othersPurchases: Int = 0,
+        ) : State
 
         /**
          * 表示していた商品が一覧から外れた（購入の記録がすべて削除された など）。「見つかりません」は見せず、
@@ -71,8 +83,10 @@ class ProductDetailViewModel @Inject constructor(
 
     val state: StateFlow<State> = catalog.observe()
         .map { snapshot ->
-            ProductMerge.detail(productId, snapshot.products, snapshot.visibleIds, snapshot.dictionary, snapshot.hidden)
-                ?.let(State::Loaded) ?: State.NotFound
+            val detail = ProductMerge.detail(productId, snapshot.products, snapshot.visibleIds, snapshot.dictionary, snapshot.hidden)
+                ?: return@map State.NotFound
+            val (own, others) = history(snapshot).partition { it.purchasedBy == currentUser.currentUserId() }
+            State.Loaded(detail, ownPurchases = own.size, othersPurchases = others.size)
         }
         // 一度表示できた商品が見つからなくなったら、外れたものとして区別する
         .scan<State, State>(State.Loading) { previous, next ->
@@ -92,6 +106,21 @@ class ProductDetailViewModel @Inject constructor(
 
     private val _events = Channel<Event>(Channel.BUFFERED)
     val events: Flow<Event> = _events.receiveAsFlow()
+
+    /** この商品の購入履歴（Undo したものを除く） */
+    private fun history(snapshot: ProductCatalog.Snapshot): List<Purchase> =
+        PurchaseHistory.of(productId, snapshot.products, snapshot.purchases, snapshot.dictionary)
+
+    /**
+     * この商品の、自分がチェックした購入をすべて、項目ごと削除する（確認は画面で行う）。家族の画面からも消え、元に戻せない。
+     * ほかのメンバーの購入は残る。1件ずつ、項目と購入の記録を同じ書き込みで消す
+     */
+    fun deleteMyPurchases() {
+        viewModelScope.launch {
+            val me = currentUser.currentUserId()
+            history(catalog.observe().first()).filter { it.purchasedBy == me }.forEach { itemRepository.deletePurchase(it.itemId) }
+        }
+    }
 
     /** 名前を [name] に訂正する。購入の記録は書き換えず、正しい名前の商品（なければ作る）にまとめる */
     fun rename(name: String) {

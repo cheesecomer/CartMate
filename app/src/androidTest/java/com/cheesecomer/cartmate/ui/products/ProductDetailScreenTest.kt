@@ -4,6 +4,8 @@ import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.lifecycle.SavedStateHandle
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.cheesecomer.cartmate.data.memory.InMemoryStore
@@ -45,7 +47,7 @@ class ProductDetailScreenTest {
     private fun setContent(name: String) {
         val productId = runBlocking { store.observeProducts().first().first { it.displayName == name }.id }
         val catalog = ProductCatalog(store, store, store, clock) { flowOf(NormalizationDictionary.EMPTY) }
-        val viewModel = ProductDetailViewModel(SavedStateHandle(mapOf("productId" to productId.value)), catalog, store)
+        val viewModel = ProductDetailViewModel(SavedStateHandle(mapOf("productId" to productId.value)), catalog, store, store) { UserId("taro") }
         composeRule.setContent {
             CartMateTheme {
                 ProductDetailScreen(
@@ -79,4 +81,24 @@ class ProductDetailScreenTest {
         composeRule.onNodeWithText("この商品は見つかりません").assertDoesNotExist()
         assertThat(backCount).isEqualTo(1)
     }
+
+    @Test
+    fun 自分の購入をすべて削除すると_確認のあとで項目ごと消え_商品名の管理に戻る() {
+        buy("ケーキ")
+        buy("ケーキ")
+        setContent("ケーキ")
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            runCatching { composeRule.onNodeWithText("自分の購入をすべて削除（2件）").assertIsDisplayed() }.isSuccess
+        }
+
+        composeRule.onNodeWithText("自分の購入をすべて削除（2件）").performScrollTo().performClick()
+        composeRule.onNodeWithText("「ケーキ」の自分の購入2件を削除しますか？").assertIsDisplayed()
+        composeRule.onNodeWithText("削除").performClick()
+        composeRule.waitForIdle()
+
+        assertThat(runBlocking { store.observePurchases(java.time.Instant.EPOCH).first() }).isEmpty()
+        composeRule.onNodeWithText("この商品は見つかりません").assertDoesNotExist()
+        assertThat(backCount).isEqualTo(1)
+    }
 }
+

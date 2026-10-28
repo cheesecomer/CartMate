@@ -27,7 +27,9 @@ class ProductNamesViewModelTest {
     val mainDispatcher = MainDispatcherExtension()
 
     private val clock = MutableClock()
-    private val store = InMemoryStore(clock) { UserId("taro") }
+    /** store を操作している人。ほかのメンバーの購入を再現するときに切り替える */
+    private var actor = UserId("taro")
+    private val store = InMemoryStore(clock) { actor }
     private val listId = runBlocking { store.createList("スーパー") }
     private val catalog = ProductCatalog(store, store, store, clock) { flowOf(NormalizationDictionary.EMPTY) }
 
@@ -41,7 +43,7 @@ class ProductNamesViewModelTest {
         MergeProductsViewModel(SavedStateHandle(mapOf("targetId" to target.value)), catalog, store)
 
     private fun detail(id: ProductId) =
-        ProductDetailViewModel(SavedStateHandle(mapOf("productId" to id.value)), catalog, store)
+        ProductDetailViewModel(SavedStateHandle(mapOf("productId" to id.value)), catalog, store, store) { UserId("taro") }
 
     @Test
     fun `一覧には未統合の商品を出し、まとめている商品の件数を添える`() = runTest {
@@ -273,6 +275,43 @@ class ProductNamesViewModelTest {
             awaitItem()
         }
         assertThat(store.observeProducts().first().first { it.displayName == "カーテンフック" }.suggestionExcluded).isTrue()
+    }
+
+    private suspend fun buy(name: String) {
+        val id = store.addItem(newItem(listId, name))
+        store.completeItem(id, clock.instant())
+    }
+
+    @Test
+    fun `商品の画面から自分の購入だけをまとめて削除でき、ほかのメンバーの購入は残る`() = runTest {
+        buy("ケーキ")
+        buy("ケーキ")
+        actor = UserId("hanako")
+        buy("ケーキ")
+        actor = UserId("taro")
+        val viewModel = detail(productId("ケーキ"))
+        viewModel.state.test {
+            val loaded = awaitUntil { (it as? ProductDetailViewModel.State.Loaded)?.ownPurchases == 2 } as ProductDetailViewModel.State.Loaded
+            assertThat(loaded.othersPurchases).isEqualTo(1)
+            viewModel.deleteMyPurchases()
+            val after = awaitUntil { (it as? ProductDetailViewModel.State.Loaded)?.ownPurchases == 0 } as ProductDetailViewModel.State.Loaded
+            assertThat(after.othersPurchases).isEqualTo(1)
+            cancelAndIgnoreRemainingEvents()
+        }
+        assertThat(store.observePurchases(java.time.Instant.EPOCH).first().map { it.purchasedBy }).containsExactly(UserId("hanako"))
+    }
+
+    @Test
+    fun `自分の購入しかない商品をまとめて削除すると、商品は一覧から外れる`() = runTest {
+        buy("ケーキ")
+        buy("ケーキ")
+        val viewModel = detail(productId("ケーキ"))
+        viewModel.state.test {
+            awaitUntil { (it as? ProductDetailViewModel.State.Loaded)?.ownPurchases == 2 }
+            viewModel.deleteMyPurchases()
+            assertThat(awaitUntil { it is ProductDetailViewModel.State.Gone }).isEqualTo(ProductDetailViewModel.State.Gone("ケーキ"))
+            cancelAndIgnoreRemainingEvents()
+        }
     }
 }
 

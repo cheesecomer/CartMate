@@ -2,6 +2,7 @@ package com.cheesecomer.cartmate.ui.products
 
 import com.cheesecomer.cartmate.domain.model.Product
 import com.cheesecomer.cartmate.domain.model.ProductId
+import com.cheesecomer.cartmate.domain.model.Purchase
 import com.cheesecomer.cartmate.domain.product.NormalizationDictionary
 import com.cheesecomer.cartmate.domain.product.ProductHiding
 import com.cheesecomer.cartmate.domain.product.ProductUsage
@@ -32,6 +33,8 @@ class ProductCatalog @Inject constructor(
         val dictionary: NormalizationDictionary,
         /** 非表示になっている統合先（[ProductHiding.hiddenRoots]） */
         val hidden: Set<ProductId> = emptySet(),
+        /** 自分に見える直近365日の購入の記録（Undo したものを含む） */
+        val purchases: List<Purchase> = emptyList(),
     )
 
     fun observe(): Flow<Snapshot> = combine(
@@ -41,7 +44,7 @@ class ProductCatalog @Inject constructor(
         dictionaryProvider.observeDictionary(),
     ) { products, items, purchases, dictionary ->
         val usage = ProductUsage.of(items, purchases)
-        Snapshot(products, usage.visibleIds, dictionary, ProductHiding.hiddenRoots(products, usage))
+        Snapshot(products, usage.visibleIds, dictionary, ProductHiding.hiddenRoots(products, usage), purchases)
     }
 
     private companion object {
