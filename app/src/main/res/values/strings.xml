@@ -223,6 +223,11 @@
     <string name="purchase_history_title">%1$sの購入履歴</string>
     <string name="purchase_history_hint">直近1年の購入です。間違えてチェックした・たまたま1回だけ買った記録は、オフにすると周期の予測に使わなくなります（記録は残ります）</string>
     <string name="purchase_history_empty">購入の記録はありません</string>
+    <string name="purchase_delete_title">「%1$s」の購入を削除しますか？</string>
+    <string name="purchase_delete_message">チェック済みの項目と購入の記録を削除します。家族の画面からも消え、元に戻せません。</string>
+    <string name="purchase_deleted">「%1$s」の購入を削除しました</string>
+    <string name="detail_delete_purchase">%1$sの購入を削除</string>
+    <string name="purchase_history_delete">%1$sの購入を削除</string>
     <string name="purchase_history_excluded">予測に使わない（%1$s・%2$s）</string>
     <string name="product_detail_rename">名前を訂正</string>
     <string name="product_detail_rename_description">打ち間違えた名前のまま買った場合に使います。購入の記録は正しい名前の商品にまとまります</string>

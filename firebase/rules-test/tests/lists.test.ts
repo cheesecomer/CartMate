@@ -15,7 +15,7 @@ import {
   type Firestore,
 } from "firebase/firestore";
 import { describe, it } from "vitest";
-import { as, HID, seed, seedHousehold } from "./setup";
+import { as, env, HID, seed, seedHousehold } from "./setup";
 
 function list(createdBy: string, visibility: "shared" | "private") {
   return {
@@ -382,12 +382,41 @@ describe("チェックと Undo", () => {
     );
   });
 
-  it("購入の記録は削除できない", async () => {
+  it("購入の記録だけは削除できない（項目と一緒に消す）", async () => {
     await seedOpenItem();
     await complete(as("taro"), "taro", "i1");
     await assertFails(deleteDoc(doc(as("taro"), `households/${HID}/purchases/i1`)));
-    await reopen(as("taro"), "taro", "i1");
-    await assertFails(deleteDoc(doc(as("taro"), `households/${HID}/purchases/i1`)));
+    await assertFails(deleteDoc(doc(as("taro"), `households/${HID}/items/i1`)));
+  });
+
+  /** アプリの FirestoreShoppingStore.deletePurchase と同じ書き込み */
+  function deletePurchase(db: Firestore, itemId: string) {
+    return writeBatch(db)
+      .delete(doc(db, `households/${HID}/purchases/${itemId}`))
+      .delete(doc(db, `households/${HID}/items/${itemId}`))
+      .commit();
+  }
+
+  it("自分がチェックした購入は、項目ごと削除できる（ほかの人が作った項目でも）", async () => {
+    await seedOpenItem("shared", "taro");
+    await complete(as("hanako"), "hanako", "i1");
+    await assertSucceeds(deletePurchase(as("hanako"), "i1"));
+  });
+
+  it("ほかの人がチェックした購入は削除できない", async () => {
+    await seedOpenItem();
+    await complete(as("taro"), "taro", "i1");
+    await assertFails(deletePurchase(as("hanako"), "i1"));
+  });
+
+  it("項目がもうなくても、自分の購入の記録は削除できる", async () => {
+    await seedOpenItem();
+    await complete(as("taro"), "taro", "i1");
+    await seed(`households/${HID}/items/i1`, {});
+    await env.withSecurityRulesDisabled(async (context) => {
+      await deleteDoc(doc(context.firestore(), `households/${HID}/items/i1`));
+    });
+    await assertSucceeds(deletePurchase(as("taro"), "i1"));
   });
 
   it("Undo のあとにもう一度チェックできる", async () => {

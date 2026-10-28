@@ -279,7 +279,8 @@ class InMemoryStore @Inject constructor(
         val now = clock.instant()
         val me = currentUser.currentUserId()
         return transact { d ->
-            val item = d.items[id] ?: return@transact d to ReopenResult.Rejected(null)
+            // 項目がない（チェックした人が購入を削除した）場合も、チェックはもう外れている
+            val item = d.items[id] ?: return@transact d to ReopenResult.AlreadyOpen
             if (item.status == ItemStatus.OPEN) return@transact d to ReopenResult.AlreadyOpen
             val reopened = item.copy(status = ItemStatus.OPEN, completedAt = null, completedBy = null)
             val purchases = d.purchases[id]
@@ -349,6 +350,14 @@ class InMemoryStore @Inject constructor(
                 excludedAt = now.takeIf { excluded },
                 excludedBy = me.takeIf { excluded },
             )))
+        }
+    }
+
+    override suspend fun deletePurchase(id: ItemId) {
+        val me = currentUser.currentUserId()
+        data.update { d ->
+            if (d.purchases[id]?.purchasedBy != me) return@update d
+            d.copy(purchases = d.purchases - id, items = d.items - id)
         }
     }
 

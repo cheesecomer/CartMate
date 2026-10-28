@@ -1,5 +1,7 @@
 package com.cheesecomer.cartmate.ui.products
 
+import com.cheesecomer.cartmate.domain.repository.CurrentUserProvider
+import com.cheesecomer.cartmate.domain.repository.ItemRepository
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -31,6 +33,8 @@ class PurchaseHistoryViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     productRepository: ProductRepository,
     private val purchaseRepository: PurchaseRepository,
+    private val itemRepository: ItemRepository,
+    currentUser: CurrentUserProvider,
     memberDirectory: MemberDirectory,
     private val clock: Clock,
     dictionaryProvider: DictionaryProvider,
@@ -47,6 +51,8 @@ class PurchaseHistoryViewModel @Inject constructor(
         /** 「予測に使わない」にした人と日。予測に使っていれば null */
         val excludedByName: String?,
         val excludedDate: LocalDate?,
+        /** 自分がチェックした購入。項目ごと削除できる */
+        val deletable: Boolean = false,
     )
 
     data class State(val productName: String = "", val rows: List<Row> = emptyList(), val loading: Boolean = true)
@@ -67,6 +73,7 @@ class PurchaseHistoryViewModel @Inject constructor(
                     checkerName = names.of(purchase.purchasedBy),
                     excludedByName = purchase.excludedBy?.takeIf { purchase.excludedFromPrediction }?.let(names::of),
                     excludedDate = purchase.excludedAt?.takeIf { purchase.excludedFromPrediction }?.atZone(zone)?.toLocalDate(),
+                    deletable = purchase.purchasedBy == currentUser.currentUserId(),
                 )
             },
             loading = false,
@@ -76,6 +83,11 @@ class PurchaseHistoryViewModel @Inject constructor(
     /** [id] の記録を予測に使わない（[excluded] が false なら使う）。家族で共有し、オフラインでも行える */
     fun setExcluded(id: ItemId, excluded: Boolean) {
         viewModelScope.launch { purchaseRepository.setExcludedFromPrediction(id, excluded) }
+    }
+
+    /** 自分がチェックした購入を、項目ごと削除する（確認は画面で行う）。家族の画面からも消え、元に戻せない */
+    fun delete(id: ItemId) {
+        viewModelScope.launch { itemRepository.deletePurchase(id) }
     }
 
     private companion object {

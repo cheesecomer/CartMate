@@ -169,7 +169,12 @@ service cloud.firestore {
           && (isCompleting() || isReopening() || isEditing() || isReordering());
         allow delete: if isMember(hid) && canSee(resource.data, resource.data.createdBy)
           && (resource.data.status == 'open'                              // 誤って追加した項目の削除
-              || isOwnPrivate(resource.data, resource.data.createdBy));  // アカウントの削除
+              || isOwnPrivate(resource.data, resource.data.createdBy)    // アカウントの削除
+              // 自分がチェックした購入の削除。購入の記録と同じ書き込みで消す（チェック済みなのに購入の記録がない状態を作らない）
+              || (resource.data.status == 'completed' && resource.data.completedBy == me()
+                  && !existsAfter(purchasePath(itemId))));
+        // 購入の削除で、項目がもうない場合（同じ書き込みに含めても何も消えない）
+        allow delete: if isMember(hid) && resource == null;
 
         // 共有のリストには共有・プライベートのどちらも、プライベートのリストには本人がプライベートだけを追加できる
         function canAddToList(list, visibility) {
@@ -220,7 +225,9 @@ service cloud.firestore {
         allow create: if isMember(hid) && isRecording();
         allow update: if isMember(hid) && canSee(resource.data, resource.data.purchasedBy)
           && ((resource.data.active == false && isRecording()) || isRevoking() || isExcluding());
-        allow delete: if isMember(hid) && isOwnPrivate(resource.data, resource.data.purchasedBy);   // アカウントの削除
+        allow delete: if isMember(hid) && (isOwnPrivate(resource.data, resource.data.purchasedBy)   // アカウントの削除
+          // 自分がチェックした購入の削除。項目と同じ書き込みで消す
+          || (resource.data.purchasedBy == me() && !existsAfter(itemPath(pid))));
 
         // 購入完了時（初回、またはUndo後の再完了）。スナップショット値は item と list に一致させる
         function isRecording() {

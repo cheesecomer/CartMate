@@ -1,5 +1,6 @@
 package com.cheesecomer.cartmate.ui.listdetail
 
+import com.cheesecomer.cartmate.domain.model.UserId
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.distinctUntilChanged
 import com.cheesecomer.cartmate.ui.suggestions.SuggestionSource
@@ -69,6 +70,8 @@ data class ListDetailUiState(
     val memberNames: MemberNames = MemberNames(emptyList()),
     /** サジェストのシートの候補 */
     val suggestions: SheetSuggestions = SheetSuggestions.Loading,
+    /** 自分。自分がチェックした項目にだけ、購入の削除を出す */
+    val me: UserId? = null,
 ) {
     /** [item] をチェックした人の名前。家族にいない人（退会したメンバー）は null */
     fun checkerName(item: Item): String? = item.completedBy?.let(memberNames::of)
@@ -100,6 +103,8 @@ sealed interface DetailMessage {
     /** のこりの商品があるため、リストを削除できない */
     data object CannotDeleteList : DetailMessage
     data object Failed : DetailMessage
+    /** 自分がチェックした購入を削除した */
+    data class PurchaseDeleted(val itemName: String) : DetailMessage
 }
 
 /** 画面の移動 */
@@ -150,7 +155,7 @@ class ListDetailViewModel @Inject constructor(
             loading = false,
         )
     }.combine(members) { state, names -> state.copy(memberNames = names) }
-        .combine(suggestions(suggestionSource)) { state, suggestions -> state.copy(suggestions = suggestions) }
+        .combine(suggestions(suggestionSource)) { state, suggestions -> state.copy(suggestions = suggestions, me = currentUser.currentUserId()) }
         .combine(lastVisibility.observe(listId)) { state, remembered ->
             state.copy(addVisibility = VisibilityDefaults.initial(state.listVisibility, remembered))
         }
@@ -257,6 +262,14 @@ class ListDetailViewModel @Inject constructor(
 
     fun move(id: ItemId, previous: ItemId?, next: ItemId?) {
         viewModelScope.launch { itemRepository.moveItem(id, previous, next) }
+    }
+
+    /** 自分がチェックした購入を、項目ごと削除する（確認は画面で行う）。元に戻せない */
+    fun deletePurchase(item: Item) {
+        viewModelScope.launch {
+            itemRepository.deletePurchase(item.id)
+            _messages.send(DetailMessage.PurchaseDeleted(item.inputName))
+        }
     }
 
     fun delete(item: Item) {

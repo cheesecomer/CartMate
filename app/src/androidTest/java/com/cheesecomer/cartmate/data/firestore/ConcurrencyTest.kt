@@ -288,6 +288,55 @@ class ConcurrencyTest {
         f.hanako.awaitItem(f) { it.status == ItemStatus.OPEN }
     }
 
+    @Test
+    fun 自分がチェックした購入を削除すると項目と購入の記録が消えもう一方の端末からも消える(): Unit = runBlocking {
+        val f = family()
+        f.hanako.store.completeItem(f.itemId, Instant.now())
+        f.hanako.settle()
+        f.taro.awaitItem(f) { it.status == ItemStatus.COMPLETED }
+
+        // taro がチェックした購入ではないので、taro からは削除できない（ルールで拒否される）
+        f.taro.store.deletePurchase(f.itemId)
+        f.taro.settle()
+        assertThat(f.taro.serverHas(f)).isEqualTo(true to true)
+
+        f.hanako.store.deletePurchase(f.itemId)
+        f.hanako.settle()
+        assertThat(f.taro.serverHas(f)).isEqualTo(false to false)
+        f.taro.store.observeListItems(f.listId, Instant.EPOCH).awaitFirst { items -> items.none { it.id == f.itemId } }
+    }
+
+    @Test
+    fun 購入の削除とほかの人のUndoが重なっても項目と購入の記録が食い違わない(): Unit = runBlocking {
+        val f = family()
+        f.hanako.store.completeItem(f.itemId, Instant.now())
+        f.hanako.settle()
+        f.taro.awaitItem(f) { it.status == ItemStatus.COMPLETED }
+
+        // taro はオフラインでチェックを外し、その間に hanako が購入を削除した
+        f.taro.offline()
+        f.taro.store.reopenItem(f.itemId)
+        f.hanako.store.deletePurchase(f.itemId)
+        f.hanako.settle()
+        f.taro.online()
+        f.taro.settle()
+
+        // taro の Undo は、項目も購入の記録もないので反映されない。どちらも残らない
+        assertThat(f.taro.serverHas(f)).isEqualTo(false to false)
+    }
+
+    /**
+     * サーバーに項目と購入の記録があるか。アプリと同じく、共有のものを条件で読む
+     * （ないドキュメントを ID で読むと、ルールが中身を確かめられず拒否されるため）
+     */
+    private suspend fun EmulatorClient.serverHas(f: Family): Pair<Boolean, Boolean> {
+        val items = Paths.items(db, f.householdId).whereEqualTo(F.LIST_ID, f.listId.value).whereEqualTo(F.VISIBILITY, V.SHARED)
+            .get(Source.SERVER).await().documents.map { it.id }
+        val purchases = Paths.purchases(db, f.householdId).whereEqualTo(F.VISIBILITY, V.SHARED)
+            .get(Source.SERVER).await().documents.map { it.id }
+        return (f.itemId.value in items) to (f.itemId.value in purchases)
+    }
+
     private fun collect(flow: Flow<RejectedCheck>, onEach: (RejectedCheck) -> Unit) {
         // 通知は購読している間にしか届かないので、書き込む前に購読を始める
         collectors.launch(start = CoroutineStart.UNDISPATCHED) { flow.collect(onEach) }

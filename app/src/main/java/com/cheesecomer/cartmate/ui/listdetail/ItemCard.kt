@@ -131,6 +131,8 @@ fun CompletedItemCard(
     onUncheck: () -> Unit,
     modifier: Modifier = Modifier,
     drag: RowDrag = RowDrag(),
+    /** 自分がチェックした項目だけ渡す。購入を項目ごと削除する */
+    onDeletePurchase: (() -> Unit)? = null,
 ) {
     SwipeableCard(
         enableStartToEnd = false,
@@ -176,6 +178,9 @@ fun CompletedItemCard(
                 }
             },
             trailing = {
+                onDeletePurchase?.let {
+                    CardIconButton(R.drawable.ic_delete, stringResource(R.string.detail_delete_purchase, item.inputName), it)
+                }
                 val uncheckLabel = stringResource(R.string.detail_uncheck_item, item.inputName)
                 OutlinedButton(
                     onClick = onUncheck,

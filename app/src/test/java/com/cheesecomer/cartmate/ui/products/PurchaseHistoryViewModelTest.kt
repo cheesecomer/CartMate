@@ -29,7 +29,9 @@ class PurchaseHistoryViewModelTest {
     val mainDispatcher = MainDispatcherExtension()
 
     private val clock = MutableClock()
-    private val store = InMemoryStore(clock) { UserId("taro") }
+    /** store を操作している人。ほかのメンバーの購入を再現するときに切り替える */
+    private var actor = UserId("taro")
+    private val store = InMemoryStore(clock) { actor }
     private val listId = runBlocking { store.createList("スーパー") }
 
     private suspend fun buy(name: String) {
@@ -44,6 +46,8 @@ class PurchaseHistoryViewModelTest {
             savedStateHandle = SavedStateHandle(mapOf("productId" to id.value)),
             productRepository = store,
             purchaseRepository = store,
+            itemRepository = store,
+            currentUser = { actor },
             memberDirectory = { flowOf(listOf(Member(UserId("taro"), MemberRole.OWNER, "山田 太郎", null, Instant.EPOCH))) },
             clock = clock,
             dictionaryProvider = { flowOf(NormalizationDictionary.EMPTY) },
@@ -72,4 +76,25 @@ class PurchaseHistoryViewModelTest {
             cancelAndIgnoreRemainingEvents()
         }
     }
+
+    @Test
+    fun `自分がチェックした購入だけを削除でき、削除すると項目ごと履歴から消える`() = runTest {
+        buy("ケーキ")
+        actor = UserId("hanako")
+        buy("ケーキ")
+        actor = UserId("taro")
+        val viewModel = viewModel("ケーキ")
+        viewModel.state.test {
+            val rows = awaitUntil { it.rows.size == 2 }.rows
+            val mine = rows.single { it.purchase.purchasedBy == UserId("taro") }
+            assertThat(mine.deletable).isTrue()
+            assertThat(rows.single { it.purchase.purchasedBy == UserId("hanako") }.deletable).isFalse()
+
+            viewModel.delete(mine.purchase.itemId)
+            assertThat(awaitUntil { it.rows.size == 1 }.rows.single().purchase.purchasedBy).isEqualTo(UserId("hanako"))
+            cancelAndIgnoreRemainingEvents()
+        }
+        assertThat(store.observeListItems(listId, Instant.EPOCH).first().map { it.completedBy }).containsExactly(UserId("hanako"))
+    }
 }
+

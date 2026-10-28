@@ -39,6 +39,12 @@ interface ItemRepository {
     suspend fun reopenItem(id: ItemId): ReopenResult
 
     /**
+     * 自分がチェックした購入を、項目（チェック済み）と購入の記録ごと削除する（docs/requirements.md §4.1「購入の削除」）。
+     * 家族の画面からも消え、元に戻せない。ほかの人がチェックした購入は削除できない（ルールで拒否される）。オフラインでも行える
+     */
+    suspend fun deletePurchase(id: ItemId)
+
+    /**
      * 書き込みキューに積んだチェックが、送られたときに拒否された（docs/design/sync.md「チェック」）。
      * アプリを開いている間に起きたものだけを流す
      */

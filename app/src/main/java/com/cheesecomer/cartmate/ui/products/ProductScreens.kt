@@ -69,6 +69,7 @@ import com.cheesecomer.cartmate.domain.input.formatQuantity
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.RadioButton
+import com.cheesecomer.cartmate.ui.listdetail.PurchaseDeleteDialog
 import com.cheesecomer.cartmate.R
 import com.cheesecomer.cartmate.domain.model.Product
 import com.cheesecomer.cartmate.domain.model.ProductId
@@ -536,6 +537,17 @@ private val HISTORY_DATE: DateTimeFormatter = DateTimeFormatter.ofPattern("M/d")
 @Composable
 fun PurchaseHistoryScreen(onBack: () -> Unit, viewModel: PurchaseHistoryViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    var deleting by remember { mutableStateOf<PurchaseHistoryViewModel.Row?>(null) }
+    deleting?.let { row ->
+        PurchaseDeleteDialog(
+            itemName = row.purchase.inputName,
+            onConfirm = {
+                deleting = null
+                viewModel.delete(row.purchase.itemId)
+            },
+            onDismiss = { deleting = null },
+        )
+    }
     ProductScaffold(title = stringResource(R.string.purchase_history_title, state.productName), onBack = onBack) {
         if (state.loading) return@ProductScaffold
         LazyColumn(Modifier.fillMaxSize()) {
@@ -543,13 +555,20 @@ fun PurchaseHistoryScreen(onBack: () -> Unit, viewModel: PurchaseHistoryViewMode
             if (state.rows.isEmpty()) {
                 item { Empty(stringResource(R.string.purchase_history_empty)) }
             }
-            items(state.rows, key = { it.purchase.itemId.value }) { row -> PurchaseRow(row, viewModel::setExcluded) }
+            items(state.rows, key = { it.purchase.itemId.value }) { row ->
+                PurchaseRow(row, viewModel::setExcluded, onDelete = { deleting = row }.takeIf { row.deletable })
+            }
         }
     }
 }
 
 @Composable
-private fun PurchaseRow(row: PurchaseHistoryViewModel.Row, onExcluded: (com.cheesecomer.cartmate.domain.model.ItemId, Boolean) -> Unit) {
+private fun PurchaseRow(
+    row: PurchaseHistoryViewModel.Row,
+    onExcluded: (com.cheesecomer.cartmate.domain.model.ItemId, Boolean) -> Unit,
+    /** 自分がチェックした購入だけ渡す */
+    onDelete: (() -> Unit)?,
+) {
     val purchase = row.purchase
     val amount = listOfNotNull(purchase.quantity?.let(::formatQuantity), purchase.unit).joinToString("")
     val excluded = purchase.excludedFromPrediction
@@ -580,7 +599,17 @@ private fun PurchaseRow(row: PurchaseHistoryViewModel.Row, onExcluded: (com.chee
                 }
             }
         },
-        trailingContent = { Switch(checked = !excluded, onCheckedChange = null) },
+        trailingContent = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                onDelete?.let {
+                    val description = stringResource(R.string.purchase_history_delete, purchase.inputName)
+                    IconButton(onClick = it, modifier = Modifier.semantics { contentDescription = description }) {
+                        Icon(painterResource(R.drawable.ic_delete), contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                Switch(checked = !excluded, onCheckedChange = null)
+            }
+        },
         colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface),
         modifier = Modifier.toggleable(
             value = !excluded,

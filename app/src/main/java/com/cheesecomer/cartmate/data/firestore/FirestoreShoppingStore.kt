@@ -363,7 +363,8 @@ class FirestoreShoppingStore @Inject constructor(
     override suspend fun reopenItem(id: ItemId): ReopenResult {
         val scope = session.requireScope()
         val itemRef = Paths.items(db, scope.householdId).document(id.value)
-        val item = cached(itemRef)?.toItem() ?: return ReopenResult.Rejected(null)
+        // 項目がない（チェックした人が購入を削除した）場合も、チェックはもう外れている
+        val item = cached(itemRef)?.toItem() ?: return ReopenResult.AlreadyOpen
         if (item.status == ItemStatus.OPEN) return ReopenResult.AlreadyOpen
         db.batch()
             .markOpen(itemRef)
@@ -413,6 +414,15 @@ class FirestoreShoppingStore @Inject constructor(
         },
         map = { it.toPurchase() },
     ).mapSorted { it.purchasedAt }
+
+    /** 購入の記録と項目を同じ書き込みで消す（チェック済みなのに購入の記録がない状態を作らない）。完了は待たない */
+    override suspend fun deletePurchase(id: ItemId) {
+        val scope = session.requireScope()
+        db.batch()
+            .delete(Paths.purchases(db, scope.householdId).document(id.value))
+            .delete(Paths.items(db, scope.householdId).document(id.value))
+            .commit().logFailure("deletePurchase")
+    }
 
     /** 予測に使わないにした人と時刻を書き、戻すときは消す。完了は待たない */
     override suspend fun setExcludedFromPrediction(id: ItemId, excluded: Boolean) {

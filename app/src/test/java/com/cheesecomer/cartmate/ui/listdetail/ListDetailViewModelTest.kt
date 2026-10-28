@@ -539,5 +539,39 @@ class ListDetailViewModelTest {
             cancelAndIgnoreRemainingEvents()
         }
     }
+
+    @Test
+    fun `自分がチェックした購入を項目ごと削除すると、リストからも消えて知らせる`() = runTest {
+        val id = store.addItem(newItem(listId, "ケーキ"))
+        store.completeItem(id, clock.instant())
+        viewModel.messages.test {
+            viewModel.uiState.test {
+                val state = awaitUntil { state -> state.me != null && state.items.any { it.id == id } }
+                assertThat(state.me).isEqualTo(UserId("taro"))
+                val item = state.items.single { it.id == id }
+                viewModel.deletePurchase(item)
+                awaitUntil { state -> state.items.none { it.id == id } }
+                cancelAndIgnoreRemainingEvents()
+            }
+            assertThat(awaitItem()).isEqualTo(DetailMessage.PurchaseDeleted("ケーキ"))
+        }
+        assertThat(store.observePurchases(Instant.EPOCH).first()).isEmpty()
+    }
+
+    @Test
+    fun `ほかのメンバーが購入を削除した項目のチェックを外そうとすると、すでに外れていると知らせる`() = runTest {
+        actor = UserId("hanako")
+        val id = store.addItem(newItem(listId, "ケーキ"))
+        store.completeItem(id, clock.instant())
+        actor = UserId("taro")
+        val item = store.observeListItems(listId, Instant.EPOCH).first().single()
+        actor = UserId("hanako")
+        store.deletePurchase(id)
+        actor = UserId("taro")
+        viewModel.messages.test {
+            viewModel.uncheck(item)
+            assertThat(awaitItem()).isEqualTo(DetailMessage.AlreadyOpen)
+        }
+    }
 }
 
