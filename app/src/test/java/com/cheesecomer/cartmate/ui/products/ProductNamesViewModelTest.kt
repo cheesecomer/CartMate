@@ -180,11 +180,14 @@ class ProductNamesViewModelTest {
         val test = productId("テスト")
         val viewModel = detail(test)
         viewModel.state.test {
-            awaitUntil { (it as? ProductDetailViewModel.State.Loaded)?.detail is ProductMerge.Detail.Target }
+            fun mode(state: ProductDetailViewModel.State) =
+                ((state as? ProductDetailViewModel.State.Loaded)?.detail as? ProductMerge.Detail.Target)?.entry?.mode
+            awaitUntil { mode(it) == ProductMerge.SuggestionMode.NORMAL }
             viewModel.setMode(ProductMerge.SuggestionMode.TEMPORARILY_HIDDEN)
-            awaitUntil { (it as? ProductDetailViewModel.State.Loaded)?.detail is ProductMerge.Detail.Hidden }
+            // 一時的に非表示にしても、同じ統合先の画面のまま、出し方だけが変わる
+            awaitUntil { mode(it) == ProductMerge.SuggestionMode.TEMPORARILY_HIDDEN }
             viewModel.show()
-            awaitUntil { (it as? ProductDetailViewModel.State.Loaded)?.detail is ProductMerge.Detail.Target }
+            awaitUntil { mode(it) == ProductMerge.SuggestionMode.NORMAL }
             cancelAndIgnoreRemainingEvents()
         }
     }

@@ -228,12 +228,6 @@
     <string name="product_detail_rename_description">打ち間違えた名前のまま買った場合に使います。購入の記録は正しい名前の商品にまとまります</string>
     <string name="product_detail_rename_hint">正しい商品名を入力してください</string>
     <string name="product_detail_rename_confirm">訂正する</string>
-    <string name="product_detail_hide_title">「%1$s」を非表示にしますか？</string>
-    <string name="product_detail_hide_message">家族全員の商品名の管理・候補・予測に出なくなります。購入の記録は消えません。同じ名前をまたリストに追加すると、自動でまた表示されます。</string>
-    <string name="product_detail_hide_confirm">非表示にする</string>
-    <string name="product_detail_hidden">この商品は非表示にしています</string>
-    <string name="product_detail_hidden_members">一緒に非表示にしている商品：%1$s</string>
-    <string name="product_detail_hidden_hint">表示すると、非表示にする前の購入の記録も、また予測に使います</string>
     <string name="product_merge_opt_out">別の商品として扱う</string>
     <string name="product_merge_opt_in">辞書でまとめる</string>
     <string name="merge_products_title">商品をまとめる</string>

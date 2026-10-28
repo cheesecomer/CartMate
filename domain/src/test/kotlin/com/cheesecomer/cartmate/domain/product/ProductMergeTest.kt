@@ -192,8 +192,9 @@ class ProductMergeTest {
         assertThat(ProductMerge.entries(all, ids(milk, test), dictionary, hidden).map { it.product }).containsExactly(milk)
         assertThat(ProductMerge.hiddenEntries(all, ids(milk, test), dictionary, hidden).map { it.product }).containsExactly(test)
         assertThat(ProductMerge.candidates(milk.id, all, ids(milk, test), dictionary, hidden)).isEmpty()
-        assertThat(ProductMerge.detail(test.id, all, ids(milk, test), dictionary, hidden))
-            .isInstanceOf(ProductMerge.Detail.Hidden::class.java)
+        // 一時的に非表示の商品も、通常と同じ統合先の画面で開く
+        val detail = ProductMerge.detail(test.id, all, ids(milk, test), dictionary, hidden) as ProductMerge.Detail.Target
+        assertThat(detail.entry.mode).isEqualTo(ProductMerge.SuggestionMode.TEMPORARILY_HIDDEN)
     }
 
     @Test

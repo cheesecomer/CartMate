@@ -46,14 +46,12 @@ object ProductMerge {
 
     /** 商品を開いたときの画面 */
     sealed interface Detail {
-        /** 未統合の商品。まとめている商品、辞書の名寄せ、「商品をまとめる」 */
+        /** 未統合の商品。まとめている商品、辞書の名寄せ、「商品をまとめる」、サジェストへの出し方（非表示の商品も同じ画面） */
         data class Target(val entry: Entry) : Detail
 
         /** 統合されている商品。今の統合先と「解除」 */
         data class Merged(val product: Product, val target: Product) : Detail
 
-        /** 非表示にした統合先。まとめている商品と「表示する」 */
-        data class Hidden(val entry: Entry) : Detail
     }
 
     /** 統合と解除で、1つのバッチに書き込む変更（docs/design/data-model.md「統合」） */
@@ -154,7 +152,8 @@ object ProductMerge {
         val root = byId[ProductGraph(products).resolve(id)]
         if (root != null && root.id != id) return Detail.Merged(product, root).takeIf { id in visibleIds }
         val entry = allEntries(products, visibleIds, dictionary, hidden).find { it.product.id == id } ?: return null
-        return if (id in hidden) Detail.Hidden(entry) else Detail.Target(entry)
+        // 一時的に非表示・常に非表示の商品も、同じ統合先の画面で出し方を選び直す
+        return Detail.Target(entry)
     }
 
     /**

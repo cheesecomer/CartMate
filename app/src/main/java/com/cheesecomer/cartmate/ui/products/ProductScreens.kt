@@ -200,7 +200,6 @@ fun ProductDetailScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     var renaming by rememberSaveable { mutableStateOf(false) }
-    var confirmHide by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(viewModel) {
         viewModel.events.collect { event ->
             when (event) {
@@ -212,7 +211,6 @@ fun ProductDetailScreen(
         is ProductDetailViewModel.State.Loaded -> when (val detail = current.detail) {
             is ProductMerge.Detail.Target -> detail.entry.product.displayName
             is ProductMerge.Detail.Merged -> detail.product.displayName
-            is ProductMerge.Detail.Hidden -> detail.entry.product.displayName
         }
         else -> ""
     }
@@ -229,15 +227,13 @@ fun ProductDetailScreen(
                     onDictionaryOptOut = viewModel::setDictionaryOptOut,
                     onRename = { renaming = true },
                     onOpenHistory = { onOpenHistory(detail.entry.product.id) },
-                    // 一時的に非表示は、一覧からも消えるので確認する
-                    onMode = { if (it == ProductMerge.SuggestionMode.TEMPORARILY_HIDDEN) confirmHide = true else viewModel.setMode(it) },
+                    onMode = viewModel::setMode,
                 )
                 is ProductMerge.Detail.Merged -> MergedDetail(
                     target = detail.target,
                     onUnmerge = { viewModel.unmerge(detail.product.id) },
                     onOpenTarget = { onOpen(detail.target.id) },
                 )
-                is ProductMerge.Detail.Hidden -> HiddenDetail(entry = detail.entry, onMode = viewModel::setMode)
             }
         }
     }
@@ -253,22 +249,6 @@ fun ProductDetailScreen(
                 viewModel.rename(it)
             },
             onDismiss = { renaming = false },
-        )
-    }
-    if (confirmHide && loaded != null) {
-        AlertDialog(
-            onDismissRequest = { confirmHide = false },
-            title = { Text(stringResource(R.string.product_detail_hide_title, loaded.entry.product.displayName)) },
-            text = { Text(stringResource(R.string.product_detail_hide_message)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    confirmHide = false
-                    viewModel.setMode(ProductMerge.SuggestionMode.TEMPORARILY_HIDDEN)
-                }) { Text(stringResource(R.string.product_detail_hide_confirm)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { confirmHide = false }) { Text(stringResource(R.string.action_cancel)) }
-            },
         )
     }
 }
@@ -382,24 +362,6 @@ private fun TargetDetail(
             Text(stringResource(R.string.product_detail_rename_description), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Spacer(Modifier.height(CartMateSpacing.xLarge))
-    }
-}
-
-/** 一時的に非表示の商品。まとめている商品と、サジェストへの出し方 */
-@Composable
-private fun HiddenDetail(entry: ProductMerge.Entry, onMode: (ProductMerge.SuggestionMode) -> Unit) {
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        Column(Modifier.padding(CartMateSpacing.large), verticalArrangement = Arrangement.spacedBy(CartMateSpacing.medium)) {
-            Text(stringResource(R.string.product_detail_hidden), style = MaterialTheme.typography.titleMedium)
-            if (entry.members.isNotEmpty()) {
-                Text(
-                    stringResource(R.string.product_detail_hidden_members, entry.members.joinToString("、") { it.displayName }),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
-            Text(stringResource(R.string.product_detail_hidden_hint), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        ModeSelector(entry.mode, onMode)
     }
 }
 
