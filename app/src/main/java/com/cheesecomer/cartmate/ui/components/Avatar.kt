@@ -1,6 +1,7 @@
 package com.cheesecomer.cartmate.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
@@ -22,6 +23,7 @@ import com.cheesecomer.cartmate.domain.family.AvatarInitial
 /**
  * メンバーのアバター（docs/requirements.md §3.5「アバター」）。Google アカウントの写真を表示し、
  * 写真がない場合と読み込みに失敗した場合は、名前の頭文字を primaryContainer の円に表示する。
+ * 白っぽい写真や頭文字の円が背景に溶けないよう、写真の有無にかかわらず 1dp の縁を付ける。
  * 読み上げは呼び出し側で名前を付ける
  */
 @Composable
@@ -30,7 +32,9 @@ fun Avatar(name: String, photoUrl: String?, size: Dp, modifier: Modifier = Modif
         modifier = modifier
             .size(size)
             .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.primaryContainer),
+            .background(MaterialTheme.colorScheme.primaryContainer)
+            // 縁は中身（写真）の上に描かれる
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape),
         contentAlignment = Alignment.Center,
     ) {
         // 写真の下に頭文字を置いておき、写真がなければそのまま見えるようにする
