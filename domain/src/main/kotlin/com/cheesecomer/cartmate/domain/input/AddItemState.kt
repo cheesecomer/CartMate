@@ -21,11 +21,15 @@ sealed interface AddItemState {
     }
 }
 
-/** サジェストの候補。前回の数量・単位は、購入の記録がなければ null */
+/**
+ * サジェストの候補。前回の数量・単位は、購入の記録がなければ null。
+ * [memo] は、備考の属性（「茶葉」「2L」）で分けて数えた候補の前回の備考で、「＋」で一緒に入れる
+ */
 data class Suggestion(
     val name: String,
     val lastQuantity: Double?,
     val lastUnit: String?,
+    val memo: String? = null,
 )
 
 sealed interface AddItemEvent {
@@ -48,7 +52,7 @@ sealed interface AddItemEvent {
 
 sealed interface AddItemEffect {
     /** すぐにリストの末尾に追加する。公開範囲はそのリストの直前の公開範囲 */
-    data class AddItem(val name: String, val quantity: Double?, val unit: String?) : AddItemEffect
+    data class AddItem(val name: String, val quantity: Double?, val unit: String?, val memo: String? = null) : AddItemEffect
 
     /** 商品詳細入力画面を開く。数量・単位はその初期値 */
     data class OpenEntry(val name: String, val quantity: Double?, val unit: String?) : AddItemEffect

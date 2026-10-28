@@ -8,7 +8,7 @@
 |---|---|---|
 | `VERSION` | | 辞書の版。中身を変えたら上げる |
 | `items.csv` | `canonical_id,name,source` | 品目。名前は前方一致の別名としても使う |
-| `aliases.csv` | `alias,canonical_id,match,source` | 別名。`match` は `exact`（完全一致だけ）、`prefix`（購入履歴の前方一致の照合にも使う）、`default`（上書きできる既定の同義語。お茶→緑茶。フェーズ4まで自動ではまとめない） |
+| `aliases.csv` | `alias,canonical_id,match,source` | 別名。`match` は `exact`（完全一致だけ）、`prefix`（購入履歴の前方一致の照合にも使う）、`default`（上書きできる既定の同義語。お茶→緑茶。予測とサジェストの集計でだけ、品目の語がなければまとめる） |
 | `cycle_groups.csv` | `cycle_group_id,canonical_id` | 購入周期だけ合わせて数えるグループ。品目とは別の ID を使う |
 | `never_merge.csv` | `left_id,right_id,reason` | 自動では同じ商品にしない品目の組 |
 | `retired_ids.csv` | `canonical_id,retired_in,reason` | 使わなくなった品目の ID。再利用しない（家族の訂正がずれるため） |

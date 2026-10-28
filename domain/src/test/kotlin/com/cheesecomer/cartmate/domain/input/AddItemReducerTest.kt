@@ -115,4 +115,12 @@ class AddItemReducerTest {
             assertThat(reduce(Entering("豆乳"), AddItemEvent.Submitted)).isEqualTo(AddItemTransition(Entering("豆乳")))
         }
     }
+
+    @Test
+    fun `候補に前回の備考があれば、＋でその備考も一緒に追加する`() {
+        val suggestion = Suggestion("緑茶", 1.0, "袋", memo = "茶葉")
+        assertThat(AddItemReducer.reduce(AddItemState.Open(""), AddItemEvent.SuggestionAdded(suggestion)).effect)
+            .isEqualTo(AddItemEffect.AddItem("緑茶", 1.0, "袋", memo = "茶葉"))
+    }
 }
+

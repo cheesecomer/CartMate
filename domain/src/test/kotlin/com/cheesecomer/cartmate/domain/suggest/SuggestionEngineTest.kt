@@ -307,4 +307,87 @@ class SuggestionEngineTest {
         assertThat(engine(listOf(milk), purchases, today = 10).memoCandidates("牛乳"))
             .containsExactly("大きいの", "1L", "低脂肪").inOrder()
     }
+
+    // 商品名と備考による判定（docs/design/suggestions.md）
+
+    private val teaDictionary = NormalizationDictionary(
+        version = "test",
+        canonicalNames = mapOf(CanonicalId("green_tea") to "緑茶", CanonicalId("barley_tea") to "麦茶"),
+        aliases = mapOf(
+            "緑茶" to Alias(CanonicalId("green_tea"), Match.EXACT),
+            "麦茶" to Alias(CanonicalId("barley_tea"), Match.EXACT),
+            "お茶" to Alias(CanonicalId("green_tea"), Match.DEFAULT),
+        ),
+        attributes = mapOf(
+            "麦茶" to NormalizationDictionary.Attribute(NormalizationDictionary.AttributeKind.ITEM, "barley_tea"),
+            "緑茶" to NormalizationDictionary.Attribute(NormalizationDictionary.AttributeKind.ITEM, "green_tea"),
+            "茶葉" to NormalizationDictionary.Attribute(NormalizationDictionary.AttributeKind.FORM, "茶葉"),
+            "特売なら" to NormalizationDictionary.Attribute(NormalizationDictionary.AttributeKind.IGNORE, "-"),
+        ),
+    )
+
+    private fun teaEngine(products: List<Product>, purchases: List<Purchase>, today: Long) =
+        engine(products, purchases, today, dictionary = teaDictionary)
+
+    @Test
+    fun `品目の指定がないお茶は、既定の同義語として緑茶と合わせて数える`() {
+        val tea = product("お茶")
+        val green = product("緑茶")
+        val purchases = bought(tea, 0, 20) + bought(green, 10)
+        assertThat(teaEngine(listOf(tea, green), purchases, today = 28).dueNames()).hasSize(1)
+    }
+
+    @Test
+    fun `お茶に備考で麦茶と書いた記録は、麦茶として数える`() {
+        val tea = product("お茶")
+        val barley = product("麦茶")
+        val purchases = listOf(purchase(tea, 0, memo = "麦茶")) + bought(barley, 10, 20)
+        val engine = teaEngine(listOf(tea, barley), purchases, today = 28)
+        assertThat(engine.dueNames()).containsExactly("麦茶")
+    }
+
+    @Test
+    fun `緑茶に備考で麦茶と書いた記録は、食い違うので緑茶にも麦茶にもまとめない`() {
+        val green = product("緑茶")
+        val purchases = bought(green, 0, 10) + purchase(green, 20, memo = "麦茶")
+        // 緑茶として使える購入日は2日だけなので、予測しない
+        assertThat(teaEngine(listOf(green), purchases, today = 28).dueNames()).isEmpty()
+    }
+
+    @Test
+    fun `備考の属性が違う記録は別に数え、属性と前回の備考を添えて出す`() {
+        val green = product("緑茶")
+        val leaf = listOf(0L, 10, 20).map { purchase(green, it, memo = "茶葉") }
+        val plain = bought(green, 1, 11, 21)
+        val items = (teaEngine(listOf(green), leaf + plain, today = 29).due("スーパー") as DueResult.Suggestions).items
+        assertThat(items).hasSize(2)
+        val withLeaf = items.single { it.labels.isNotEmpty() }
+        assertThat(withLeaf.labels).containsExactly("茶葉")
+        assertThat(withLeaf.lastMemo).isEqualTo("茶葉")
+        val withoutLeaf = items.single { it.labels.isEmpty() }
+        assertThat(withoutLeaf.lastMemo).isNull()
+    }
+
+    @Test
+    fun `属性が未指定の記録と指定のある記録は、合わせて数えない`() {
+        val green = product("緑茶")
+        val purchases = bought(green, 0, 10) + purchase(green, 20, memo = "2L")
+        assertThat(teaEngine(listOf(green), purchases, today = 28).dueNames()).isEmpty()
+    }
+
+    @Test
+    fun `判定に使わない語だけの備考は、分けずに数える`() {
+        val milk = product("牛乳")
+        val purchases = bought(milk, 0, 10) + purchase(milk, 20, memo = "特売なら")
+        assertThat(teaEngine(listOf(milk), purchases, today = 28).dueNames()).containsExactly("牛乳")
+    }
+
+    @Test
+    fun `容量は書き方が違っても同じものとして数え、2Lと表示する`() {
+        val green = product("緑茶")
+        val purchases = listOf(purchase(green, 0, memo = "2L"), purchase(green, 10, memo = "2リットル"), purchase(green, 20, memo = "2000ml"))
+        val item = (teaEngine(listOf(green), purchases, today = 28).due("スーパー") as DueResult.Suggestions).items.single()
+        assertThat(item.labels).containsExactly("2L")
+    }
 }
+

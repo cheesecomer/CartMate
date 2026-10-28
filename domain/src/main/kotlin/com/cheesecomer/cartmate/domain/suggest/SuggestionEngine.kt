@@ -4,7 +4,10 @@ import com.cheesecomer.cartmate.domain.model.Item
 import com.cheesecomer.cartmate.domain.model.Product
 import com.cheesecomer.cartmate.domain.model.ProductId
 import com.cheesecomer.cartmate.domain.model.Purchase
+import com.cheesecomer.cartmate.domain.product.AttributeExtractor
 import com.cheesecomer.cartmate.domain.product.NormalizationDictionary
+import com.cheesecomer.cartmate.domain.product.Qualifier
+import com.cheesecomer.cartmate.domain.product.RecordAttributes
 import com.cheesecomer.cartmate.domain.product.ProductGraph
 import com.cheesecomer.cartmate.domain.product.ProductHiding
 import com.cheesecomer.cartmate.domain.product.ProductResolver
@@ -42,9 +45,54 @@ class SuggestionEngine(
 
     private fun rootOf(id: ProductId): ProductId = graph.resolve(id)
 
-    private fun keyOf(id: ProductId): ResolvedKey = resolver.resolve(id).key
+    /** 周期を合わせて数える単位。周期のグループ（なければまとめる先）と、名寄せに関係する属性（形態・用途・種類・容量） */
+    private data class Group(val cycle: CycleKey, val qualifiers: Set<Qualifier>)
 
-    private fun cycleKeyOf(id: ProductId): CycleKey = resolver.cycleKey(id)
+    /** 1件の記録のまとめる先と属性 */
+    private data class Record(val key: ResolvedKey, val group: Group, val attributes: RecordAttributes)
+
+    /**
+     * 商品 [id] を、商品名 [name] と備考 [memo] で記録したもののまとめる先（docs/design/suggestions.md「商品名と備考による判定」）。
+     * 手動の統合・分離と辞書の名寄せは [ProductResolver] のとおり。そのうえで、
+     * - 既定の同義語の商品（「お茶」）は、商品名や備考に品目の語（「麦茶」）があればその品目、なければ既定の品目（緑茶）にまとめる。
+     *   品目の語が食い違えば、まとめない（その商品のまま）
+     * - 辞書でまとめた商品でも、備考の品目の語が食い違えば（「緑茶」＋備考「麦茶」）、まとめない
+     * 属性（形態・用途・種類・容量）が未指定の記録と指定のある記録は、別のものとして数える（未指定を一致とみなさない）
+     */
+    private fun record(id: ProductId, name: String, memo: String?): Record {
+        val resolution = resolver.resolve(id)
+        val attributes = AttributeExtractor.extract(name, memo, dictionary)
+        val own = ResolvedKey.OfProduct(rootOf(id))
+        val key = when (val reason = resolution.reason) {
+            ProductResolver.Reason.Self -> {
+                val alias = byId[rootOf(id)]?.normalizedName?.let(dictionary::lookup)
+                    ?.takeIf { it.match == NormalizationDictionary.Match.DEFAULT }
+                val items = attributes.nameItems + attributes.memoItems
+                when {
+                    alias == null -> resolution.key
+                    items.isEmpty() -> ResolvedKey.OfCanonical(alias.canonicalId)
+                    items.size == 1 -> ResolvedKey.OfCanonical(items.single())
+                    else -> own
+                }
+            }
+            is ProductResolver.Reason.Dictionary ->
+                if (attributes.memoItems.isEmpty() || attributes.memoItems == setOf(reason.canonicalId)) resolution.key else own
+            else -> resolution.key
+        }
+        return Record(key, Group(cycleOf(key), attributes.qualifiers), attributes)
+    }
+
+    private fun Purchase.record(): Record = record(productId!!, inputName, memo)
+
+    private fun Item.record(): Record? = productId?.let { record(it, inputName, memo) }
+
+    /** 商品のまとめる先（名前だけで決まるもの。備考は使わない） */
+    private fun keyOf(id: ProductId): ResolvedKey = record(id, byId[id]?.displayName.orEmpty(), memo = null).key
+
+    private fun cycleOf(key: ResolvedKey): CycleKey {
+        val group = (key as? ResolvedKey.OfCanonical)?.canonicalId?.let(dictionary.cycleGroups::get)
+        return if (group != null) CycleKey.OfGroup(group) else CycleKey.Of(key)
+    }
 
     /** 有効で、非表示の商品でも、非表示にする前のものでもない購入の記録（前回の購入と備考の候補に使う） */
     private val activePurchases: List<Purchase> = purchases.filter { purchase ->
@@ -54,25 +102,28 @@ class SuggestionEngine(
         purchase.active && root !in hidden && (hiddenAt == null || !purchase.purchasedAt.isBefore(hiddenAt))
     }
 
+    private val records: Map<Purchase, Record> = activePurchases.associateWith { it.record() }
+
     /** 予測に使う購入の記録 */
     private val facts: List<Purchase> = activePurchases.filter { !it.excludedFromPrediction }
 
     private fun Purchase.date(): LocalDate = checkedAt.atZone(zone).toLocalDate()
 
-    private val factsByCycle: Map<CycleKey, List<Purchase>> = facts.groupBy { cycleKeyOf(it.productId!!) }
-    private val factsByKey: Map<ResolvedKey, List<Purchase>> = facts.groupBy { keyOf(it.productId!!) }
-    private val estimates = HashMap<CycleKey, CycleEstimate?>()
+    private val factsByGroup: Map<Group, List<Purchase>> = facts.groupBy { records.getValue(it).group }
+    private val factsByKey: Map<ResolvedKey, List<Purchase>> = facts.groupBy { records.getValue(it).key }
+    private val estimates = HashMap<Group, CycleEstimate?>()
 
-    private fun estimate(cycle: CycleKey): CycleEstimate? = estimates.getOrPut(cycle) {
-        CycleEstimator.estimate(factsByCycle[cycle].orEmpty().map { it.date() }, params)
+    private fun estimate(group: Group): CycleEstimate? = estimates.getOrPut(group) {
+        CycleEstimator.estimate(factsByGroup[group].orEmpty().map { it.date() }, params)
     }
 
-    /** 家族のいずれかのリストに未購入である商品（統合先で比較） */
-    private val openKeys: Set<ResolvedKey> = openItems.mapNotNull { it.productId?.let(::keyOf) }.toSet()
-    private val openCycles: Set<CycleKey> = openItems.mapNotNull { it.productId?.let(::cycleKeyOf) }.toSet()
+    /** 家族のいずれかのリストに未購入である商品（統合先で比較）。属性が違っても、同じ商品があれば出さない */
+    private val openRecords: List<Record> = openItems.mapNotNull { it.record() }
+    private val openKeys: Set<ResolvedKey> = openRecords.map { it.key }.toSet()
+    private val openCycles: Set<CycleKey> = openRecords.map { it.group.cycle }.toSet()
 
     /**
-     * 統合先ごとの、名前を出す商品の候補（どこにもまとめられていない、非表示でない商品）。自分に見える項目か購入の記録がある
+     * まとめる先ごとの、名前を出す商品の候補（どこにもまとめられていない、非表示でない商品）。自分に見える項目か購入の記録がある
      * 商品の統合先だけ（他のメンバーがプライベートでだけ使った名前を出さない）。統合された商品の名前（誤字など）は出さない
      */
     private val rootsByKey: Map<ResolvedKey, Set<ProductId>> = usage.visibleIds
@@ -97,7 +148,7 @@ class SuggestionEngine(
     private fun relevance(listName: String): Map<ResolvedKey, Double> =
         ListSimilarity.relevance(
             ListSimilarity.listKey(listName),
-            ListSimilarity.buildProfiles(facts.map { it.listNameSnapshot to keyOf(it.productId!!) }),
+            ListSimilarity.buildProfiles(facts.map { it.listNameSnapshot to records.getValue(it).key }),
             params,
         )
 
@@ -121,6 +172,12 @@ class SuggestionEngine(
         val lastUnit: String?,
         /** 最後に買ってからの日数（「最後は16日前」） */
         val daysSinceLast: Long,
+        /**
+         * 備考から読んだ属性で分けて数えたときの、前回の備考（「＋」で一緒に入れて、属性を引き継ぐ）。分けていなければ null
+         */
+        val lastMemo: String? = null,
+        /** 名前に添えて表示する属性（「茶葉」「2L」「麦茶」）。同じ名前の候補を見分けるため */
+        val labels: List<String> = emptyList(),
     )
 
     /**
@@ -130,24 +187,50 @@ class SuggestionEngine(
     fun due(listName: String): DueResult {
         val relevance = relevance(listName)
         if (relevance.isEmpty()) return DueResult.NoContext
-        val items = factsByCycle.keys.mapNotNull { cycle ->
-            if (cycle in openCycles) return@mapNotNull null
-            val estimate = estimate(cycle) ?: return@mapNotNull null
+        val items = factsByGroup.keys.mapNotNull { group ->
+            if (group.cycle in openCycles) return@mapNotNull null
+            val estimate = estimate(group) ?: return@mapNotNull null
             val ratio = CycleEstimator.elapsedRatio(estimate, today)
             if (ratio < params.dueRatio || ratio > params.staleRatio) return@mapNotNull null
-            val purchases = factsByCycle.getValue(cycle)
-            val keys = purchases.map { keyOf(it.productId!!) }.toSet()
+            val purchases = factsByGroup.getValue(group)
+            val keys = purchases.map { records.getValue(it).key }.toSet()
             if (keys.any { it in openKeys }) return@mapNotNull null
             if (keys.flatMap { rootsByKey[it].orEmpty() }.any { byId[it]?.suggestionExcluded == true }) return@mapNotNull null
             val score = keys.maxOf { relevance[it] ?: 0.0 }
             if (score <= 0.0) return@mapNotNull null
             val last = latest(purchases)!!
-            val product = representative(keyOf(last.productId!!)) ?: return@mapNotNull null
-            DueSuggestion(product, estimate, ratio, score, last.quantity, last.unit, ChronoUnit.DAYS.between(estimate.lastPurchase, today))
+            val record = records.getValue(last)
+            // まとめる先に名前を出せる商品がなければ（「お茶」＋備考「麦茶」だけで買っている場合など）、前回買った商品の名前
+            val product = representative(record.key) ?: byId[rootOf(last.productId!!)]?.takeIf { it.id !in hidden } ?: return@mapNotNull null
+            val memoItemNames = record.attributes.memoItems.map { dictionary.canonicalNames[it] ?: it.value }
+            DueSuggestion(
+                product = product,
+                estimate = estimate,
+                ratio = ratio,
+                relevance = score,
+                lastQuantity = last.quantity,
+                lastUnit = last.unit,
+                daysSinceLast = ChronoUnit.DAYS.between(estimate.lastPurchase, today),
+                lastMemo = last.memo?.trim()?.takeIf { record.attributes.fromMemo && it.isNotEmpty() },
+                labels = memoItemNames.filter { it != product.displayName } + group.qualifiers.map { label(it) }.sorted(),
+            )
         }
         return DueResult.Suggestions(
             items.sortedWith(compareByDescending<DueSuggestion> { it.ratio }.thenByDescending { it.relevance }).take(params.maxDue),
         )
+    }
+
+    /** 属性の表示。容量は「2000ml」を「2L」に戻す */
+    private fun label(qualifier: Qualifier): String {
+        if (qualifier.kind != "volume") return qualifier.value
+        val amount = qualifier.value.dropLast(if (qualifier.value.endsWith("ml")) 2 else 1).toBigDecimalOrNull() ?: return qualifier.value
+        val thousand = 1000.toBigDecimal()
+        return when {
+            qualifier.value.endsWith("ml") && amount >= thousand -> amount.divide(thousand).stripTrailingZeros().toPlainString() + "L"
+            qualifier.value.endsWith("g") && !qualifier.value.endsWith("ml") && amount >= thousand ->
+                amount.divide(thousand).stripTrailingZeros().toPlainString() + "kg"
+            else -> qualifier.value
+        }
     }
 
     // 入力中の補完
@@ -207,13 +290,14 @@ class SuggestionEngine(
             val count = factsByKey[resolved].orEmpty().size
             if (reason == MatchReason.PARTIAL && count < 2) return@mapNotNull null
             val product = representative(resolved) ?: return@mapNotNull null
-            val last = latest(activePurchases.filter { keyOf(it.productId!!) == resolved })
+            val last = latest(activePurchases.filter { records.getValue(it).key == resolved })
             Completion(
                 product = product,
                 reason = reason,
                 purchaseCount = count,
                 alreadyAdded = resolved in openKeys,
-                early = EarlyPurchaseDetector.detect(estimate(cycleKeyOf(product.id)), today, params),
+                // 補完は名前で選ぶので、属性を指定していない記録の周期で判定する
+                early = EarlyPurchaseDetector.detect(estimate(Group(cycleOf(resolved), emptySet())), today, params),
                 lastQuantity = last?.quantity,
                 lastUnit = last?.unit,
             ) to (relevance[resolved] ?: 0.0)
@@ -241,12 +325,11 @@ class SuggestionEngine(
         val early: EarlyPurchaseNotice?,
     )
 
-    /** [name] の商品の前回の購入。購入の記録がなければ null */
+    /** [name] の商品の前回の購入。購入の記録がなければ null。周期は前回の購入と同じ属性の記録で求める */
     fun previous(name: String): PreviousPurchase? {
-        val id = ProductId(NameNormalizer.productId(name))
-        val resolved = keyOfName(name, id)
-        val last = latest(activePurchases.filter { keyOf(it.productId!!) == resolved }) ?: return null
-        val estimate = estimate(cycleKeyOfName(name, id))
+        val resolved = keyOfName(name)
+        val last = latest(activePurchases.filter { records.getValue(it).key == resolved }) ?: return null
+        val estimate = estimate(records.getValue(last).group)
         return PreviousPurchase(
             quantity = last.quantity,
             unit = last.unit,
@@ -258,28 +341,27 @@ class SuggestionEngine(
 
     /** [name] の商品の備考の候補。自分に見える購入の記録の、空でない備考を新しい順に、重複を除いて最大3件 */
     fun memoCandidates(name: String): List<String> {
-        val resolved = keyOfName(name, ProductId(NameNormalizer.productId(name)))
+        val resolved = keyOfName(name)
         return activePurchases
-            .filter { keyOf(it.productId!!) == resolved }
+            .filter { records.getValue(it).key == resolved }
             .sortedByDescending { it.checkedAt }
             .mapNotNull { it.memo?.trim()?.takeIf(String::isNotEmpty) }
             .distinct()
             .take(MAX_MEMO_CANDIDATES)
     }
 
-    /** 名前から決まる商品のまとめる先。まだない商品なら、辞書（既定の同義語を除く）で当たる品目か、その名前の商品 */
-    private fun keyOfName(name: String, id: ProductId): ResolvedKey {
+    /** 名前から決まるまとめる先。まだない商品なら、名前だけの新しい商品として求める（辞書と既定の同義語を使う） */
+    private fun keyOfName(name: String): ResolvedKey {
+        val id = ProductId(NameNormalizer.productId(name))
         if (id in byId) return keyOf(id)
-        val alias = dictionary.lookup(NameNormalizer.normalizedName(name))
-            ?.takeIf { it.match != NormalizationDictionary.Match.DEFAULT }
-        return if (alias != null) ResolvedKey.OfCanonical(alias.canonicalId) else ResolvedKey.OfProduct(id)
-    }
-
-    private fun cycleKeyOfName(name: String, id: ProductId): CycleKey {
-        if (id in byId) return cycleKeyOf(id)
-        val resolved = keyOfName(name, id)
-        val group = (resolved as? ResolvedKey.OfCanonical)?.canonicalId?.let(dictionary.cycleGroups::get)
-        return if (group != null) CycleKey.OfGroup(group) else CycleKey.Of(resolved)
+        val attributes = AttributeExtractor.extract(name, null, dictionary)
+        val alias = dictionary.lookup(NameNormalizer.normalizedName(name)) ?: return ResolvedKey.OfProduct(id)
+        if (alias.match != NormalizationDictionary.Match.DEFAULT) return ResolvedKey.OfCanonical(alias.canonicalId)
+        return when (attributes.nameItems.size) {
+            0 -> ResolvedKey.OfCanonical(alias.canonicalId)
+            1 -> ResolvedKey.OfCanonical(attributes.nameItems.single())
+            else -> ResolvedKey.OfProduct(id)
+        }
     }
 
     private companion object {

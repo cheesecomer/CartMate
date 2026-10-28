@@ -35,7 +35,7 @@ object AddItemReducer {
                 }
             is AddItemEvent.SuggestionAdded -> {
                 val (quantity, unit) = lastOrDefault(event.suggestion)
-                AddItemTransition(Open(""), AddItemEffect.AddItem(event.suggestion.name, quantity, unit))
+                AddItemTransition(Open(""), AddItemEffect.AddItem(event.suggestion.name, quantity, unit, event.suggestion.memo))
             }
             is AddItemEvent.SuggestionOpened -> {
                 val (quantity, unit) = lastOrDefault(event.suggestion)

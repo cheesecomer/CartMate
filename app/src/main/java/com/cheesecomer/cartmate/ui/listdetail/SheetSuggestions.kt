@@ -23,8 +23,10 @@ sealed interface SheetSuggestions {
                 if (due.items.isEmpty()) return Hint
                 return Items(due.items.map { item ->
                     SuggestionRow(
-                        Suggestion(item.product.displayName, item.lastQuantity, item.lastUnit),
+                        Suggestion(item.product.displayName, item.lastQuantity, item.lastUnit, item.lastMemo),
                         SuggestionNote.Due(item.estimate.typicalIntervalDays, item.daysSinceLast),
+                        // 同じ名前でも備考の属性で分けて数えた候補は、「緑茶（茶葉）」のように見分ける
+                        label = if (item.labels.isEmpty()) item.product.displayName else "${item.product.displayName}（${item.labels.joinToString("・")}）",
                     )
                 })
             }
@@ -38,7 +40,12 @@ sealed interface SheetSuggestions {
     }
 }
 
-data class SuggestionRow(val suggestion: Suggestion, val note: SuggestionNote)
+data class SuggestionRow(
+    val suggestion: Suggestion,
+    val note: SuggestionNote,
+    /** 表示する名前 */
+    val label: String = suggestion.name,
+)
 
 /** 候補の名前の下に出す補足 */
 sealed interface SuggestionNote {

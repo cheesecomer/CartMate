@@ -55,7 +55,7 @@ data class NormalizationDictionary(
 
         /**
          * 既定の同義語（「お茶」→ 緑茶）。商品名や備考に品目の語（「麦茶」）があればそちらを優先するので、確定ではない。
-         * 備考を使う判定（フェーズ4）を作るまでは、自動の名寄せには使わない
+         * 予測とサジェストの集計（SuggestionEngine）でだけ、品目の語がない記録をまとめるのに使う。ProductResolver では使わない
          */
         DEFAULT,
     }

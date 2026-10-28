@@ -43,7 +43,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -198,7 +198,7 @@ internal fun AddItemSheetContent(
             is SheetSuggestions.Items -> if (suggestions.rows.isNotEmpty()) {
                 // シートがキーボードより上に伸びすぎないよう、一覧の高さを抑えて中でスクロールする
                 LazyColumn(Modifier.fillMaxWidth().heightIn(max = SUGGESTIONS_MAX_HEIGHT)) {
-                    items(suggestions.rows, key = { it.suggestion.name }) { row ->
+                    itemsIndexed(suggestions.rows, key = { index, row -> "$index:${row.label}" }) { _, row ->
                         SuggestionRowView(
                             row = row,
                             onOpen = { onEvent(AddItemEvent.SuggestionOpened(row.suggestion)) },
@@ -236,12 +236,12 @@ private fun SuggestionRowView(row: SuggestionRow, onOpen: () -> Unit, onAdd: () 
                 .clickable(role = Role.Button, onClick = onOpen)
                 .padding(horizontal = CartMateSpacing.small, vertical = CartMateSpacing.small),
         ) {
-            Text(row.suggestion.name, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(row.label, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
             noteText(row.note)?.let {
                 Text(it, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
             }
         }
-        val description = stringResource(R.string.add_item_add_suggestion, row.suggestion.name)
+        val description = stringResource(R.string.add_item_add_suggestion, row.label)
         FilledIconButton(
             onClick = onAdd,
             shape = CircleShape,

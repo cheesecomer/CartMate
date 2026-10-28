@@ -213,7 +213,7 @@ class ListDetailViewModel @Inject constructor(
             is AddItemEffect.AddItem -> viewModelScope.launch {
                 val list = listRepository.observeLists().first().firstOrNull { it.id == listId } ?: return@launch
                 val visibility = VisibilityDefaults.initial(list.visibility, lastVisibility.get(listId))
-                itemRepository.addItem(NewItem(listId, effect.name, effect.quantity, effect.unit, memo = null, visibility))
+                itemRepository.addItem(NewItem(listId, effect.name, effect.quantity, effect.unit, effect.memo, visibility))
             }
             is AddItemEffect.OpenEntry -> _navigation.trySend(DetailNavigation.OpenEntry(effect.name, effect.quantity, effect.unit))
             null -> Unit
