@@ -588,8 +588,21 @@ fun MergeProductsScreen(onBack: () -> Unit, onDone: () -> Unit, viewModel: Merge
 private val HISTORY_DATE: DateTimeFormatter = DateTimeFormatter.ofPattern("M/d")
 
 @Composable
-fun PurchaseHistoryScreen(onBack: () -> Unit, viewModel: PurchaseHistoryViewModel = hiltViewModel()) {
+fun PurchaseHistoryScreen(
+    onBack: () -> Unit,
+    /** 最後の購入を削除して0件になった。商品名の管理まで戻る */
+    onEmptied: () -> Unit = onBack,
+    viewModel: PurchaseHistoryViewModel = hiltViewModel(),
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    if (state.emptied) {
+        val message = stringResource(R.string.product_detail_gone, state.productName)
+        LaunchedEffect(Unit) {
+            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+            onEmptied()
+        }
+    }
     var deleting by remember { mutableStateOf<PurchaseHistoryViewModel.Row?>(null) }
     deleting?.let { row ->
         PurchaseDeleteDialog(

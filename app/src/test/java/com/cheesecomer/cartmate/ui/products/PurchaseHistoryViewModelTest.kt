@@ -96,5 +96,32 @@ class PurchaseHistoryViewModelTest {
         }
         assertThat(store.observeListItems(listId, Instant.EPOCH).first().map { it.completedBy }).containsExactly(UserId("hanako"))
     }
-}
 
+    @Test
+    fun `記録があった状態から最後の購入を削除すると、0件になったことを商品名とともに知らせる`() = runTest {
+        buy("ケーキ")
+        val viewModel = viewModel("ケーキ")
+        viewModel.state.test {
+            val row = awaitUntil { it.rows.size == 1 }.also { assertThat(it.emptied).isFalse() }.rows.single()
+
+            viewModel.delete(row.purchase.itemId)
+            val emptied = awaitUntil { it.emptied }
+            assertThat(emptied.productName).isEqualTo("ケーキ")
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `最初から記録がない購入履歴は、0件になったとはみなさない`() = runTest {
+        buy("ケーキ")
+        val id = store.observePurchases(Instant.EPOCH).first().single().itemId
+        val viewModel = viewModel("ケーキ")
+        store.deletePurchase(id)
+        viewModel.state.test {
+            val state = awaitUntil { !it.loading }
+            assertThat(state.rows).isEmpty()
+            assertThat(state.emptied).isFalse()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+}

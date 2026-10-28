@@ -17,6 +17,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.Clock
@@ -55,7 +56,13 @@ class PurchaseHistoryViewModel @Inject constructor(
         val deletable: Boolean = false,
     )
 
-    data class State(val productName: String = "", val rows: List<Row> = emptyList(), val loading: Boolean = true)
+    data class State(
+        val productName: String = "",
+        val rows: List<Row> = emptyList(),
+        val loading: Boolean = true,
+        /** 記録があった状態から0件になった（最後の購入を削除した）。商品名の管理まで戻って知らせる */
+        val emptied: Boolean = false,
+    )
 
     val state: StateFlow<State> = combine(
         productRepository.observeProducts(),
@@ -77,6 +84,11 @@ class PurchaseHistoryViewModel @Inject constructor(
                 )
             },
             loading = false,
+        )
+    }.scan(State()) { previous, next ->
+        next.copy(
+            productName = next.productName.ifEmpty { previous.productName },
+            emptied = previous.emptied || (previous.rows.isNotEmpty() && !next.loading && next.rows.isEmpty()),
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), State())
 
