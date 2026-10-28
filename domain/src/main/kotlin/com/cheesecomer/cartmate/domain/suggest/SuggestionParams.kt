@@ -10,9 +10,14 @@ data class SuggestionParams(
     val dueRatio: Double = 0.8,
     /** これを超えたら「買うのをやめた」とみなして出さない */
     val staleRatio: Double = 3.0,
+    /**
+     * 時期が近い商品の順位がいちばん高くなる経過率。これを超えると、超えた分だけ順位を下げる
+     * （予定日を大きく過ぎた商品が、今ちょうど必要な商品より上に並ばないように）
+     */
+    val overduePeakRatio: Double = 1.5,
     /** 早すぎる再購入とみなす経過率 */
     val earlyRatio: Double = 0.5,
-    /** 中央絶対偏差 / 中央値 がこれを超えたら、周期が不安定 */
+    /** 中央絶対偏差 / 中央値 がこれを超えたら、周期が不安定（時期が近い商品にも、早すぎる再購入の注意にも使わない） */
     val maxDispersion: Double = 0.5,
     /** 類似度を計算するリストの最小の商品数 */
     val minProfileSize: Int = 5,

@@ -94,4 +94,18 @@ class MergeCandidatesTest {
     fun `どれにも当たらなければ候補なし`() {
         assertThat(find("卵", listOf(product("牛乳")))).isNull()
     }
+
+    @Test
+    fun `選択肢を含む名前は、表記ゆれの候補を出さず、候補にもならない`() {
+        val kabu = product("カブ")
+        val daikon = product("大根")
+        val either = product("カブもしくは大根")
+        // 選択肢を含む新しい名前には、候補を出さない
+        assertThat(find("カブもしくは大根", listOf(kabu, daikon))).isNull()
+        assertThat(find("カブまたは大根", listOf(kabu, daikon))).isNull()
+        // 選択肢を含む既存の名前は、ほかの名前の候補にならない
+        assertThat(find("大根", listOf(either))).isNull()
+        assertThat(find("カブ", listOf(either))).isNull()
+    }
 }
+

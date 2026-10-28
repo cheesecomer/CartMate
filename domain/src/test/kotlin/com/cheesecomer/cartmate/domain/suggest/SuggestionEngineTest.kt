@@ -417,5 +417,47 @@ class SuggestionEngineTest {
         val item = (teaEngine(listOf(green), purchases, today = 28).due("スーパー") as DueResult.Suggestions).items.single()
         assertThat(item.labels).containsExactly("2L")
     }
+
+    // 献立で買う食材と、予定日を過ぎた商品（フィードバック #010）
+
+    @Test
+    fun `間隔がばらつく商品は、時期が近い商品に出さない`() {
+        val mince = product("ひき肉")
+        // 間隔が 3日・15日・30日 とばらつく（ばらつきの指標 0.8）
+        val purchases = bought(mince, 0, 3, 18, 48)
+        assertThat(engine(listOf(mince), purchases, today = 63).dueNames()).isEmpty()
+    }
+
+    @Test
+    fun `ばらつきが0点5ちょうどなら出し、超えたら出さない`() {
+        val steady = product("牛乳")
+        // 間隔 10・15・20 日: 中央値 15、偏差の中央値 5 → 0.33
+        assertThat(engine(listOf(steady), bought(steady, 0, 10, 25, 45), today = 59).dueNames()).containsExactly("牛乳")
+        val border = product("豆腐")
+        // 間隔 4・8・12 日: 中央値 8、偏差の中央値 4 → 0.5
+        assertThat(engine(listOf(border), bought(border, 0, 4, 12, 24), today = 31).dueNames()).containsExactly("豆腐")
+        val unstable = product("キャベツ")
+        // 間隔 2・8・20 日: 中央値 8、偏差の中央値 6 → 0.75
+        assertThat(engine(listOf(unstable), bought(unstable, 0, 2, 10, 30), today = 38).dueNames()).isEmpty()
+    }
+
+    @Test
+    fun `予定日を大きく過ぎた商品は、今ちょうど必要な商品より下に並ぶ`() {
+        val overdue = product("ヨーグルト")
+        val due = product("洗剤")
+        // ヨーグルトは10日ごとで最後は25日前（経過率2.5）、洗剤は10日ごとで最後は9日前（0.9）
+        val purchases = bought(overdue, 0, 10, 20) + bought(due, 16, 26, 36)
+        val names = engine(listOf(overdue, due), purchases, today = 45).dueNames()
+        assertThat(names).containsExactly("洗剤", "ヨーグルト").inOrder()
+    }
+
+    @Test
+    fun `経過率1点5までは経過率の大きい順`() {
+        val a = product("牛乳")
+        val b = product("卵")
+        // 牛乳は経過率1.4、卵は0.9
+        val purchases = bought(a, 0, 10, 20) + bought(b, 5, 15, 25)
+        assertThat(engine(listOf(a, b), purchases, today = 34).dueNames()).containsExactly("牛乳", "卵").inOrder()
+    }
 }
 

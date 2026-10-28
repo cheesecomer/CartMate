@@ -185,8 +185,9 @@ class SuggestionEngine(
     )
 
     /**
-     * [listName] のリストで出す、時期が近い商品。周期の経過率が [SuggestionParams.dueRatio] 以上 [SuggestionParams.staleRatio] 以下で、
-     * 未購入の項目になく、提案から除外しておらず、このリストで関連がある商品を、経過率・関連度の大きい順に
+     * [listName] のリストで出す、時期が近い商品。周期が安定していて（ばらつきが [SuggestionParams.maxDispersion] 以下）、
+     * 経過率が [SuggestionParams.dueRatio] 以上 [SuggestionParams.staleRatio] 以下で、未購入の項目になく、非表示でなく、
+     * このリストで関連がある商品を、[priority] と関連度の大きい順に
      */
     fun due(listName: String): DueResult {
         val relevance = relevance(listName)
@@ -194,6 +195,8 @@ class SuggestionEngine(
         val items = factsByGroup.keys.mapNotNull { group ->
             if (group.cycle in openCycles) return@mapNotNull null
             val estimate = estimate(group) ?: return@mapNotNull null
+            // 献立で買う食材のように、たまたまの間隔でばらついている商品は、補充が必要とはみなさない
+            if (estimate.dispersion > params.maxDispersion) return@mapNotNull null
             val ratio = CycleEstimator.elapsedRatio(estimate, today)
             if (ratio < params.dueRatio || ratio > params.staleRatio) return@mapNotNull null
             val purchases = factsByGroup.getValue(group)
@@ -221,9 +224,16 @@ class SuggestionEngine(
             )
         }
         return DueResult.Suggestions(
-            items.sortedWith(compareByDescending<DueSuggestion> { it.ratio }.thenByDescending { it.relevance }).take(params.maxDue),
+            items.sortedWith(compareByDescending<DueSuggestion> { priority(it.ratio) }.thenByDescending { it.relevance }).take(params.maxDue),
         )
     }
+
+    /**
+     * 時期が近い商品の順位。経過率が [SuggestionParams.overduePeakRatio] までは経過率そのもの（大きいほど上）で、
+     * それを超えると超えた分だけ下げる（予定日を大きく過ぎた商品は「買うのをやめた」かもしれないので、下に沈める）
+     */
+    private fun priority(ratio: Double): Double =
+        if (ratio <= params.overduePeakRatio) ratio else params.overduePeakRatio - (ratio - params.overduePeakRatio)
 
     /** 属性の表示。容量は「2000ml」を「2L」に戻す */
     private fun label(qualifier: Qualifier): String {
