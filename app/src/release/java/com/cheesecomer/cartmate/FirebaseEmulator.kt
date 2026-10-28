@@ -4,6 +4,8 @@ package com.cheesecomer.cartmate
 object FirebaseEmulator {
     val enabled: Boolean get() = false
 
+    val testUserSignInVisible: Boolean get() = false
+
     fun install() = Unit
 
     suspend fun signInTestUser() = Unit

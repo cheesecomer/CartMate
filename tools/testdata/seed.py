@@ -6,6 +6,8 @@
 入れるもの:
   - テスト用ユーザー taro@example.com（パスワード cartmate-test、表示名 山田 太郎）と、その家族
   - リスト「スーパー」「薬局」と、そこで過去に買った商品の購入の記録（今日を基準にした日付）
+  - --showcase のときは、画面のスクリーンショット用に、家族のメンバー（山田 花子）、未購入とチェック済みの項目、
+    プライベートのリスト、まとめた商品、招待コードも入れる（tools/screenshots/take.sh）
 
 標準ライブラリだけを使う（Python 3.9 以上）。
 
@@ -19,6 +21,7 @@ import hashlib
 import json
 import re
 import sys
+import time
 import unicodedata
 import urllib.error
 import urllib.request
@@ -52,7 +55,35 @@ PURCHASES = [
 # --third で足す、卵の3回目の購入（3回目の購入から予測が出ることを確かめる）
 THIRD = ("卵", "スーパー", 1, "パック", None, [9])
 
-LISTS = [("super", "スーパー", 1.0), ("drugstore", "薬局", 2.0)]
+# ID, 名前, 並び順, 公開範囲, 備考
+LISTS = [("super", "スーパー", 1.0, "shared", None), ("drugstore", "薬局", 2.0, "shared", None)]
+
+# --showcase で足すもの（スクリーンショット用）。予測の確かめ方（docs/testing.md「テストデータ」の表）は変えない:
+# 上の商品は未購入にせず、ほかのメンバーの購入は上の商品の購入の一部を付け替えるだけにする
+MEMBER_UID = "test-hanako"
+MEMBER_NAME = "山田 花子"
+SHOWCASE_LISTS = [
+    ("super", "スーパー", 1.0, "shared", "週末のまとめ買い"),
+    ("drugstore", "薬局", 2.0, "shared", None),
+    ("homecenter", "ホームセンター", 3.0, "shared", None),
+    ("birthday", "誕生日の準備", 4.0, "private", "日曜のパーティー"),
+]
+# 商品名, リスト, 数量, 単位, 備考, 公開範囲, 作った人（花子なら True）, チェックした時刻（何時間前か。未購入は None）
+SHOWCASE_ITEMS = [
+    ("にんじん", "スーパー", 3, "本", None, "shared", False, None),
+    ("玉ねぎ", "スーパー", 1, "袋", None, "shared", True, None),
+    ("豚こま切れ肉", "スーパー", 300, "g", "特売なら2パック", "shared", True, None),
+    ("バナナ", "スーパー", 1, "房", None, "shared", False, None),
+    ("プリン", "スーパー", 3, "個", None, "private", False, None),
+    ("豆腐", "スーパー", 2, "丁", "絹", "shared", True, 2),
+    ("納豆", "スーパー", 1, "パック", None, "shared", False, 1),
+    ("ケーキ", "誕生日の準備", 1, "台", "チョコレート", "private", False, None),
+    ("ろうそく", "誕生日の準備", 1, "箱", None, "private", False, None),
+    ("クラッカー", "誕生日の準備", 6, "個", None, "private", False, None),
+]
+# 「牛乳」にまとめた別の表記。購入日（27日前）は牛乳の周期（7日ごと）に沿わせる
+SHOWCASE_MERGED = ("ミルク", "牛乳", "スーパー", 1, "本", 27)
+INVITE_CODE = "K7QM2XWP4R"
 
 
 def normalized_name(name):
@@ -120,6 +151,7 @@ def main():
     parser.add_argument("--host", default="127.0.0.1", help="エミュレータのホスト（このスクリプトを動かす PC から見たもの）")
     parser.add_argument("--project", default="cartmate-cheesecomer", help="エミュレータを起動したプロジェクト ID")
     parser.add_argument("--third", action="store_true", help="卵の3回目の購入だけを足す（最初の投入のあとで実行する）")
+    parser.add_argument("--showcase", action="store_true", help="スクリーンショット用のデータ（メンバー・未購入の項目など）も入れる")
     args = parser.parse_args()
 
     uid = sign_up(args.host)
@@ -128,7 +160,15 @@ def main():
         clear = urllib.request.Request(
             f"http://{args.host}:8085/emulator/v1/projects/{args.project}/databases/(default)/documents", method="DELETE",
         )
-        urllib.request.urlopen(clear, timeout=10).close()
+        # アプリが購読している最中だと、まれに 499 で断られるので、少し待ってやり直す
+        for attempt in range(5):
+            try:
+                urllib.request.urlopen(clear, timeout=10).close()
+                break
+            except urllib.error.HTTPError as error:
+                if error.code != 499 or attempt == 4:
+                    raise
+                time.sleep(1)
     now = datetime.datetime.now().astimezone()
     noon = now.replace(hour=12, minute=0, second=0, microsecond=0)
     root = f"projects/{args.project}/databases/(default)/documents"
@@ -143,37 +183,74 @@ def main():
         "role": "owner", "displayName": DISPLAY_NAME, "photoUrl": None, "joinedAt": now, "joinedVia": None,
     })
     put(f"users/{uid}", {"householdId": HOUSEHOLD_ID, "updatedAt": now})
+    lists = SHOWCASE_LISTS if args.showcase else LISTS
     list_ids = {}
-    for list_id, name, sort_key in LISTS:
+    for list_id, name, sort_key, visibility, memo in lists:
         list_ids[name] = list_id
         put(f"{household}/lists/{list_id}", {
-            "name": name, "memo": None, "visibility": "shared", "sortKey": sort_key,
+            "name": name, "memo": memo, "visibility": visibility, "sortKey": sort_key,
             "createdBy": uid, "createdAt": now - datetime.timedelta(days=120), "status": "active",
         })
 
-    count = 0
-    for name, list_name, quantity, unit, memo, days in ([THIRD] if args.third else PURCHASES):
+    def product(name, created_at, merged_into=None):
         pid = product_id(name)
-        first = noon - datetime.timedelta(days=max(days))
-        put(f"{household}/products/{pid}", {
+        fields = {
             "displayName": unicodedata.normalize("NFKC", name).strip(), "normalizedName": normalized_name(name),
-            "searchKey": search_key(name), "createdBy": uid, "createdAt": first, "mergedInto": None,
+            "searchKey": search_key(name), "createdBy": uid, "createdAt": created_at, "mergedInto": merged_into,
+        }
+        if merged_into:
+            fields.update({"mergedAt": now, "mergedBy": uid, "mergeUpdatedAt": now, "mergeUpdatedBy": uid})
+        put(f"{household}/products/{pid}", fields)
+        return pid
+
+    def item(item_id, pid, name, list_name, quantity, unit, memo, visibility, by, sort_key, created_at, checked_at):
+        """項目。checked_at があればチェック済みにして、購入の記録も入れる"""
+        put(f"{household}/items/{item_id}", {
+            "listId": list_ids[list_name], "productId": pid, "inputName": name, "sortKey": float(sort_key),
+            "quantity": quantity, "unit": unit, "memo": memo, "visibility": visibility,
+            "status": "completed" if checked_at else "open", "createdBy": by, "createdAt": created_at,
+            "completedAt": checked_at, "completedBy": by if checked_at else None, "checkedAt": checked_at,
         })
-        for day in days:
-            at = noon - datetime.timedelta(days=day)
-            item_id = f"seed-{pid[2:10]}-{day}"
-            put(f"{household}/items/{item_id}", {
-                "listId": list_ids[list_name], "productId": pid, "inputName": name, "sortKey": float(day),
-                "quantity": quantity, "unit": unit, "memo": memo, "visibility": "shared", "status": "completed",
-                "createdBy": uid, "createdAt": at, "completedAt": at, "completedBy": uid, "checkedAt": at,
-            })
+        if checked_at:
             put(f"{household}/purchases/{item_id}", {
                 "itemId": item_id, "listId": list_ids[list_name], "listNameSnapshot": list_name, "productId": pid,
-                "inputName": name, "quantity": quantity, "unit": unit, "memo": memo, "visibility": "shared",
-                "checkedAt": at, "purchasedAt": at, "purchasedBy": uid, "active": True,
+                "inputName": name, "quantity": quantity, "unit": unit, "memo": memo, "visibility": visibility,
+                "checkedAt": checked_at, "purchasedAt": checked_at, "purchasedBy": by, "active": True,
                 "revokedAt": None, "revokedBy": None,
             })
+
+    count = 0
+    for name, list_name, quantity, unit, memo, days in ([THIRD] if args.third else PURCHASES):
+        pid = product(name, noon - datetime.timedelta(days=max(days)))
+        for index, day in enumerate(days):
+            at = noon - datetime.timedelta(days=day)
+            # スクリーンショット用には、ほかのメンバーの購入も混ぜる（購入日は変えないので、予測は変わらない）
+            by = MEMBER_UID if args.showcase and index % 2 == 1 else uid
+            item(f"seed-{pid[2:10]}-{day}", pid, name, list_name, quantity, unit, memo, "shared", by, day, at, at)
             count += 1
+
+    if args.showcase:
+        put(f"{household}/members/{MEMBER_UID}", {
+            "role": "member", "displayName": MEMBER_NAME, "photoUrl": None,
+            "joinedAt": now - datetime.timedelta(days=100), "joinedVia": None,
+        })
+        for index, (name, list_name, quantity, unit, memo, visibility, by_member, hours) in enumerate(SHOWCASE_ITEMS):
+            pid = product(name, now - datetime.timedelta(days=1))
+            by = MEMBER_UID if by_member else uid
+            checked_at = now - datetime.timedelta(hours=hours) if hours else None
+            created_at = now - datetime.timedelta(hours=20 - index)
+            item(f"showcase-{index}", pid, name, list_name, quantity, unit, memo, visibility, by, 1000 + index, created_at, checked_at)
+            count += 1 if checked_at else 0
+        name, into, list_name, quantity, unit, day = SHOWCASE_MERGED
+        pid = product(name, noon - datetime.timedelta(days=day), merged_into=product_id(into))
+        at = noon - datetime.timedelta(days=day)
+        item(f"seed-{pid[2:10]}-{day}", pid, name, list_name, quantity, unit, None, "shared", MEMBER_UID, day, at, at)
+        count += 1
+        put(f"invites/{INVITE_CODE}", {
+            "householdId": HOUSEHOLD_ID, "createdBy": uid, "inviterName": DISPLAY_NAME,
+            "createdAt": now - datetime.timedelta(hours=2), "expiresAt": now + datetime.timedelta(hours=22),
+            "maxUses": 1, "usedCount": 0,
+        })
 
     # 管理者として書く（ルールを通さない）。エミュレータだけが受け付ける
     result = request(
@@ -183,7 +260,7 @@ def main():
     )
     if "error" in result:
         sys.exit(f"Firestore エミュレータに書けない: {result['error']}")
-    print(f"ユーザー {EMAIL}（{uid}）の家族に、リスト {len(LISTS)} 件・商品 {len(PURCHASES)} 件・購入の記録 {count} 件を入れた")
+    print(f"ユーザー {EMAIL}（{uid}）の家族に、リスト {len(lists)} 件・購入の記録 {count} 件を入れた")
     return 0
 
 

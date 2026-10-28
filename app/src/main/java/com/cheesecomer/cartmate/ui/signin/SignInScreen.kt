@@ -59,7 +59,7 @@ fun SignInScreen(viewModel: SignInViewModel = hiltViewModel()) {
             scope.launch { viewModel.onResult(GoogleSignIn.requestIdToken(context)) }
         },
         // エミュレータにつないだデバッグ版だけ（Google のログインはエミュレータでは使えない）
-        onSignInTestUser = if (FirebaseEmulator.enabled) {
+        onSignInTestUser = if (FirebaseEmulator.enabled && FirebaseEmulator.testUserSignInVisible) {
             { scope.launch { FirebaseEmulator.signInTestUser() } }
         } else {
             null

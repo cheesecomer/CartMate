@@ -19,6 +19,9 @@ object FirebaseEmulator {
 
     val enabled: Boolean get() = BuildConfig.FIREBASE_EMULATOR_HOST.isNotEmpty()
 
+    /** ログイン画面に、テスト用ユーザーでログインするボタンを出すか。スクリーンショットでは隠す（ScreenshotTour） */
+    var testUserSignInVisible = true
+
     /** Firebase へのアクセスより先に呼ぶ */
     fun install() {
         if (!enabled) return
