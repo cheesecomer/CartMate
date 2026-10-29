@@ -380,11 +380,12 @@ class ListDetailScreenTest {
     }
 
     @Test
-    fun 編集ボタンで項目の商品詳細入力画面を開く() {
+    fun メニューの編集で項目の商品詳細入力画面を開く() {
         val itemId = addItem("牛乳")
         setContent()
 
-        composeRule.onNodeWithContentDescription("牛乳を編集").performClick()
+        composeRule.onNodeWithContentDescription("牛乳のメニュー").performClick()
+        composeRule.onNodeWithText("編集").performClick()
 
         composeRule.waitUntil { editedItems.isNotEmpty() }
         assertThat(editedItems).containsExactly(itemId)
@@ -392,11 +393,12 @@ class ListDetailScreenTest {
     }
 
     @Test
-    fun 削除ボタンで削除できる() {
+    fun メニューの削除で削除できる() {
         addItem("牛乳")
         setContent()
 
-        composeRule.onNodeWithContentDescription("牛乳を削除").performClick()
+        composeRule.onNodeWithContentDescription("牛乳のメニュー").performClick()
+        composeRule.onNodeWithText("削除").performClick()
 
         composeRule.waitUntil { openItemNames().isEmpty() }
         assertThat(activePurchaseCount()).isEqualTo(0)
@@ -413,6 +415,23 @@ class ListDetailScreenTest {
 
         composeRule.waitUntil { openItemNames() == listOf("牛乳") }
         assertThat(activePurchaseCount()).isEqualTo(0)
+    }
+
+    @Test
+    fun チェックした人は_自分なら名前ではなくあなた_ほかのメンバーなら名前で表示する() {
+        val milk = addItem("牛乳")
+        val egg = addItem("卵")
+        runBlocking { store.completeItem(milk, Instant.now()) }
+        actor = UserId("hanako")
+        runBlocking { store.completeItem(egg, Instant.now()) }
+        actor = UserId("taro")
+        setContent()
+
+        // 画面が落ち着いたあと
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("あなた ", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("花子 ", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("退会したメンバー", substring = true).assertDoesNotExist()
     }
 
     @Test

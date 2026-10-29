@@ -6,8 +6,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -93,55 +95,62 @@ private fun CreateListForm(
             .padding(start = CartMateSpacing.xLarge, end = CartMateSpacing.xLarge, bottom = CartMateSpacing.xLarge),
         verticalArrangement = Arrangement.spacedBy(CartMateSpacing.large),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                stringResource(R.string.lists_create_sheet_title),
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.weight(1f),
-            )
-            TextButton(onClick = onCancel) { Text(stringResource(R.string.action_cancel)) }
-        }
-        OutlinedTextField(
-            value = name,
-            onValueChange = onNameChange,
-            label = { Text(stringResource(R.string.lists_name_label)) },
-            placeholder = { Text(stringResource(R.string.lists_name_placeholder)) },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-            modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
-        )
-        Column(verticalArrangement = Arrangement.spacedBy(CartMateSpacing.small)) {
-            Text(
-                stringResource(R.string.lists_visibility_label),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(CartMateSpacing.small)) {
-                SelectableOption(
-                    title = stringResource(R.string.lists_visibility_shared),
-                    selected = visibility == Visibility.SHARED,
-                    onSelect = { onVisibilityChange(Visibility.SHARED) },
-                    icon = R.drawable.ic_group,
+        // 背の低い画面でキーボードが出ていると収まりきらないので、入力欄の側をスクロールし、
+        // 作成するボタンはいつもキーボードのすぐ上に見えるようにする
+        Column(
+            modifier = Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(CartMateSpacing.large),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    stringResource(R.string.lists_create_sheet_title),
+                    style = MaterialTheme.typography.titleLarge,
                     modifier = Modifier.weight(1f),
                 )
-                SelectableOption(
-                    title = stringResource(R.string.lists_visibility_private),
-                    selected = visibility == Visibility.PRIVATE,
-                    onSelect = { onVisibilityChange(Visibility.PRIVATE) },
-                    icon = R.drawable.ic_lock,
-                    modifier = Modifier.weight(1f),
-                )
+                TextButton(onClick = onCancel) { Text(stringResource(R.string.action_cancel)) }
             }
+            OutlinedTextField(
+                value = name,
+                onValueChange = onNameChange,
+                label = { Text(stringResource(R.string.lists_name_label)) },
+                placeholder = { Text(stringResource(R.string.lists_name_placeholder)) },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
+            )
+            Column(verticalArrangement = Arrangement.spacedBy(CartMateSpacing.small)) {
+                Text(
+                    stringResource(R.string.lists_visibility_label),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(CartMateSpacing.small)) {
+                    SelectableOption(
+                        title = stringResource(R.string.lists_visibility_shared),
+                        selected = visibility == Visibility.SHARED,
+                        onSelect = { onVisibilityChange(Visibility.SHARED) },
+                        icon = R.drawable.ic_group,
+                        modifier = Modifier.weight(1f),
+                    )
+                    SelectableOption(
+                        title = stringResource(R.string.lists_visibility_private),
+                        selected = visibility == Visibility.PRIVATE,
+                        onSelect = { onVisibilityChange(Visibility.PRIVATE) },
+                        icon = R.drawable.ic_lock,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+            OutlinedTextField(
+                value = memo,
+                onValueChange = onMemoChange,
+                label = { Text(stringResource(R.string.lists_memo_label)) },
+                placeholder = { Text(stringResource(R.string.lists_memo_placeholder)) },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
-        OutlinedTextField(
-            value = memo,
-            onValueChange = onMemoChange,
-            label = { Text(stringResource(R.string.lists_memo_label)) },
-            placeholder = { Text(stringResource(R.string.lists_memo_placeholder)) },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-            modifier = Modifier.fillMaxWidth(),
-        )
         Button(
             onClick = onCreate,
             enabled = name.isNotBlank(),

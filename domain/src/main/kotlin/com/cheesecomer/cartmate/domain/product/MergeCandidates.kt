@@ -7,7 +7,9 @@ import com.cheesecomer.cartmate.domain.text.NameNormalizer
 
 /**
  * 商品詳細入力画面の表記ゆれのチップ（docs/design/suggestions.md「表記ゆれの紐付け」）。
- * 入力した名前が新しい商品で、検索用のキーが前方一致・部分一致する既存の商品があれば、「『牛乳』と同じ商品として記録する」の候補にする
+ * 入力した名前が新しい商品で、検索用のキーが前方一致・部分一致する既存の商品があれば、「『牛乳』と同じ商品として扱う」の候補にする。
+ * 同じくらい近い候補が別々の商品で複数あれば（「コーヒー豆」に対する「コーヒー豆（深煎り）」と「コーヒー豆（中煎り）」）、
+ * どちらにまとめるか決められないので候補を出さない
  */
 object MergeCandidates {
 
@@ -29,17 +31,20 @@ object MergeCandidates {
         val inputCanonical = dictionary.lookup(NameNormalizer.normalizedName(name))?.canonicalId
         val graph = ProductGraph(all)
         val byId = all.associateBy { it.id }
-        return visible
+        // 一致の度合い（前方一致が先）、キーの短い順で近さを決める。同じ近さの候補は、統合先が1つに決まるときだけ出す
+        val nearest = visible
             .asSequence()
             .filter { it.searchKey.length >= MIN_KEY_LENGTH && !ChoiceName.hasChoice(it.displayName) }
-            .mapNotNull { product -> rank(key, product.searchKey)?.let { product to it } }
+            .mapNotNull { product -> rank(key, product.searchKey)?.let { product to (it to product.searchKey.length) } }
             .filter { (product, _) ->
                 val canonical = dictionary.lookup(product.normalizedName)?.canonicalId
                 inputCanonical == null || canonical == null || dictionary.mayMerge(inputCanonical, canonical)
             }
-            .sortedWith(compareBy({ it.second }, { it.first.searchKey.length }, { it.first.displayName }))
-            .map { (product, _) -> byId[graph.resolve(product.id)] ?: product }
-            .firstOrNull()
+            .groupBy({ it.second }, { it.first })
+            .minWithOrNull(compareBy({ it.key.first }, { it.key.second }))
+            ?.value
+            ?: return null
+        return nearest.map { byId[graph.resolve(it.id)] ?: it }.distinctBy { it.id }.singleOrNull()
     }
 
     /** 0: 前方一致、1: 部分一致。当たらなければ null */

@@ -4,6 +4,7 @@
 
     <!-- 共通 -->
     <string name="action_cancel">キャンセル</string>
+    <string name="action_edit">編集</string>
     <string name="action_delete">削除</string>
     <string name="action_undo">元に戻す</string>
     <string name="action_back">戻る</string>
@@ -49,8 +50,7 @@
     <string name="detail_empty">購入予定の商品はありません</string>
     <string name="detail_check">チェック</string>
     <string name="detail_uncheck">チェックを外す</string>
-    <string name="detail_edit_item">%1$sを編集</string>
-    <string name="detail_delete_item">%1$sを削除</string>
+    <string name="detail_item_menu">%1$sのメニュー</string>
     <string name="detail_uncheck_item">%1$sのチェックを外す</string>
     <string name="detail_checked_message">%1$s をチェックしました</string>
     <string name="detail_deleted_message">%1$s を削除しました</string>
@@ -60,6 +60,7 @@
     <string name="detail_others_checked_many">%1$sさんが%2$sほか%3$d件をチェックしました</string>
     <string name="detail_check_not_applied">%1$sのチェックを反映できませんでした</string>
     <string name="former_member">退会したメンバー</string>
+    <string name="checker_you">あなた</string>
     <string name="detail_already_open">すでにチェックが外されています</string>
     <string name="detail_checked_by_other">%1$sさんがチェックしたため、チェックを外せません</string>
     <string name="detail_checked_by_former">退会したメンバーがチェックしたため、チェックを外せません</string>
@@ -75,6 +76,7 @@
     <string name="add_item_suggestion_hint">商品名を入力すると候補が出ます</string>
     <string name="add_item_add_suggestion">%1$sを追加</string>
     <string name="add_item_note_due">約%1$d日ごと・最後は%2$d日前</string>
+    <string name="add_item_note_frequent">%1$d回購入・最後は%2$d日前</string>
     <string name="add_item_note_added">追加済み</string>
     <string name="add_item_note_added_in">追加済み（%1$s）</string>
     <string name="add_item_open_product">商品の設定を開く</string>
@@ -90,6 +92,7 @@
     <string name="entry_destination_private">（プライベートリスト）</string>
     <string name="entry_name_label">商品名</string>
     <string name="entry_quantity">数量</string>
+    <string name="entry_quantity_hint">タップして直接編集可能</string>
     <string name="entry_quantity_increment">数量を1増やす</string>
     <string name="entry_quantity_decrement">数量を1減らす</string>
     <string name="entry_unit">単位</string>
@@ -109,7 +112,8 @@
     <string name="entry_recent">最近購入したばかりです</string>
     <string name="entry_memo_placeholder">メモ（例: 特売品なら2個、賞味期限が長いものなど）</string>
     <string name="entry_add">リストに追加する</string>
-    <string name="entry_merge_chip">「%1$s」と同じ商品として記録する</string>
+    <string name="entry_merge_title">「%1$s」と同じ商品として扱う</string>
+    <string name="entry_merge_description">購入履歴を合わせて、次の購入時期を予測します</string>
     <string name="entry_update">更新する</string>
 
     <!-- ログイン -->

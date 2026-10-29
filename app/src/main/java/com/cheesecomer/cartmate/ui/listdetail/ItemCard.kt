@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -12,6 +13,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -22,9 +25,11 @@ import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -67,7 +72,7 @@ data class RowDrag(
 )
 
 /**
- * 未購入の項目のカード。タップか → でチェック、「編集」ボタンで編集、← か「削除」ボタンで削除。
+ * 未購入の項目のカード。タップか → でチェック、⋮ メニューの「編集」で編集、← か ⋮ メニューの「削除」で削除。
  * [showLock] は共有のリストにあるプライベートな項目に鍵アイコンを付けるか
  */
 @Composable
@@ -110,10 +115,7 @@ fun OpenItemCard(
                     )
                 }
             },
-            trailing = {
-                CardIconButton(R.drawable.ic_edit, stringResource(R.string.detail_edit_item, item.inputName), onEdit)
-                CardIconButton(R.drawable.ic_delete, stringResource(R.string.detail_delete_item, item.inputName), onDelete)
-            },
+            trailing = { ItemMenu(item.inputName, onEdit = onEdit, onDelete = onDelete) },
         )
     }
 }
@@ -126,7 +128,7 @@ fun OpenItemCard(
 @Composable
 fun CompletedItemCard(
     item: Item,
-    /** チェックした人の名前（家族にいない人は「退会したメンバー」） */
+    /** チェックした人の名前（自分は「あなた」、家族にいない人は「退会したメンバー」） */
     checkerName: String,
     showLock: Boolean,
     canUncheck: Boolean,
@@ -218,10 +220,16 @@ private fun CardBody(
             // TalkBack 用の操作（並び替え）。clickable と同じ要素に付けないと読み上げの対象にならない
             .semantics { customActions = drag.actions }
             .heightIn(min = 72.dp)
-            .padding(start = CartMateSpacing.large, end = CartMateSpacing.small, top = CartMateSpacing.medium, bottom = CartMateSpacing.medium),
+            // 右端のボタンは内側に余白を持つので、右は狭くして、アイコンと枠の距離を左の文字と揃える
+            .padding(start = 20.dp, end = CartMateSpacing.medium),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(CartMateSpacing.xSmall)) {
+        // 上下の余白は文字の部分にだけ付ける（右端の 48dp のボタンでカードが高くならないように）。
+        // チェック済みの項目は必ず2行になるので、2行（備考付き・チェック済み）でも 72dp に収まる余白にする
+        Column(
+            Modifier.weight(1f).padding(vertical = CartMateSpacing.medium),
+            verticalArrangement = Arrangement.spacedBy(CartMateSpacing.xSmall),
+        ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(CartMateSpacing.small),
@@ -258,10 +266,38 @@ private fun LockIcon() {
     )
 }
 
+/**
+ * 未購入の項目の ⋮ メニュー（「編集」「削除」）。編集と削除のアイコンを並べるより行が詰まり、削除の誤タップも減る。
+ * スワイプは気づきにくいので、操作があることが見て分かるようメニューは常に出す
+ */
 @Composable
-private fun CardIconButton(icon: Int, contentDescription: String, onClick: () -> Unit) {
-    IconButton(onClick = onClick) {
-        Icon(painterResource(icon), contentDescription = contentDescription, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+private fun ItemMenu(itemName: String, onEdit: () -> Unit, onDelete: () -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        // 読み上げには商品名を含める
+        IconButton(onClick = { expanded = true }) {
+            Icon(
+                painterResource(R.drawable.ic_more_vert),
+                contentDescription = stringResource(R.string.detail_item_menu, itemName),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.action_edit)) },
+                onClick = {
+                    expanded = false
+                    onEdit()
+                },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.action_delete)) },
+                onClick = {
+                    expanded = false
+                    onDelete()
+                },
+            )
+        }
     }
 }
 

@@ -356,7 +356,10 @@ private fun ItemList(
                     ItemStatus.COMPLETED ->
                         CompletedItemCard(
                             item = item,
-                            checkerName = state.checkerName(item) ?: stringResource(R.string.former_member),
+                            checkerName = when {
+                                state.checkedByMe(item) -> stringResource(R.string.checker_you)
+                                else -> state.checkerName(item) ?: stringResource(R.string.former_member)
+                            },
                             showLock = showLock,
                             canUncheck = state.canUncheck(item),
                             onUncheck = { onUncheck(item) },

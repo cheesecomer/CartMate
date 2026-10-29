@@ -269,10 +269,11 @@ private fun SuggestionRowView(row: SuggestionRow, onOpen: () -> Unit, onAdd: () 
     }
 }
 
-/** 候補の補足。時期が近い商品は周期と前回からの日数、補完は「追加済み」と早すぎる再購入 */
+/** 候補の補足。時期が近い商品は周期と前回からの日数、よく買う商品は買った日の数と前回からの日数、補完は「追加済み」と早すぎる再購入 */
 @Composable
 private fun noteText(note: SuggestionNote): String? = when (note) {
     is SuggestionNote.Due -> stringResource(R.string.add_item_note_due, note.intervalDays, note.daysSinceLast.toInt())
+    is SuggestionNote.Frequent -> stringResource(R.string.add_item_note_frequent, note.purchaseDays, note.daysSinceLast.toInt())
     is SuggestionNote.Completion -> listOfNotNull(
         // どのリストに入っているか分かるように、リストの名前を添える
         when {

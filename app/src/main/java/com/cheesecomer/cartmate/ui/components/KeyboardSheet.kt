@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.imeAnimationTarget
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
@@ -119,7 +120,8 @@ fun KeyboardSheet(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars))
+                // 中身が多くても、ステータスバーの下までにとどめる（収まらない分は中身の側でスクロールする）
+                .windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars).union(WindowInsets.statusBars))
                 // 出す前は画面の下に隠しておく（入力欄はフォーカスできるよう、配置はしておく）。
                 // シートの下端はキーボードかナビゲーションバーの上にあるので、自分の高さとその高い方の分
                 // （と余白）だけ下げると、画面の外に出る

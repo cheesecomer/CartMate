@@ -1,0 +1,266 @@
+<!DOCTYPE html><html lang="ja"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport">
+<title>商品の詳細入力</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            lilac: {
+              bg: '#FFF7FF',
+              surface: '#FFFFFF',
+              banner: '#FBF0FF',
+              primary: '#6B4E8C',
+              'primary-active': '#583F73',
+              border: '#CAC4CF',
+              'border-subtle': '#E1D6E7',
+              pill: '#F8EEFC',
+              textPrimary: '#1D1B20',
+              textSecondary: '#49454F',
+              textMuted: '#7A757F'
+            }
+          },
+          fontFamily: {
+            sans: ['-apple-system', 'BlinkMacSystemFont', '"Hiragino Kaku Gothic ProN"', '"Hiragino Sans"', 'Meiryo', 'sans-serif']
+          },
+          borderRadius: {
+            '2xl': '16px',
+            'xl': '12px'
+          }
+        }
+      }
+    }
+  </script>
+<style data-purpose="base-layout">
+    body {
+      background-color: #FFF7FF;
+      color: #1D1B20;
+      -webkit-font-smoothing: antialiased;
+      -webkit-tap-highlight-color: transparent;
+    }
+    /* Hide default scrollbars for pure mobile view */
+    ::-webkit-scrollbar {
+      display: none;
+    }
+  </style>
+</head>
+<body class="bg-lilac-bg min-h-screen flex justify-center text-lilac-textPrimary font-sans">
+<!-- Mobile Viewport Container (iOS Frame Simulation) -->
+<div class="w-full max-w-[428px] min-h-screen bg-lilac-bg flex flex-col relative pb-28">
+<!-- BEGIN: iOSStatusBar -->
+<header class="w-full px-6 pt-3 pb-2 flex justify-between items-center select-none text-[15px] font-semibold tracking-tight text-lilac-textPrimary z-20">
+<!-- Time Indicator -->
+<time class="font-semibold text-[15px]" datetime="10:00">10:00</time>
+<!-- Right Status Icons (Cellular, Wifi, Battery) -->
+<div aria-label="Device Status" class="flex items-center space-x-1.5">
+<!-- Cellular Bars -->
+<svg class="w-4 h-3.5" fill="currentColor" viewBox="0 0 17 12">
+<rect height="3" rx="0.5" width="3" x="0" y="9"></rect>
+<rect height="6" rx="0.5" width="3" x="4.5" y="6"></rect>
+<rect height="9" rx="0.5" width="3" x="9" y="3"></rect>
+<rect height="12" rx="0.5" width="3" x="13.5" y="0"></rect>
+</svg>
+<!-- Wifi Icon -->
+<svg class="w-4 h-3.5" fill="currentColor" viewBox="0 0 16 12">
+<path clip-rule="evenodd" d="M8 2.5C5.2 2.5 2.68 3.58.79 5.37a.75.75 0 0 1-1.04-1.08C2.01 2.15 4.88.92 8 .92c3.12 0 5.99 1.23 8.25 3.37a.75.75 0 0 1-1.04 1.08A10.84 10.84 0 0 0 8 2.5zm0 3.83c-1.87 0-3.57.75-4.82 1.97a.75.75 0 0 1-1.03-1.09A9.15 9.15 0 0 1 8 4.75c2.31 0 4.41.87 6 2.29a.75.75 0 0 1-1.03 1.09A7.63 7.63 0 0 0 8 6.33zm0 3.84a1.75 1.75 0 1 0 0 3.5 1.75 1.75 0 0 0 0-3.5z" fill-rule="evenodd"></path>
+</svg>
+<!-- Battery Icon -->
+<div class="flex items-center">
+<div class="w-6 h-3 rounded-[4px] border border-current p-0.5 flex items-center">
+<div class="h-full w-full bg-current rounded-[1.5px]"></div>
+</div>
+<div class="w-0.5 h-1.5 bg-current rounded-r-sm -ml-[0.5px]"></div>
+</div>
+</div>
+</header>
+<!-- END: iOSStatusBar -->
+<!-- BEGIN: TopBar -->
+<nav aria-label="Page Navigation" class="w-full px-4 pt-1 pb-3 flex items-center select-none">
+<button aria-label="閉じる" class="w-10 h-10 flex items-center justify-center -ml-2 rounded-full text-lilac-textPrimary active:bg-lilac-border-subtle transition-colors" type="button">
+<svg class="w-6 h-6 stroke-[2.2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<path d="M6 18L18 6M6 6l12 12" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+<h1 class="text-xl font-bold tracking-tight text-lilac-textPrimary ml-2">商品の詳細入力</h1>
+</nav>
+<!-- END: TopBar -->
+<!-- BEGIN: MainContent -->
+<main class="flex-1 px-4 space-y-3.5">
+<!-- BEGIN: StoreBanner -->
+<section class="w-full bg-lilac-banner rounded-2xl px-4 py-3 flex items-center space-x-2 text-[14px]" data-purpose="store-banner">
+<svg class="w-5 h-5 text-lilac-primary flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
+<path d="M4 4h16a1 1 0 011 1v2H3V5a1 1 0 011-1zm-1 5h18v2a3 3 0 01-3 3 3 3 0 01-3-3 3 3 0 01-3 3 3 3 0 01-3-3 3 3 0 01-3 3 3 3 0 01-3-3V9zm1 7h2v4H4v-4zm4 0h8v4H8v-4zm10 0h2v4h-2v-4z"></path>
+</svg>
+<div class="leading-snug">
+<span class="text-lilac-textSecondary">追加先:</span>
+<span class="font-bold text-lilac-textPrimary ml-1">スーパー</span>
+<span class="text-lilac-textSecondary ml-2 text-xs">（共有リスト 2人）</span>
+</div>
+</section>
+<!-- END: StoreBanner -->
+<!-- BEGIN: ProductNameCard -->
+<section class="bg-lilac-surface border border-lilac-border rounded-2xl p-4 shadow-sm" data-purpose="product-name-section">
+<!-- Outlined Floating Input Box -->
+<div class="relative pt-1.5 pb-0.5">
+<div class="border border-lilac-border rounded-lg px-3.5 py-3.5 relative bg-white focus-within:border-lilac-primary focus-within:ring-1 focus-within:ring-lilac-primary">
+<label class="absolute -top-2.5 left-2.5 bg-white px-1 text-xs text-lilac-textSecondary font-medium">商品名</label>
+<input class="w-full bg-transparent p-0 border-none text-[17px] font-bold text-lilac-textPrimary focus:ring-0 leading-tight" type="text" value="プレーンヨーグルト">
+</div>
+</div>
+<!-- IMPROVED ASSOCIATION/MERGE UI (UNSELECTED STATE) -->
+<div class="mt-3.5" data-purpose="merge-association-unselected"><button class="w-full text-left bg-white border border-lilac-border hover:border-lilac-textMuted active:bg-gray-50 rounded-xl p-3 flex items-start gap-3 transition-colors shadow-sm cursor-pointer" type="button">
+  <div class="w-5 h-5 rounded-md border border-lilac-textMuted bg-white mt-0.5 flex-shrink-0 flex items-center justify-center"></div>
+  <div class="flex-1 min-w-0">
+    <span class="block text-[14px] font-semibold text-lilac-textPrimary leading-snug">
+      「ヨーグルト」と同じ商品として扱う
+    </span>
+    <span class="block text-[12px] font-medium text-lilac-textSecondary mt-0.5 leading-normal">
+      購入履歴を合わせて、次の購入時期を予測します
+    </span>
+  </div>
+</button></div>
+</section>
+<!-- END: ProductNameCard -->
+<!-- BEGIN: QuantityCard -->
+<section class="bg-lilac-surface border border-lilac-border rounded-2xl p-4 shadow-sm" data-purpose="quantity-section">
+<div class="flex justify-between items-center mb-3">
+<h2 class="text-[17px] font-bold text-lilac-textPrimary">数量</h2>
+<span class="text-xs text-lilac-textSecondary">タップして直接編集可能</span>
+</div>
+<!-- Stepper Control -->
+<div class="w-full bg-lilac-pill/60 border border-lilac-border-subtle rounded-full py-1.5 px-2 flex items-center justify-between">
+<!-- Minus Button -->
+<button aria-label="減らす" class="w-11 h-11 rounded-full bg-white border border-lilac-border-subtle flex items-center justify-center text-lilac-textSecondary active:bg-gray-100 shadow-sm" type="button">
+<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<path d="M20 12H4" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2"></path>
+</svg>
+</button>
+<!-- Current Count -->
+<div class="flex items-center space-x-1 cursor-pointer select-none">
+<span class="text-2xl font-black text-lilac-textPrimary">1</span>
+<span class="text-sm font-medium text-lilac-textPrimary">個</span>
+<!-- Pencil Edit Icon -->
+<svg class="w-3.5 h-3.5 text-lilac-primary ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+<path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a.996.996 0 000-1.41l-2.34-2.34a.996.996 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"></path>
+</svg>
+</div>
+<!-- Plus Button -->
+<button aria-label="増やす" class="w-11 h-11 rounded-full bg-lilac-primary text-white flex items-center justify-center active:bg-lilac-primary-active shadow-sm" type="button">
+<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<path d="M12 4v16m8-8H4" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2"></path>
+</svg>
+</button>
+</div>
+<!-- Quantity Quick Pills -->
+<div class="grid grid-cols-6 gap-2 mt-3.5">
+<button class="h-9 rounded-full bg-lilac-primary text-white font-medium text-sm flex items-center justify-center shadow-sm" type="button">1</button>
+<button class="h-9 rounded-full bg-lilac-pill text-lilac-textPrimary font-medium text-sm flex items-center justify-center hover:bg-lilac-border-subtle active:scale-95 transition-all" type="button">2</button>
+<button class="h-9 rounded-full bg-lilac-pill text-lilac-textPrimary font-medium text-sm flex items-center justify-center hover:bg-lilac-border-subtle active:scale-95 transition-all" type="button">3</button>
+<button class="h-9 rounded-full bg-lilac-pill text-lilac-textPrimary font-medium text-sm flex items-center justify-center hover:bg-lilac-border-subtle active:scale-95 transition-all" type="button">4</button>
+<button class="h-9 rounded-full bg-lilac-pill text-lilac-textPrimary font-medium text-sm flex items-center justify-center hover:bg-lilac-border-subtle active:scale-95 transition-all" type="button">5</button>
+<button class="h-9 rounded-full bg-lilac-pill text-lilac-textPrimary font-medium text-sm flex items-center justify-center hover:bg-lilac-border-subtle active:scale-95 transition-all" type="button">6</button>
+</div>
+</section>
+<!-- END: QuantityCard -->
+<!-- BEGIN: UnitCard -->
+<section class="bg-lilac-surface border border-lilac-border rounded-2xl p-4 shadow-sm" data-purpose="unit-section">
+<h2 class="text-[17px] font-bold text-lilac-textPrimary mb-3">単位</h2>
+<!-- Input Box with Clear Button -->
+<div class="w-full border border-lilac-border rounded-xl px-4 py-2.5 flex items-center justify-between bg-white focus-within:border-lilac-primary">
+<input class="bg-transparent border-none p-0 text-[16px] text-lilac-textPrimary font-medium focus:ring-0 w-full" type="text" value="個">
+<button aria-label="入力をクリア" class="text-lilac-textPrimary hover:text-lilac-primary p-1" type="button">
+<svg class="w-4 h-4 stroke-[2.2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<path d="M6 18L18 6M6 6l12 12" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+</div>
+<!-- Unit Quick Pills -->
+<div class="flex flex-wrap gap-2 mt-3.5">
+<button class="px-5 h-8 rounded-full bg-lilac-primary text-white text-xs font-semibold flex items-center justify-center shadow-sm" type="button">個</button>
+<button class="px-5 h-8 rounded-full bg-lilac-pill text-lilac-textPrimary text-xs font-medium flex items-center justify-center hover:bg-lilac-border-subtle" type="button">本</button>
+<button class="px-4 h-8 rounded-full bg-lilac-pill text-lilac-textPrimary text-xs font-medium flex items-center justify-center hover:bg-lilac-border-subtle" type="button">パック</button>
+<button class="px-5 h-8 rounded-full bg-lilac-pill text-lilac-textPrimary text-xs font-medium flex items-center justify-center hover:bg-lilac-border-subtle" type="button">袋</button>
+<button class="px-5 h-8 rounded-full bg-lilac-pill text-lilac-textPrimary text-xs font-medium flex items-center justify-center hover:bg-lilac-border-subtle" type="button">箱</button>
+<button class="w-12 h-8 rounded-full bg-lilac-pill text-lilac-textPrimary text-xs font-medium flex items-center justify-center hover:bg-lilac-border-subtle" type="button">g</button>
+</div>
+</section>
+<!-- END: UnitCard -->
+<!-- BEGIN: VisibilityCard -->
+<section class="bg-lilac-surface border border-lilac-border rounded-2xl p-4 shadow-sm" data-purpose="visibility-section">
+<h2 class="text-[17px] font-bold text-lilac-textPrimary">公開範囲</h2>
+<p class="text-[13px] text-lilac-textSecondary mt-1 leading-normal">
+          同居家族や共有メンバーに見せるかどうかを選択します。
+        </p>
+<!-- Selection Cards (2 options) -->
+<div class="grid grid-cols-2 gap-2.5 mt-3">
+<!-- Active: 全員に共有 -->
+<button class="text-left border-2 border-lilac-primary bg-lilac-pill/40 rounded-xl p-3 flex flex-col justify-between min-h-[78px] transition-all" type="button">
+<div class="flex items-center justify-between w-full">
+<div class="flex items-center space-x-1.5 font-bold text-sm text-lilac-primary">
+<!-- Group Icon -->
+<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+<path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"></path>
+</svg>
+<span class="">全員に共有</span>
+</div>
+<!-- Checkmark circle badge -->
+<div class="w-4 h-4 rounded-full bg-lilac-primary flex items-center justify-center text-white">
+<svg class="w-3 h-3 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+</div>
+<span class="text-[11px] text-lilac-textSecondary mt-2 leading-tight">標準・リスト全員に表示</span>
+</button>
+<!-- Inactive: 自分のみ -->
+<button class="text-left border border-lilac-border-subtle bg-white hover:bg-gray-50 rounded-xl p-3 flex flex-col justify-between min-h-[78px] transition-all" type="button">
+<div class="flex items-center space-x-1.5 font-bold text-sm text-lilac-textPrimary">
+<!-- Lock Icon -->
+<svg class="w-4 h-4 text-lilac-textSecondary" fill="currentColor" viewBox="0 0 20 20">
+<path clip-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" fill-rule="evenodd"></path>
+</svg>
+<span class="">自分のみ</span>
+</div>
+<span class="text-[11px] text-lilac-textSecondary mt-2 leading-tight">サプライズや自分専用</span>
+</button>
+</div>
+<!-- Note info below cards -->
+<div class="flex items-center space-x-1.5 mt-3 text-lilac-textSecondary text-[11px]">
+<svg class="w-3.5 h-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+<path clip-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" fill-rule="evenodd"></path>
+</svg>
+<span class="">※ 登録後に公開範囲を変更することはできません</span>
+</div>
+</section>
+<!-- END: VisibilityCard -->
+<!-- BEGIN: NotesCard -->
+<section class="bg-lilac-surface border border-lilac-border rounded-2xl p-4 shadow-sm" data-purpose="notes-section">
+<div class="flex justify-between items-center mb-2.5">
+<h2 class="text-[17px] font-bold text-lilac-textPrimary">備考・メモ</h2>
+<span class="text-xs text-lilac-textSecondary">任意</span>
+</div>
+<div class="border border-lilac-border rounded-xl p-3 bg-white focus-within:border-lilac-primary">
+<textarea class="w-full border-none p-0 text-[14px] text-lilac-textPrimary placeholder:text-lilac-textSecondary focus:ring-0 resize-none leading-relaxed" placeholder="メモ（例: 特売品なら2個、賞味期限が長いものなど）" rows="3"></textarea>
+</div>
+</section>
+<!-- END: NotesCard -->
+</main>
+<!-- END: MainContent -->
+<!-- BEGIN: BottomCTA -->
+<div class="fixed bottom-0 left-0 right-0 w-full max-w-[428px] mx-auto px-4 pt-2 pb-5 bg-gradient-to-t from-lilac-bg via-lilac-bg to-transparent pointer-events-auto z-30">
+<button class="w-full h-[52px] bg-lilac-primary hover:bg-lilac-primary-active active:scale-[0.99] text-white font-bold text-[16px] rounded-full shadow-md flex items-center justify-center space-x-1.5 transition-all" type="submit">
+<span class="">リストに追加する</span>
+<svg class="w-5 h-5 stroke-[2.4]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+<!-- iOS Home Indicator -->
+<div class="w-36 h-1 bg-lilac-textPrimary/70 rounded-full mx-auto mt-3"></div>
+</div>
+<!-- END: BottomCTA -->
+</div>
+
+
+</body></html>

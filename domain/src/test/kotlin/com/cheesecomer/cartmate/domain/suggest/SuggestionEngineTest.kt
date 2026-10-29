@@ -239,6 +239,63 @@ class SuggestionEngineTest {
             .isEmpty()
     }
 
+    // よく買う商品
+
+    private fun SuggestionEngine.frequentNames(list: String = "スーパー"): List<String> = frequent(list).map { it.product.displayName }
+
+    @Test
+    fun `周期が不安定でも2日以上買った商品は、よく買う商品として買った日の多い順に出し、補足の日数と前回の数量を持つ`() {
+        val carrot = product("にんじん")
+        val tofu = product("豆腐")
+        // 間隔が 2・12・7 日でばらつく（中央絶対偏差 5 / 中央値 7 で、周期が不安定）。買った日は4日
+        val purchases = bought(carrot, 0, 2, 14) + purchase(carrot, 21, quantity = 3.0, unit = "本") + bought(tofu, 5, 19)
+        val items = engine(listOf(carrot, tofu), purchases, today = 30).frequent("スーパー")
+        assertThat(items.map { it.product.displayName }).containsExactly("にんじん", "豆腐").inOrder()
+        assertThat(items.first().purchaseDays).isEqualTo(4)
+        assertThat(items.first().daysSinceLast).isEqualTo(9)
+        assertThat(items.first().lastQuantity).isEqualTo(3.0)
+        assertThat(items.first().lastUnit).isEqualTo("本")
+    }
+
+    @Test
+    fun `1日しか買っていない商品は、よく買う商品に出さない`() {
+        val cake = product("ケーキ")
+        val tofu = product("豆腐")
+        assertThat(engine(listOf(cake, tofu), bought(cake, 0) + bought(tofu, 5, 19), today = 30).frequentNames()).containsExactly("豆腐")
+    }
+
+    @Test
+    fun `周期が安定している商品は、時期が近くても早くても買うのをやめていても、よく買う商品に出さない`() {
+        val milk = product("牛乳")
+        val purchases = bought(milk, 0, 10, 20)
+        // 時期が近い（周期予測の側に出る）
+        assertThat(engine(listOf(milk), purchases, today = 29).dueNames()).containsExactly("牛乳")
+        assertThat(engine(listOf(milk), purchases, today = 29).frequentNames()).isEmpty()
+        // まだ早い・買うのをやめた
+        assertThat(engine(listOf(milk), purchases, today = 24).frequentNames()).isEmpty()
+        assertThat(engine(listOf(milk), purchases, today = 60).frequentNames()).isEmpty()
+    }
+
+    @Test
+    fun `買ったばかりの商品と未購入にある商品は、よく買う商品に出さない`() {
+        val tofu = product("豆腐")
+        val purchases = bought(tofu, 5, 19)
+        assertThat(engine(listOf(tofu), purchases, today = 22).frequentNames()).isEmpty()
+        assertThat(engine(listOf(tofu), purchases, today = 23).frequentNames()).containsExactly("豆腐")
+        assertThat(engine(listOf(tofu), purchases, today = 23, openItems = listOf(openItem(tofu))).frequentNames()).isEmpty()
+    }
+
+    @Test
+    fun `非表示の商品と、関連のないリストでは、よく買う商品を出さない`() {
+        val putty = product("パテ", hiddenAt = at(21))
+        val curtain = product("カーテンフック", suggestionExcluded = true)
+        val tofu = product("豆腐")
+        val purchases = bought(putty, 5, 19) + bought(curtain, 5, 19) + bought(tofu, 5, 19)
+        val engine = engine(listOf(putty, curtain, tofu), purchases, today = 30)
+        assertThat(engine.frequentNames()).containsExactly("豆腐")
+        assertThat(engine.frequentNames("ホームセンター")).isEmpty()
+    }
+
     // 入力中の補完
 
     @Test

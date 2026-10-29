@@ -27,5 +27,8 @@ data class SuggestionParams(
     /** 重複係数の閾値 */
     val minOverlap: Double = 0.5,
     val maxDue: Int = 10,
+    /** よく買う商品として出す、直近365日に買った日の数の下限 */
+    val minFrequentDays: Int = 2,
+    val maxFrequent: Int = 5,
     val maxCompletions: Int = 8,
 )

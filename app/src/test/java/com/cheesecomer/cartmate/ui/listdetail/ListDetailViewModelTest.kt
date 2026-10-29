@@ -511,6 +511,21 @@ class ListDetailViewModelTest {
     }
 
     @Test
+    fun `シートを開くと、時期が近い商品の下に、よく買う商品を買った日の数と前回からの日数を添えて出す`() = runTest {
+        // 豆腐は2日だけ買っていて周期が分からない。牛乳は10日ごとで、最後から9日たつ
+        bought("豆腐", times = 2, intervalDays = 5)
+        bought("牛乳", times = 3, intervalDays = 10)
+        clock.advance(java.time.Duration.ofDays(9))
+        viewModel.uiState.test {
+            viewModel.onAddItemEvent(AddItemEvent.FieldFocused)
+            val items = awaitUntil { (it.suggestions as? SheetSuggestions.Items)?.rows?.isNotEmpty() == true }.suggestions as SheetSuggestions.Items
+            assertThat(items.rows.map { it.suggestion.name }).containsExactly("牛乳", "豆腐").inOrder()
+            assertThat(items.rows.last().note).isEqualTo(SuggestionNote.Frequent(purchaseDays = 2, daysSinceLast = 29))
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
     fun `入力すると補完に切り替わり、候補の＋で前回の数量と単位のまま追加する`() = runTest {
         bought("牛乳", times = 1, intervalDays = 0)
         viewModel.uiState.test {

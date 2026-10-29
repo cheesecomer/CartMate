@@ -52,9 +52,13 @@ class PurchaseHistoryViewModel @Inject constructor(
         /** 「予測に使わない」にした人と日。予測に使っていれば null */
         val excludedByName: String?,
         val excludedDate: LocalDate?,
-        /** 自分がチェックした購入。項目ごと削除できる */
-        val deletable: Boolean = false,
-    )
+        /** 自分がチェックした購入。チェックした人を「あなた」と表示し、項目ごと削除できる */
+        val purchasedByMe: Boolean = false,
+        /** 自分が「予測に使わない」にした。外した人を「あなた」と表示する */
+        val excludedByMe: Boolean = false,
+    ) {
+        val deletable: Boolean get() = purchasedByMe
+    }
 
     data class State(
         val productName: String = "",
@@ -71,6 +75,7 @@ class PurchaseHistoryViewModel @Inject constructor(
         memberDirectory.observeNames(),
     ) { products, purchases, dictionary, names ->
         val zone = clock.zone
+        val me = currentUser.currentUserId()
         State(
             productName = products.find { it.id == productId }?.displayName.orEmpty(),
             rows = PurchaseHistory.of(productId, products, purchases, dictionary).map { purchase ->
@@ -80,7 +85,8 @@ class PurchaseHistoryViewModel @Inject constructor(
                     checkerName = names.of(purchase.purchasedBy),
                     excludedByName = purchase.excludedBy?.takeIf { purchase.excludedFromPrediction }?.let(names::of),
                     excludedDate = purchase.excludedAt?.takeIf { purchase.excludedFromPrediction }?.atZone(zone)?.toLocalDate(),
-                    deletable = purchase.purchasedBy == currentUser.currentUserId(),
+                    purchasedByMe = purchase.purchasedBy == me,
+                    excludedByMe = purchase.excludedFromPrediction && purchase.excludedBy == me,
                 )
             },
             loading = false,

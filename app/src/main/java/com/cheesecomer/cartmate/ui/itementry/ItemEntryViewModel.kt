@@ -65,7 +65,7 @@ data class EntryHistory(
     val memoCandidates: List<String>,
 )
 
-/** 表記ゆれのチップ「『[candidateName]』と同じ商品として記録する」 */
+/** 表記ゆれのチップ「『[candidateName]』と同じ商品として扱う」 */
 data class MergeChip(val candidateId: ProductId, val candidateName: String, val selected: Boolean)
 
 data class ItemEntryUiState(

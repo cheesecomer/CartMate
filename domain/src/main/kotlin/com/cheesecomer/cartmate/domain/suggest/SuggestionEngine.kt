@@ -238,6 +238,50 @@ class SuggestionEngine(
         )
     }
 
+    data class FrequentSuggestion(
+        /** 追加に使う商品と、表示する名前 */
+        val product: Product,
+        /** 直近365日に買った日の数（「4回購入」） */
+        val purchaseDays: Int,
+        val relevance: Double,
+        /** 前回の数量と単位（「＋」と商品詳細入力画面の初期値） */
+        val lastQuantity: Double?,
+        val lastUnit: String?,
+        /** 最後に買ってからの日数（「最後は12日前」） */
+        val daysSinceLast: Long,
+    )
+
+    /**
+     * [listName] のリストで、時期が近い商品の下に出す、よく買う商品。このリストで関連があり、
+     * [SuggestionParams.minFrequentDays] 日以上買っていて、未購入の項目になく、非表示でない商品を、買った日の多い順に。
+     * 周期が安定している商品は出さない（時期が近ければ [due] に出る。まだ早い・買うのをやめた商品は、周期から分かっている）。
+     * 献立に合わせて買う食材のように、周期では勧められないがよく買う商品を補う。
+     * [SuggestionParams.recentPurchaseDays] 日以内に買ったばかりの商品は出さない
+     */
+    fun frequent(listName: String): List<FrequentSuggestion> {
+        val relevance = relevance(listName)
+        if (relevance.isEmpty()) return emptyList()
+        val dueKeys = (due(listName) as DueResult.Suggestions).items.map { keyOf(it.product.id) }.toSet()
+        val items = factsByKey.mapNotNull { (key, purchases) ->
+            if (key in dueKeys || key in openKeys || cycleOf(key) in openCycles) return@mapNotNull null
+            val score = relevance[key] ?: 0.0
+            if (score <= 0.0) return@mapNotNull null
+            val dates = purchases.map { it.date() }
+            val days = dates.toSet().size
+            if (days < params.minFrequentDays) return@mapNotNull null
+            val estimate = CycleEstimator.estimate(dates, params)
+            if (estimate != null && estimate.dispersion <= params.maxDispersion) return@mapNotNull null
+            val last = latest(purchases)!!
+            val daysSinceLast = ChronoUnit.DAYS.between(last.date(), today)
+            if (daysSinceLast <= params.recentPurchaseDays) return@mapNotNull null
+            val product = representative(key) ?: return@mapNotNull null
+            FrequentSuggestion(product, days, score, last.quantity, last.unit, daysSinceLast)
+        }
+        return items
+            .sortedWith(compareByDescending<FrequentSuggestion> { it.purchaseDays }.thenByDescending { it.relevance }.thenBy { it.daysSinceLast })
+            .take(params.maxFrequent)
+    }
+
     /**
      * 時期が近い商品の順位。経過率が [SuggestionParams.overduePeakRatio] までは経過率そのもの（大きいほど上）で、
      * それを超えると超えた分だけ下げる（予定日を大きく過ぎた商品は「買うのをやめた」かもしれないので、下に沈める）

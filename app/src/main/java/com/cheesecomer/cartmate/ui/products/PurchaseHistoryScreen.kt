@@ -174,7 +174,7 @@ private fun PurchaseCard(
                     }
                 }
                 Text(
-                    listOf(purchase.listNameSnapshot, row.checkerName ?: stringResource(R.string.former_member)).joinToString(" ・ "),
+                    listOf(purchase.listNameSnapshot, personName(row.purchasedByMe, row.checkerName)).joinToString(" ・ "),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -183,7 +183,7 @@ private fun PurchaseCard(
                     Text(
                         stringResource(
                             R.string.purchase_history_excluded,
-                            row.excludedByName ?: stringResource(R.string.former_member),
+                            personName(row.excludedByMe, row.excludedByName),
                             row.excludedDate?.let(HISTORY_DATE::format).orEmpty(),
                         ),
                         style = MaterialTheme.typography.bodySmall,
@@ -226,4 +226,11 @@ private fun PurchaseDeleteDialog(itemName: String, onConfirm: () -> Unit, onDism
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
         },
     )
+}
+
+/** 記録に添える人の名前。自分なら「あなた」、家族にいない人（[name] が null）は「退会したメンバー」 */
+@Composable
+private fun personName(isMe: Boolean, name: String?): String = when {
+    isMe -> stringResource(R.string.checker_you)
+    else -> name ?: stringResource(R.string.former_member)
 }

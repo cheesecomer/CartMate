@@ -4,10 +4,13 @@ import com.cheesecomer.cartmate.ui.suggestions.SuggestionSource
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
@@ -26,6 +29,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.cheesecomer.cartmate.data.memory.InMemoryStore
@@ -44,6 +48,7 @@ import com.cheesecomer.cartmate.ui.newEntryRoute
 import com.cheesecomer.cartmate.ui.rememberEntryResults
 import com.cheesecomer.cartmate.ui.theme.CartMateTheme
 import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Rule
@@ -215,12 +220,13 @@ class ItemEntryFlowTest {
     }
 
     @Test
-    fun 編集ボタンから商品の編集を開き_更新すると内容が変わる_公開範囲は変えられない() {
+    fun メニューの編集から商品の編集を開き_更新すると内容が変わる_公開範囲は変えられない() {
         val listId = createList()
         runBlocking { store.addItem(NewItem(listId, "牛乳", 1.0, "本", "無調整", Visibility.SHARED)) }
         setContent(listId)
 
-        composeRule.onNodeWithContentDescription("牛乳を編集").performClick()
+        composeRule.onNodeWithContentDescription("牛乳のメニュー").performClick()
+        composeRule.onNodeWithText("編集").performClick()
         composeRule.waitUntil(timeoutMillis = 5_000) { composeRule.onAllNodesWithText("商品の編集").fetchSemanticsNodes().isNotEmpty() }
         composeRule.onNodeWithTag(ItemEntryTags.NAME).performTextReplacement("低脂肪乳")
         composeRule.onNodeWithText("自分のみ").performScrollTo().assertIsNotEnabled()
@@ -235,5 +241,63 @@ class ItemEntryFlowTest {
         composeRule.onNodeWithText("低脂肪乳").assertIsDisplayed()
         // 編集から戻っても、サジェストのシートは開かない
         composeRule.onNodeWithTag(AddItemTags.SHEET_INPUT).assertDoesNotExist()
+    }
+
+    @Test
+    fun 数量の数字をタップして直接入力すると_その数量で追加される() {
+        val listId = createList()
+        setContent(listId)
+
+        openEntryFor("卵")
+        composeRule.onNodeWithTag(ItemEntryTags.QUANTITY).performClick()
+        composeRule.onNodeWithTag(ItemEntryTags.QUANTITY).assertIsFocused()
+        composeRule.onNodeWithTag(ItemEntryTags.QUANTITY).performTextReplacement("12")
+        composeRule.onNodeWithText("リストに追加する").performClick()
+
+        composeRule.waitUntil(timeoutMillis = 5_000) { items(listId).size == 1 }
+        assertThat(items(listId).single().quantity).isEqualTo(12.0)
+    }
+
+    @Test
+    fun 似た名前の商品があるときの同じ商品として扱うは_カードのどこを押してもチェックが切り替わる() {
+        val listId = createList()
+        runBlocking { store.addItem(NewItem(listId, "ヨーグルト", 1.0, "個", null, Visibility.SHARED)) }
+        setContent(listId)
+
+        openEntryFor("プレーンヨーグルト")
+        val option = composeRule.onNode(hasText("「ヨーグルト」と同じ商品として扱う"))
+        option.assertIsOff()
+
+        // 説明の文を押しても、見出しを押しても切り替わる
+        composeRule.onNodeWithText("購入履歴を合わせて、次の購入時期を予測します", useUnmergedTree = true).performClick()
+        composeRule.waitForIdle()
+        option.assertIsOn()
+        composeRule.onNodeWithText("「ヨーグルト」と同じ商品として扱う", useUnmergedTree = true).performClick()
+        composeRule.waitForIdle()
+        option.assertIsOff()
+    }
+
+    @Test
+    fun 数量が3桁の商品の編集を開くと_数量の数字が欠けずに表示される() {
+        val listId = createList()
+        runBlocking { store.addItem(NewItem(listId, "豚こま切れ肉", 300.0, "g", null, Visibility.SHARED)) }
+        setContent(listId)
+
+        composeRule.onNodeWithContentDescription("豚こま切れ肉のメニュー").performClick()
+        composeRule.onNodeWithText("編集").performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) { composeRule.onAllNodesWithText("商品の編集").fetchSemanticsNodes().isNotEmpty() }
+
+        // 画面が落ち着いたあと: 数量の数字は、欄の中に収まって描かれている
+        composeRule.waitForIdle()
+        val quantity = composeRule.onNodeWithTag(ItemEntryTags.QUANTITY)
+        quantity.assertTextEquals("300")
+        val node = quantity.fetchSemanticsNode()
+        val layouts = mutableListOf<TextLayoutResult>()
+        node.config[SemanticsActions.GetTextLayoutResult].action?.invoke(layouts)
+        val layout = layouts.single()
+        val left = layout.getLineLeft(0)
+        val right = layout.getLineRight(0)
+        assertWithMessage("数量の数字（%s〜%s px）が、欄（幅 %s px）からはみ出している", left, right, node.size.width)
+            .that(left >= 0f && right <= node.size.width).isTrue()
     }
 }

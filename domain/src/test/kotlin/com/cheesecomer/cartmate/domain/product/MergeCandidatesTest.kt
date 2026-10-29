@@ -64,6 +64,28 @@ class MergeCandidatesTest {
     }
 
     @Test
+    fun `同じくらい近い候補が別々の商品で複数あれば、どちらにするか決められないので候補を出さない`() {
+        val dark = product("コーヒー豆（深煎り）")
+        val medium = product("コーヒー豆（中煎り）")
+        assertThat(find("コーヒー豆", listOf(dark, medium))).isNull()
+        assertThat(find("コーヒー豆", listOf(medium, dark))).isNull()
+    }
+
+    @Test
+    fun `一致の度合いかキーの長さで差がつけば、近い方を候補にする`() {
+        val beans = product("コーヒー豆（深煎り）")
+        val milk = product("コーヒー豆乳")
+        assertThat(find("コーヒー豆", listOf(beans, milk))).isEqualTo(milk)
+    }
+
+    @Test
+    fun `同じくらい近い候補でも、同じ商品にまとめられていれば候補にする`() {
+        val dark = product("コーヒー豆（深煎り）")
+        val medium = product("コーヒー豆（中煎り）", mergedInto = dark)
+        assertThat(find("コーヒー豆", listOf(dark, medium))).isEqualTo(dark)
+    }
+
+    @Test
     fun `統合されていれば統合先を候補にする`() {
         val milk = product("牛乳")
         val kana = product("ぎゅうにゅう瓶", mergedInto = milk)

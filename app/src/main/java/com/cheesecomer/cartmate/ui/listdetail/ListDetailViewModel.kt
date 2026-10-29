@@ -77,8 +77,11 @@ data class ListDetailUiState(
     /** [item] をチェックした人の名前。家族にいない人（退会したメンバー）は null */
     fun checkerName(item: Item): String? = item.completedBy?.let(memberNames::of)
 
+    /** 自分がチェックした。チェックした人を、名前ではなく「あなた」と表示する */
+    fun checkedByMe(item: Item): Boolean = item.completedBy != null && item.completedBy == me
+
     /** チェックを外せるのは、チェックした本人だけ */
-    fun canUncheck(item: Item): Boolean = item.completedBy != null && item.completedBy == me
+    fun canUncheck(item: Item): Boolean = checkedByMe(item)
 
     val addVisibilitySelectable: Boolean get() = VisibilityDefaults.selectable(listVisibility)
 

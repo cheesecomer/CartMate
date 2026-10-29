@@ -40,6 +40,7 @@ class PurchaseHistoryScreenTest {
         val listId = store.createList(NewList("スーパー", null, Visibility.SHARED))
         val id = store.addItem(NewItem(listId, name, 1.0, "個", memo = null, Visibility.SHARED))
         store.completeItem(id, clock.instant())
+        id
     }
 
     private fun setContent(name: String) {
@@ -59,6 +60,20 @@ class PurchaseHistoryScreenTest {
                 PurchaseHistoryScreen(onBack = { backCount++ }, onEmptied = { emptiedCount++ }, viewModel = viewModel)
             }
         }
+    }
+
+    @Test
+    fun 自分の購入と_自分が予測から外した記録は_名前ではなくあなたと表示する() {
+        val itemId = buy("牛乳")
+        runBlocking { store.setExcludedFromPrediction(itemId, excluded = true) }
+        setContent("牛乳")
+
+        // 画面が落ち着いたあと
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            runCatching { composeRule.onNodeWithText("スーパー ・ あなた").assertIsDisplayed() }.isSuccess
+        }
+        composeRule.onNodeWithText("除外: あなた・", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("退会したメンバー", substring = true).assertDoesNotExist()
     }
 
     /** 最後の購入を1件ずつ削除して0件になったら、商品の画面を経由せずに商品名の管理まで戻る */

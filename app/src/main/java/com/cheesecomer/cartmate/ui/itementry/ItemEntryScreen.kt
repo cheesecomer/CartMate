@@ -1,18 +1,24 @@
 package com.cheesecomer.cartmate.ui.itementry
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
@@ -22,20 +28,23 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedIconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -45,19 +54,27 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -81,6 +98,9 @@ object ItemEntryTags {
     const val UNIT = "entry_unit"
     const val MEMO = "entry_memo"
 }
+
+/** 数量の欄で、数字の幅に足すカーソルの分 */
+private val QuantityCursorWidth = 2.dp
 
 /** 数量のチップ（1〜6） */
 private val QuantityChips = (1..6).map(Int::toDouble)
@@ -201,26 +221,54 @@ fun ItemEntryContent(
                     modifier = Modifier.fillMaxWidth().testTag(ItemEntryTags.NAME),
                 )
                 history?.previous?.let { PreviousPurchaseText(it) }
-                // 似た名前の商品があれば「『牛乳』と同じ商品として記録する」。初期は未選択（docs/design/suggestions.md）
-                mergeChip?.let { chip ->
-                    FilterChip(
-                        selected = chip.selected,
-                        onClick = onToggleMerge,
-                        label = { Text(stringResource(R.string.entry_merge_chip, chip.candidateName)) },
-                        leadingIcon = if (chip.selected) {
-                            { Icon(painterResource(R.drawable.ic_check), contentDescription = null, modifier = Modifier.size(18.dp)) }
-                        } else {
-                            null
-                        },
-                        modifier = Modifier.padding(top = CartMateSpacing.small),
-                    )
-                }
+                // 似た名前の商品があれば「『牛乳』と同じ商品として扱う」。初期は未選択（docs/design/suggestions.md）
+                mergeChip?.let { chip -> MergeOption(chip, onToggleMerge) }
             }
             QuantitySection(entry, onQuantityChange, onIncrement, onDecrement)
             UnitSection(entry, onUnitChange)
             // プライベートのリストでは、すべてプライベートになるので表示しない
             if (state.listVisibility == Visibility.SHARED) VisibilitySection(entry, onVisibilityChange)
             MemoSection(entry, onMemoChange, history?.memoCandidates.orEmpty(), onSelectMemo)
+        }
+    }
+}
+
+/**
+ * 「『牛乳』と同じ商品として扱う」の選択肢（docs/design/screens/item-entry-merge-full、item-entry-merge-selected-full）。
+ * カードのどこを押してもチェックが切り替わる。中のチェックボックスは表示だけにして、押せる場所を1つにする
+ */
+@Composable
+private fun MergeOption(chip: MergeChip, onToggle: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    val shape = MaterialTheme.shapes.medium
+    Row(
+        modifier = Modifier
+            .padding(top = CartMateSpacing.small)
+            .fillMaxWidth()
+            .clip(shape)
+            .background(if (chip.selected) colors.surfaceContainerLow else colors.surfaceContainerLowest)
+            .border(1.dp, colors.outlineVariant, shape)
+            .toggleable(value = chip.selected, role = Role.Checkbox, onValueChange = { onToggle() })
+            .padding(CartMateSpacing.medium),
+        horizontalArrangement = Arrangement.spacedBy(CartMateSpacing.medium),
+    ) {
+        Checkbox(
+            checked = chip.selected,
+            onCheckedChange = null,
+            colors = CheckboxDefaults.colors(checkedColor = colors.primary, uncheckedColor = colors.onSurfaceVariant),
+            modifier = Modifier.padding(top = 2.dp).size(20.dp),
+        )
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                stringResource(R.string.entry_merge_title, chip.candidateName),
+                style = MaterialTheme.typography.titleSmall,
+                color = colors.onSurface,
+            )
+            Text(
+                stringResource(R.string.entry_merge_description),
+                style = MaterialTheme.typography.bodySmall,
+                color = colors.onSurfaceVariant,
+            )
         }
     }
 }
@@ -277,6 +325,10 @@ private fun Section(
     }
 }
 
+/**
+ * 数量のカード。「−」・数字と単位・「＋」を1つの丸い入れ物にまとめ（docs/design/screens/product-detail-entry）、
+ * その下に 1〜6 のチップを等幅で並べる
+ */
 @Composable
 private fun QuantitySection(
     entry: ItemEntry,
@@ -286,37 +338,70 @@ private fun QuantitySection(
 ) {
     val colors = MaterialTheme.colorScheme
     val quantityLabel = stringResource(R.string.entry_quantity)
-    Section(title = quantityLabel) {
+    val quantityStyle = TextStyle(
+        fontSize = 32.sp,
+        fontWeight = FontWeight.Bold,
+        color = colors.onSurface,
+        textAlign = TextAlign.Center,
+    )
+    // 数字の幅に合わせ、単位との間が空きすぎないようにする。IntrinsicSize.Min で合わせると、欄の幅と
+    // 入力欄の中で文字を並べる幅が食い違い、中央揃えの数字が欄の外に描かれて見えなくなるため、自分で測る
+    val textMeasurer = rememberTextMeasurer()
+    val quantityWidth = with(LocalDensity.current) {
+        textMeasurer.measure(entry.quantity, quantityStyle, maxLines = 1).size.width.toDp() + QuantityCursorWidth
+    }.coerceIn(24.dp, 120.dp)
+    val quantityFocus = remember { FocusRequester() }
+    val quantityInteraction = remember { MutableInteractionSource() }
+    val quantityFocused by quantityInteraction.collectIsFocusedAsState()
+    Section(title = quantityLabel, trailing = stringResource(R.string.entry_quantity_hint)) {
+        // 入力中は、OutlinedTextField と同じく primary の太い枠にする
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .align(Alignment.CenterHorizontally)
+                .widthIn(max = 320.dp)
+                .fillMaxWidth()
+                .background(colors.surfaceContainerLow, CircleShape)
+                .border(
+                    width = if (quantityFocused) 2.dp else 1.dp,
+                    color = if (quantityFocused) colors.primary else colors.outlineVariant,
+                    shape = CircleShape,
+                )
+                .padding(6.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceEvenly,
         ) {
-            FilledTonalIconButton(
+            OutlinedIconButton(
                 onClick = onDecrement,
-                modifier = Modifier.size(56.dp),
-                colors = IconButtonDefaults.filledTonalIconButtonColors(containerColor = colors.primaryContainer),
+                modifier = Modifier.size(48.dp),
+                colors = IconButtonDefaults.outlinedIconButtonColors(
+                    containerColor = colors.surfaceContainerLowest,
+                    contentColor = colors.primary,
+                ),
+                border = BorderStroke(1.dp, colors.outlineVariant),
             ) {
                 Icon(painterResource(R.drawable.ic_remove), stringResource(R.string.entry_quantity_decrement))
             }
-            Row(verticalAlignment = Alignment.Bottom) {
-                // 数字をタップして直接入力もできる
+            // 数字・単位・鉛筆のどこをタップしても、数字を直接入力できる
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {
+                        quantityFocus.requestFocus()
+                    },
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 BasicTextField(
                     value = entry.quantity,
                     onValueChange = onQuantityChange,
-                    textStyle = TextStyle(
-                        fontSize = 32.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = colors.onSurface,
-                        textAlign = TextAlign.Center,
-                    ),
+                    textStyle = quantityStyle,
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
                     cursorBrush = SolidColor(colors.primary),
-                    // 数字の幅に合わせ、単位との間が空きすぎないようにする
+                    interactionSource = quantityInteraction,
                     modifier = Modifier
-                        .width(IntrinsicSize.Min)
-                        .widthIn(min = 32.dp, max = 120.dp)
+                        .width(quantityWidth)
+                        .alignByBaseline()
+                        .focusRequester(quantityFocus)
                         .semantics { contentDescription = quantityLabel }
                         .testTag(ItemEntryTags.QUANTITY),
                 )
@@ -325,19 +410,53 @@ private fun QuantitySection(
                         entry.unit,
                         style = MaterialTheme.typography.titleSmall,
                         color = colors.onSurfaceVariant,
-                        modifier = Modifier.padding(start = CartMateSpacing.xSmall, bottom = 6.dp),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.alignByBaseline().padding(start = CartMateSpacing.xSmall).weight(1f, fill = false),
                     )
                 }
+                Icon(
+                    painterResource(R.drawable.ic_edit),
+                    contentDescription = null,
+                    tint = colors.primary.copy(alpha = 0.7f),
+                    modifier = Modifier.padding(start = CartMateSpacing.xSmall).size(14.dp),
+                )
             }
-            FilledIconButton(onClick = onIncrement, modifier = Modifier.size(56.dp)) {
+            FilledIconButton(onClick = onIncrement, modifier = Modifier.size(48.dp)) {
                 Icon(painterResource(R.drawable.ic_add), stringResource(R.string.entry_quantity_increment))
             }
         }
-        ChipRow(
-            labels = QuantityChips.map(::formatQuantity),
+        QuantityChipRow(
             selected = entry.quantityValue?.let(::formatQuantity),
             onSelect = onQuantityChange,
         )
+    }
+}
+
+/** 数量のチップ 1〜6。カードの幅いっぱいに等幅で並べ、選んでいる数を塗りで示す */
+@Composable
+private fun QuantityChipRow(selected: String?, onSelect: (String) -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        QuantityChips.map(::formatQuantity).forEach { label ->
+            val isSelected = label == selected
+            Surface(
+                selected = isSelected,
+                onClick = { onSelect(label) },
+                shape = CircleShape,
+                color = if (isSelected) colors.primary else colors.surfaceContainerLow,
+                contentColor = if (isSelected) colors.onPrimary else colors.onSurface,
+                modifier = Modifier.weight(1f).heightIn(min = 40.dp),
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(
+                        label,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                    )
+                }
+            }
+        }
     }
 }
 
