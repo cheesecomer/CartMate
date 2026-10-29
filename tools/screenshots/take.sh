@@ -10,6 +10,7 @@
 #    失敗したときは出力先を変えず、撮れた分と失敗したときの画面（failed.png）を build/screenshots に残す
 #
 # 端末は ANDROID_SERIAL で選ぶ（既定は最初の Android Emulator）。アプリのデータを消して入れ替えるので、実機では動かさない。
+# 同時には1つしか実行しない（実行中なら、すぐに終わる）。
 # 撮ったあとも、エミュレータにつなぐデバッグ版が入ったまま。戻すときは ./gradlew :app:installDebug
 set -euo pipefail
 
@@ -31,8 +32,24 @@ if [[ "$ANDROID_SERIAL" != emulator-* ]]; then
   exit 1
 fi
 
+# 同時に実行すると、テストデータの入れ直しとアプリの入れ替えで、互いの撮影を壊す（どちらも失敗し、原因も分かりにくい）。
+# Firebase のエミュレータと端末は、どのチェックアウトから実行しても共有なので、ロックは共通の場所に置く
+LOCK="/tmp/cartmate-take-screenshots.lock"
+if ! mkdir "$LOCK" 2>/dev/null; then
+  holder="$(cat "$LOCK/pid" 2>/dev/null || true)"
+  if [[ -n "$holder" ]] && kill -0 "$holder" 2>/dev/null; then
+    echo "別の take.sh（pid ${holder}）が実行中。終わってから実行する" >&2
+    exit 1
+  fi
+  # 前の実行が強制終了などでロックを残した
+  rm -rf "$LOCK"
+  mkdir "$LOCK" || { echo "ロックを取れない（$LOCK）" >&2; exit 1; }
+fi
+echo $$ >"$LOCK/pid"
+
 mkdir -p "$OUT" "$WORK"
 cleanup() {
+  rm -rf "$LOCK"
   adb shell am broadcast -a com.android.systemui.demo -e command exit >/dev/null 2>&1 || true
   adb shell wm size reset >/dev/null 2>&1 || true
   [[ -n "${FIREBASE_PID:-}" ]] && kill "$FIREBASE_PID" 2>/dev/null || true

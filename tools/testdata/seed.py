@@ -69,17 +69,23 @@ SHOWCASE_LISTS = [
     ("birthday", "誕生日の準備", 4.0, "private", "日曜のパーティー"),
 ]
 # 商品名, リスト, 数量, 単位, 備考, 公開範囲, 作った人（花子なら True）, チェックした時刻（何時間前か。未購入は None）
+# スーパーは、ストアの掲載画像で上から「未チェック → 自分がチェック → 他人がチェック」を並べて見せ、
+# 4行目からは未チェックを続ける
 SHOWCASE_ITEMS = [
     ("にんじん", "スーパー", 3, "本", None, "shared", False, None),
-    ("玉ねぎ", "スーパー", 1, "袋", None, "shared", True, None),
+    ("納豆", "スーパー", 1, "パック", None, "shared", False, 1),
+    ("豆腐", "スーパー", 2, "丁", "絹", "shared", True, 2),
     ("豚こま切れ肉", "スーパー", 300, "g", "特売なら2パック", "shared", True, None),
     ("バナナ", "スーパー", 1, "房", None, "shared", False, None),
     ("プリン", "スーパー", 3, "個", None, "private", False, None),
-    ("豆腐", "スーパー", 2, "丁", "絹", "shared", True, 2),
-    ("納豆", "スーパー", 1, "パック", None, "shared", False, 1),
     ("ケーキ", "誕生日の準備", 1, "台", "チョコレート", "private", False, None),
     ("ろうそく", "誕生日の準備", 1, "箱", None, "private", False, None),
     ("クラッカー", "誕生日の準備", 6, "個", None, "private", False, None),
+]
+# サジェストのシートで、時期が近い商品の下に出す「よく買う商品」。間隔が 3・20・9 日でばらつく（周期が不安定）ので、
+# 時期が近い商品には出ない。商品名, リスト, 数量, 単位, 備考, 購入日（今日から何日前か）
+SHOWCASE_PURCHASES = [
+    ("ヨーグルト", "スーパー", 1, "個", None, [40, 37, 17, 8]),
 ]
 # 「牛乳」にまとめた別の表記。購入日（27日前）は牛乳の周期（7日ごと）に沿わせる
 SHOWCASE_MERGED = ("ミルク", "牛乳", "スーパー", 1, "本", 27)
@@ -220,7 +226,8 @@ def main():
             })
 
     count = 0
-    for name, list_name, quantity, unit, memo, days in ([THIRD] if args.third else PURCHASES):
+    purchases = [THIRD] if args.third else PURCHASES + (SHOWCASE_PURCHASES if args.showcase else [])
+    for name, list_name, quantity, unit, memo, days in purchases:
         pid = product(name, noon - datetime.timedelta(days=max(days)))
         for index, day in enumerate(days):
             at = noon - datetime.timedelta(days=day)
