@@ -221,12 +221,22 @@ fun ListDetailContent(
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
                 )
             },
-            snackbarHost = { SnackbarHost(snackbarHostState) },
+            // チェックの通知は、一覧の上ではなく商品追加欄に重ねて出す（フィードバック #012）。一覧に重ねると、一番下の項目が
+            // 隠れて続けてチェックできない。一覧の余白を広げて項目を上に送ると、チェックのたびに表示位置が動く（#011）。
+            // 追加欄の大きさの中に収め、一覧の大きさも位置も変えない。通知が出ている数秒の間は、追加欄が隠れる
             bottomBar = {
-                AddItemField(
-                    text = state.addItem.text,
-                    onClick = { onAddItemEvent(AddItemEvent.FieldFocused) },
-                )
+                Box {
+                    AddItemField(
+                        text = state.addItem.text,
+                        onClick = { onAddItemEvent(AddItemEvent.FieldFocused) },
+                    )
+                    Box(
+                        Modifier.matchParentSize().windowInsetsPadding(WindowInsets.navigationBars),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        SnackbarHost(snackbarHostState)
+                    }
+                }
             },
         ) { innerPadding ->
             ItemList(

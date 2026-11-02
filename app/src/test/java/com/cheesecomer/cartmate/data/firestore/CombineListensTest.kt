@@ -3,8 +3,10 @@ package com.cheesecomer.cartmate.data.firestore
 import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 
@@ -42,6 +44,24 @@ class CombineListensTest {
             assertThat(awaitItem()).containsExactly("牛乳")
             assertThat(awaitItem()).containsExactly("牛乳", "パン")
             cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    /** フィードバック #011。チェックした項目が、未購入の購読から消えてからチェック済みの購読に現れる */
+    @Test
+    fun `1つの変更が購読ごとに別々に届いても、途中の項目がない一覧は流さない`() = runTest {
+        val open = MutableStateFlow(listOf("牛乳", "卵"))
+        val checked = MutableStateFlow(emptyList<String>())
+
+        combineListens(listOf({ open }, { checked }), awaitPendingWrites = {}, isDenied = isDenied).test {
+            assertThat(awaitItem()).containsExactly("牛乳", "卵")
+
+            open.value = listOf("卵")
+            advanceTimeBy(5)
+            checked.value = listOf("牛乳")
+
+            assertThat(awaitItem()).containsExactly("卵", "牛乳")
+            expectNoEvents()
         }
     }
 

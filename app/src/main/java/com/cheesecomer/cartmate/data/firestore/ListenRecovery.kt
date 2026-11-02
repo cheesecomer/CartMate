@@ -1,9 +1,11 @@
 package com.cheesecomer.cartmate.data.firestore
 
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.retryWhen
@@ -51,6 +53,7 @@ private fun retryDelay(attempt: Long): Duration = min(2L shl min(attempt, 4L).to
  * 複数の購読（[listens]）の結果を1つの一覧にまとめる。購読は1本ずつやり直す（[recoverListen]）。
  * 1本が失敗し続けても（インデックスの作成中など）、ほかの購読の結果は出るよう、失敗した購読はやり直している間は空として扱う
  */
+@OptIn(FlowPreview::class)
 fun <T> combineListens(
     listens: List<() -> Flow<List<T>>>,
     awaitPendingWrites: suspend () -> Unit,
@@ -61,3 +64,10 @@ fun <T> combineListens(
         recoverListen(listen, denied = emptyList(), awaitPendingWrites, isDenied, onError, whileRetrying = emptyList())
     },
 ) { results -> results.flatMap { it } }
+    // 1つの変更が複数の購読に別々に届いたら、まとめてから流す。項目をチェックすると、未購入の購読から消えたあと、
+    // チェック済みの購読に現れる。その間の「項目がない」一覧を流すと、最終行まで表示しているリスト詳細では一覧が縮んで
+    // 下端に合わせて戻り、項目が戻ってもその分だけ表示がずれたままになる（フィードバック #011）
+    .debounce(COALESCE_MILLIS)
+
+/** 1つの変更から届く購読ごとの通知を、まとめて待つ時間。同じ変更の通知は数ミリ秒の間に届く */
+private const val COALESCE_MILLIS = 50L
