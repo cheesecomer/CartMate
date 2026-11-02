@@ -57,6 +57,7 @@ import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.flowOf
 
 @RunWith(AndroidJUnit4::class)
@@ -85,7 +86,7 @@ class ListDetailScreenTest {
             clock = clock,
             currentUser = { UserId("taro") },
             memberDirectory = { flowOf(listOf(Member(UserId("hanako"), MemberRole.MEMBER, "花子", null, Instant.EPOCH))) },
-            suggestionSource = SuggestionSource(store, store, store, clock) { flowOf(NormalizationDictionary.EMPTY) },
+            suggestionSource = SuggestionSource(store, store, store, clock, { flowOf(NormalizationDictionary.EMPTY) }, Dispatchers.Default),
         )
         // アプリと同じく、キーボードの高さを画面側で受け取る（シートはキーボードが出てから表示する）
         composeRule.runOnUiThread {

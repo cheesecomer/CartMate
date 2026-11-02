@@ -256,12 +256,13 @@ class SuggestionEngine(
      * [SuggestionParams.minFrequentDays] 日以上買っていて、未購入の項目になく、非表示でない商品を、買った日の多い順に。
      * 周期が安定している商品は出さない（時期が近ければ [due] に出る。まだ早い・買うのをやめた商品は、周期から分かっている）。
      * 献立に合わせて買う食材のように、周期では勧められないがよく買う商品を補う。
-     * [SuggestionParams.recentPurchaseDays] 日以内に買ったばかりの商品は出さない
+     * [SuggestionParams.recentPurchaseDays] 日以内に買ったばかりの商品は出さない。
+     * [due] は同じリストの [due] の結果（呼び出し側で計算済みなら渡して、二度計算しない）
      */
-    fun frequent(listName: String): List<FrequentSuggestion> {
+    fun frequent(listName: String, due: DueResult = due(listName)): List<FrequentSuggestion> {
         val relevance = relevance(listName)
-        if (relevance.isEmpty()) return emptyList()
-        val dueKeys = (due(listName) as DueResult.Suggestions).items.map { keyOf(it.product.id) }.toSet()
+        if (relevance.isEmpty() || due !is DueResult.Suggestions) return emptyList()
+        val dueKeys = due.items.map { keyOf(it.product.id) }.toSet()
         val items = factsByKey.mapNotNull { (key, purchases) ->
             if (key in dueKeys || key in openKeys || cycleOf(key) in openCycles) return@mapNotNull null
             val score = relevance[key] ?: 0.0

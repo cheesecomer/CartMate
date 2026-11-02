@@ -3,6 +3,7 @@ package com.cheesecomer.cartmate.ui.listdetail
 import com.cheesecomer.cartmate.domain.model.ProductId
 import com.cheesecomer.cartmate.domain.model.UserId
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.distinctUntilChanged
 import com.cheesecomer.cartmate.ui.suggestions.SuggestionSource
 import androidx.lifecycle.SavedStateHandle
@@ -207,13 +208,17 @@ class ListDetailViewModel @Inject constructor(
         }
     }
 
-    /** シートの候補。未入力なら時期が近い商品、入力中なら補完（docs/design/suggestions.md） */
+    /**
+     * シートの候補。未入力なら時期が近い商品とよく買う商品、入力中なら補完（docs/design/suggestions.md）。
+     * 計算が終わるまでは読み込み中を流し、項目の一覧の表示を待たせない（フィードバック #016）
+     */
     private fun suggestions(source: SuggestionSource): Flow<SheetSuggestions> = combine(
         source.observe(),
         addItemState.map { it.text }.distinctUntilChanged(),
         listRepository.observeLists().map { lists -> lists.associate { it.id to it.name } }.distinctUntilChanged(),
     ) { engine, text, listNames -> SheetSuggestions.of(engine, text, listNames[listId].orEmpty(), listId, listNames) }
         .flowOn(source.dispatcher)
+        .onStart { emit(SheetSuggestions.Loading) }
 
     /** サジェストのシートで公開範囲を切り替える。そのリストの次の追加の初期値になる（docs/requirements.md §3.4） */
     fun setAddVisibility(visibility: Visibility) {

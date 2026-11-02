@@ -1,6 +1,12 @@
 package com.cheesecomer.cartmate.ui.listdetail
 
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.cancel
+import org.junit.jupiter.api.AfterEach
+import com.cheesecomer.cartmate.domain.repository.DictionaryProvider
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.flow.flow
 import com.cheesecomer.cartmate.domain.product.NormalizationDictionary
 import com.cheesecomer.cartmate.ui.suggestions.SuggestionSource
 import androidx.lifecycle.SavedStateHandle
@@ -65,9 +71,23 @@ class ListDetailViewModelTest {
     private val otherListId: ListId = runBlocking { store.createList("薬局") }
 
     private val lastVisibility = LastVisibilityStore()
+
+    /**
+     * テストで作った ViewModel。テストの終わりに止める。項目はサジェストの計算を待たずに出るので、テストが終わった時点で
+     * 計算が残っていることがあり、止めないと Dispatchers.Main を戻したあとに動いて、次のテストで失敗する
+     */
+    private val viewModels = mutableListOf<ListDetailViewModel>()
     private val viewModel = viewModelFor(listId)
 
-    private fun viewModelFor(listId: ListId) = ListDetailViewModel(
+    @AfterEach
+    fun cancelViewModels() {
+        viewModels.forEach { it.viewModelScope.cancel() }
+    }
+
+    private fun viewModelFor(
+        listId: ListId,
+        dictionary: DictionaryProvider = DictionaryProvider { flowOf(NormalizationDictionary.EMPTY) },
+    ) = ListDetailViewModel(
         savedStateHandle = SavedStateHandle(mapOf("listId" to listId.value)),
         listRepository = store,
         itemRepository = object : ItemRepository by store {
@@ -77,8 +97,22 @@ class ListDetailViewModelTest {
         clock = clock,
         currentUser = { UserId("taro") },
         memberDirectory = { members },
-        suggestionSource = SuggestionSource(store, store, store, clock, { flowOf(NormalizationDictionary.EMPTY) }, Dispatchers.Main),
-    )
+        suggestionSource = SuggestionSource(store, store, store, clock, dictionary, Dispatchers.Main),
+    ).also(viewModels::add)
+
+    /** リストを開いたときの表示の遅れ（フィードバック #016）。重いサジェストの計算を待たずに、項目を出す */
+    @Test
+    fun `サジェストの計算が終わっていなくても、項目の一覧は表示し、候補は読み込み中にする`() = runTest {
+        store.addItem(newItem(listId, "牛乳"))
+        // 辞書がいつまでも届かない（起動直後の辞書の読み込みに時間がかかっている）
+        val viewModel = viewModelFor(listId, dictionary = DictionaryProvider { flow { awaitCancellation() } })
+        viewModel.uiState.test {
+            val state = awaitUntil { !it.loading }
+            assertThat(state.items.map { it.inputName }).containsExactly("牛乳")
+            assertThat(state.suggestions).isEqualTo(SheetSuggestions.Loading)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
 
     @Test
     fun `シートで商品名を入れて Enter を押すと数量1・単位「個」で追加され、シートは開いたまま入力欄が空になる`() = runTest {
@@ -96,6 +130,7 @@ class ListDetailViewModelTest {
             assertThat(item.quantity).isEqualTo(1.0)
             assertThat(item.unit).isEqualTo("個")
             assertThat(item.visibility).isEqualTo(Visibility.SHARED)
+            cancelAndIgnoreRemainingEvents()
         }
     }
 
@@ -109,6 +144,7 @@ class ListDetailViewModelTest {
 
         viewModel.uiState.test {
             assertThat(awaitUntil { it.items.isNotEmpty() }.items.single().visibility).isEqualTo(Visibility.PRIVATE)
+            cancelAndIgnoreRemainingEvents()
         }
         assertThat(lastVisibility.get(listId)).isEqualTo(Visibility.PRIVATE)
     }
@@ -123,6 +159,7 @@ class ListDetailViewModelTest {
 
         viewModel.uiState.test {
             assertThat(awaitUntil { it.items.isNotEmpty() }.items.single().visibility).isEqualTo(Visibility.PRIVATE)
+            cancelAndIgnoreRemainingEvents()
         }
     }
 
@@ -157,6 +194,8 @@ class ListDetailViewModelTest {
 
         viewModel.uiState.test {
             assertThat(awaitUntil { !it.loading }.items.map { it.inputName }).containsExactly("牛乳")
+            // サジェストの候補は、項目のあとから届く
+            cancelAndIgnoreRemainingEvents()
         }
     }
 
@@ -180,6 +219,7 @@ class ListDetailViewModelTest {
 
             states.awaitUntil { it.items.first().status == ItemStatus.OPEN }
             assertThat(store.observePurchases(Instant.EPOCH).first().single().active).isFalse()
+            states.cancelAndIgnoreRemainingEvents()
         }
     }
 
@@ -211,6 +251,7 @@ class ListDetailViewModelTest {
             viewModel.undoDelete(item)
 
             assertThat(states.awaitUntil { it.items.isNotEmpty() }.items.map { it.id }).containsExactly(item.id)
+            states.cancelAndIgnoreRemainingEvents()
         }
     }
 
@@ -236,6 +277,7 @@ class ListDetailViewModelTest {
             val state = awaitUntil { it.listName != "スーパー" }
             assertThat(state.listName).isEqualTo("イオン")
             assertThat(state.listMemo).isEqualTo("火曜市")
+            cancelAndIgnoreRemainingEvents()
         }
     }
 
@@ -249,6 +291,7 @@ class ListDetailViewModelTest {
 
             assertThat(viewModel.canDeleteList()).isFalse()
             assertThat(messages.awaitItem()).isEqualTo(DetailMessage.CannotDeleteList)
+            states.cancelAndIgnoreRemainingEvents()
         }
     }
 
@@ -375,6 +418,7 @@ class ListDetailViewModelTest {
             states.awaitUntil { it.items.isNotEmpty() }
             advanceTimeBy(5_000)
             messages.expectNoEvents()
+            states.cancelAndIgnoreRemainingEvents()
         }
     }
 
@@ -409,6 +453,7 @@ class ListDetailViewModelTest {
 
             rejectedChecks.emit(RejectedCheck.NotApplied("卵"))
             assertThat(messages.awaitItem()).isEqualTo(DetailMessage.CheckNotApplied("卵"))
+            states.cancelAndIgnoreRemainingEvents()
         }
     }
 
@@ -438,6 +483,7 @@ class ListDetailViewModelTest {
             assertThat(navigation.awaitItem()).isEqualTo(DetailNavigation.ListDeleted)
             // 削除したリストは表示しなくなる
             states.awaitUntil { it.listName.isEmpty() }
+            states.cancelAndIgnoreRemainingEvents()
         }
     }
 
@@ -451,6 +497,7 @@ class ListDetailViewModelTest {
             viewModel.move(egg, previous = null, next = milk)
 
             awaitUntil { state -> state.items.map { it.inputName } == listOf("卵", "牛乳") }
+            cancelAndIgnoreRemainingEvents()
         }
     }
 
@@ -468,7 +515,7 @@ class ListDetailViewModelTest {
         currentUser = { UserId("taro") },
         memberDirectory = { members },
         suggestionSource = SuggestionSource(store, store, store, clock, { flowOf(NormalizationDictionary.EMPTY) }, Dispatchers.Main),
-    )
+    ).also(viewModels::add)
 
     @Test
     fun `リストの削除に失敗しても落ちずに失敗を知らせる`() = runTest {
@@ -482,6 +529,7 @@ class ListDetailViewModelTest {
             viewModel.deleteList()
 
             assertThat(messages.awaitItem()).isEqualTo(DetailMessage.Failed)
+            states.cancelAndIgnoreRemainingEvents()
         }
     }
 
@@ -603,6 +651,7 @@ class ListDetailViewModelTest {
             assertThat(navigation.awaitItem()).isEqualTo(DetailNavigation.OpenProduct(milk))
             states.awaitUntil { it.addItem == AddItemState.Idle("") }
             navigation.cancelAndIgnoreRemainingEvents()
+            states.cancelAndIgnoreRemainingEvents()
         }
     }
 

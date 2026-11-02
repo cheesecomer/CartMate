@@ -15,7 +15,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.cheesecomer.cartmate.R
 import com.cheesecomer.cartmate.domain.family.Destination
@@ -85,8 +84,8 @@ private fun OnboardingNavHost(removed: Boolean, pending: PendingNavigation) {
         pending.consumeJoin()?.let { navController.navigate(JoinConfirmRoute(it)) }
     }
     NavHost(navController = navController, startDestination = OnboardingRoute) {
-        composable<OnboardingRoute> {
-            OnboardingScreen(removed = removed, onJoinWithCode = { navController.navigate(JoinCodeRoute) })
+        screen<OnboardingRoute> { entry ->
+            OnboardingScreen(removed = removed, onJoinWithCode = { entry.whenResumed { navController.navigate(JoinCodeRoute) } })
         }
         joinGraph(navController)
     }

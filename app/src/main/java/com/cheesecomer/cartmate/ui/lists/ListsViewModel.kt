@@ -1,5 +1,6 @@
 package com.cheesecomer.cartmate.ui.lists
 
+import com.cheesecomer.cartmate.ui.suggestions.SuggestionSource
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.cheesecomer.cartmate.domain.list.ListProgress
@@ -50,7 +51,13 @@ class ListsViewModel @Inject constructor(
     clock: Clock,
     accountRepository: AccountRepository,
     onlineStatus: OnlineStatus,
+    suggestionSource: SuggestionSource,
 ) : ViewModel() {
+
+    init {
+        // リストを開くころにはサジェストの計算が終わっているよう、一覧を表示している間に裏で計算しておく（フィードバック #016）
+        suggestionSource.keepWarm(viewModelScope)
+    }
 
     val uiState: StateFlow<ListsUiState> =
         combine(

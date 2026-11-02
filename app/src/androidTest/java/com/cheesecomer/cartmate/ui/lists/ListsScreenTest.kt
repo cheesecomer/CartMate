@@ -1,5 +1,8 @@
 package com.cheesecomer.cartmate.ui.lists
 
+import kotlinx.coroutines.Dispatchers
+import com.cheesecomer.cartmate.domain.product.NormalizationDictionary
+import com.cheesecomer.cartmate.ui.suggestions.SuggestionSource
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.enableEdgeToEdge
@@ -47,7 +50,7 @@ class ListsScreenTest {
             composeRule.activity.enableEdgeToEdge()
             composeRule.activity.window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
         }
-        val viewModel = ListsViewModel(store, store, store, Clock.systemUTC(), FixedAccountRepository(null), { flowOf(true) })
+        val viewModel = ListsViewModel(store, store, store, Clock.systemUTC(), FixedAccountRepository(null), { flowOf(true) }, SuggestionSource(store, store, store, Clock.systemUTC(), { flowOf(NormalizationDictionary.EMPTY) }, Dispatchers.Default))
         composeRule.setContent {
             CartMateTheme { ListsScreen(onOpenList = {}, viewModel = viewModel) }
         }

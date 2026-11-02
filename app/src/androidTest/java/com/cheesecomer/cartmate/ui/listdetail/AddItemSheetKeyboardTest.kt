@@ -31,6 +31,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.time.Clock
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.flowOf
 
 /**
@@ -66,7 +67,7 @@ class AddItemSheetKeyboardTest {
             clock = clock,
             currentUser = { UserId("taro") },
             memberDirectory = { flowOf(emptyList()) },
-            suggestionSource = SuggestionSource(store, store, store, clock) { flowOf(NormalizationDictionary.EMPTY) },
+            suggestionSource = SuggestionSource(store, store, store, clock, { flowOf(NormalizationDictionary.EMPTY) }, Dispatchers.Default),
         )
         composeRule.setContent {
             val bottom = WindowInsets.ime.getBottom(LocalDensity.current)

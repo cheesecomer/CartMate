@@ -56,6 +56,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import java.time.Clock
 import java.time.Instant
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.flowOf
 import com.cheesecomer.cartmate.domain.product.NormalizationDictionary
 
@@ -68,7 +69,7 @@ class ItemEntryFlowTest {
 
     private val clock = Clock.systemUTC()
     private val store = InMemoryStore(clock) { UserId("taro") }
-    private val suggestions = SuggestionSource(store, store, store, clock) { flowOf(NormalizationDictionary.EMPTY) }
+    private val suggestions = SuggestionSource(store, store, store, clock, { flowOf(NormalizationDictionary.EMPTY) }, Dispatchers.Default)
     private val lastVisibility = LastVisibilityStore()
 
     private fun createList(visibility: Visibility = Visibility.SHARED) =

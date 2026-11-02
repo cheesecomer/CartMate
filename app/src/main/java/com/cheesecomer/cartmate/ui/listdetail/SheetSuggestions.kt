@@ -38,7 +38,7 @@ sealed interface SheetSuggestions {
                         label = if (item.labels.isEmpty()) item.product.displayName else "${item.product.displayName}（${item.labels.joinToString("・")}）",
                     )
                 }
-                val frequentRows = engine.frequent(listName).map { item ->
+                val frequentRows = engine.frequent(listName, due).map { item ->
                     SuggestionRow(
                         Suggestion(item.product.displayName, item.lastQuantity, item.lastUnit, productId = item.product.id),
                         SuggestionNote.Frequent(item.purchaseDays, item.daysSinceLast),

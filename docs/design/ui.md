@@ -116,6 +116,7 @@ sealed interface AddItemState {
 | Entering | 追加して戻った | Idle（空） | |
 | Entering | 追加せずに戻った（✕・戻るキー） | Open（入力文字は保持） | シートを開き直す |
 
+- 画面の遷移（既定の約0.7秒のクロスフェード）の間は、操作中（RESUMED）でない画面は入力を受けません（`CartMateNavHost` の `screen`）。遷移の途中は、離れようとしている画面もまだ表示されていて、戻るときはそちらが手前にあるので、そのままでは戻った直後のタップで項目がチェックされたり、もう一度戻って白紙になったりします（フィードバック #015・#017）。遷移の途中のタップは、どちらの画面にも届きません。戻る・開くの操作も、その画面が RESUMED のときだけ行います（`whenResumed`）。
 - 商品詳細入力画面の結果（追加した・やめた・編集が拒否された）は、リスト詳細の `NavBackStackEntry.savedStateHandle` に渡します（`CartMateNavHost` の `closeEntry` / `rememberEntryResults`）。
 - サジェストのシートは、共通の `KeyboardSheet` の中に入力欄と候補を置いたものです（`AddItemSheet`。「部品」を参照）。
 

@@ -236,3 +236,8 @@ fun detect(estimate: CycleEstimate?, lastPurchase: LocalDate?, today: LocalDate,
 ## 計算の実行場所
 
 `combine(products, purchases, openItems, currentList)` の Flow で入力をまとめ（どれも自分に見えるものだけを購読している）、`Dispatchers.Default` で再計算します。商品ごとの `CycleEstimate` は、購入データが変わったときだけ計算し直します。日付が変わったときも再計算します。
+
+- **エンジンはアプリで1つ持っておく**（`ui/suggestions/SuggestionSource`、シングルトン）。計算した `SuggestionEngine` を最新の1件だけ共有し（`shareIn`）、リスト詳細や商品詳細入力を開くたびには作り直しません。データが変わったときだけ、裏で作り直して差し替えます。購入の記録などの購読も張り直さないので、Firestore の読み取りも減ります。
+- **リスト一覧を表示したときに計算を始める**（`ListsViewModel` が `keepWarm` で購読する）。リストを開くころには計算が終わっていることが多くなります。購読がなくなっても5分は持っておきます。
+- 計算したユーザーを添えて持ち、ログインやアカウントの切り替えの直後に、前のユーザーのエンジンを使いません。
+- リスト詳細の項目の一覧は、エンジンの計算を待たずに表示します。候補は、計算が終わるまで読み込み中にします（フィードバック #016）。
