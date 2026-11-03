@@ -305,12 +305,34 @@ class ListDetailScreenTest {
         assertThat(activePurchaseCount()).isEqualTo(1)
     }
 
+    /** スワイプの削除を、チェックの代わりに使ってしまう（購入の記録が残らない）ため、← では削除しない（フィードバック #018） */
     @Test
-    fun 左スワイプで削除し_Snackbarの元に戻すで復元できる() {
+    fun 未購入の項目は左スワイプしても削除されない() {
         addItem("牛乳")
         setContent()
 
         composeRule.onNodeWithText("牛乳").performTouchInput { swipeLeft() }
+
+        // 画面が落ち着いたあとも、未購入のまま一覧にある
+        composeRule.waitForIdle()
+        Thread.sleep(1_000)
+        composeRule.waitForIdle()
+        assertThat(openItemNames()).containsExactly("牛乳")
+        assertThat(activePurchaseCount()).isEqualTo(0)
+        composeRule.onNodeWithText("牛乳").assertIsDisplayed()
+        // 右スワイプでは、これまでどおりチェックできる
+        composeRule.onNodeWithText("牛乳").performTouchInput { swipeRight() }
+        composeRule.waitUntil { openItemNames().isEmpty() }
+        assertThat(activePurchaseCount()).isEqualTo(1)
+    }
+
+    @Test
+    fun メニューで削除し_Snackbarの元に戻すで復元できる() {
+        addItem("牛乳")
+        setContent()
+
+        composeRule.onNodeWithContentDescription("牛乳のメニュー").performClick()
+        composeRule.onNodeWithText("削除").performClick()
         composeRule.waitUntil { openItemNames().isEmpty() }
 
         snackbarUndo().performClick()

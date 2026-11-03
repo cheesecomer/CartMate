@@ -72,7 +72,8 @@ data class RowDrag(
 )
 
 /**
- * 未購入の項目のカード。タップか → でチェック、⋮ メニューの「編集」で編集、← か ⋮ メニューの「削除」で削除。
+ * 未購入の項目のカード。タップか → でチェック、⋮ メニューの「編集」で編集、「削除」で削除。
+ * ← のスワイプでは削除しない。チェックの代わりに削除してしまい、購入の記録が残らないため（フィードバック #018）。
  * [showLock] は共有のリストにあるプライベートな項目に鍵アイコンを付けるか
  */
 @Composable
@@ -87,10 +88,9 @@ fun OpenItemCard(
 ) {
     SwipeableCard(
         enableStartToEnd = true,
+        enableEndToStart = false,
         onStartToEnd = onCheck,
-        onEndToStart = onDelete,
-        endToStartIcon = R.drawable.ic_delete,
-        endToStartColors = deleteSwipeColors(),
+        onEndToStart = {},
         modifier = modifier,
         dragging = drag.dragging,
     ) {
@@ -141,8 +141,6 @@ fun CompletedItemCard(
         enableEndToStart = canUncheck,
         onStartToEnd = {},
         onEndToStart = onUncheck,
-        endToStartIcon = R.drawable.ic_undo,
-        endToStartColors = uncheckSwipeColors(),
         modifier = modifier,
         dragging = drag.dragging,
     ) {
@@ -303,14 +301,13 @@ private fun ItemMenu(itemName: String, onEdit: () -> Unit, onDelete: () -> Unit)
 
 private data class SwipeColors(val container: Color, val content: Color)
 
+/** → はチェック、← はチェックを外す（docs/design/ui.md「スワイプ操作」） */
 @Composable
 private fun SwipeableCard(
     enableStartToEnd: Boolean,
-    enableEndToStart: Boolean = true,
+    enableEndToStart: Boolean,
     onStartToEnd: () -> Unit,
     onEndToStart: () -> Unit,
-    endToStartIcon: Int,
-    endToStartColors: SwipeColors,
     modifier: Modifier = Modifier,
     dragging: Boolean = false,
     content: @Composable RowScope.() -> Unit,
@@ -320,6 +317,7 @@ private fun SwipeableCard(
     val state = remember { SwipeToDismissBoxState(SwipeToDismissBoxValue.Settled, { it * SWIPE_THRESHOLD }) }
     val scope = rememberCoroutineScope()
     val checkColors = checkSwipeColors()
+    val uncheckColors = uncheckSwipeColors()
     val currentOnStartToEnd by rememberUpdatedState(onStartToEnd)
     val currentOnEndToStart by rememberUpdatedState(onEndToStart)
 
@@ -346,7 +344,7 @@ private fun SwipeableCard(
         backgroundContent = {
             when (state.dismissDirection) {
                 SwipeToDismissBoxValue.StartToEnd -> SwipeBackground(state, R.drawable.ic_check, checkColors)
-                SwipeToDismissBoxValue.EndToStart -> SwipeBackground(state, endToStartIcon, endToStartColors)
+                SwipeToDismissBoxValue.EndToStart -> SwipeBackground(state, R.drawable.ic_undo, uncheckColors)
                 SwipeToDismissBoxValue.Settled -> Unit
             }
         },
@@ -366,14 +364,10 @@ private fun RowScope.SwipeBackground(state: SwipeToDismissBoxState, icon: Int, c
     }
 }
 
-// → のチェックとチェック済みの ← はブランドカラー、未購入の ← の削除は赤。緑は使わない（docs/design/ui.md「スワイプ操作」）
+// → のチェックとチェック済みの ← は、どちらもブランドカラー。緑は使わない（docs/design/ui.md「スワイプ操作」）
 @Composable
 private fun checkSwipeColors(): SwipeColors =
     SwipeColors(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.onPrimary)
-
-@Composable
-private fun deleteSwipeColors(): SwipeColors =
-    SwipeColors(MaterialTheme.colorScheme.errorContainer, MaterialTheme.colorScheme.onErrorContainer)
 
 @Composable
 private fun uncheckSwipeColors(): SwipeColors =
