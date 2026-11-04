@@ -99,7 +99,7 @@ class SuggestionSource(
     private fun dateChanges(): Flow<LocalDate> = flow {
         while (true) {
             val now = clock.instant()
-            val today = LocalDate.ofInstant(now, clock.zone)
+            val today = now.atZone(clock.zone).toLocalDate()
             emit(today)
             val nextMidnight = today.plusDays(1).atStartOfDay(clock.zone).toInstant()
             delay(Duration.between(now, nextMidnight).toMillis().coerceAtLeast(1))
