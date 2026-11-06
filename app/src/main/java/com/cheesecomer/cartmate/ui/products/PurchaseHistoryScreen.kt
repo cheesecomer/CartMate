@@ -82,18 +82,32 @@ fun PurchaseHistoryScreen(
         LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(CartMateSpacing.medium)) {
             item { InfoCard() }
             item {
-                // 件数のバッジは、見出しの文字と下をそろえる
+                // 件数のバッジは見出しのすぐ右に、見出しの文字と下をそろえる。右端には、スイッチの列の見出しを置く
+                // （スイッチが何を切り替えるのかを、一覧を見ただけで分かるように。UI レビュー UI001-8）
                 Row(
                     verticalAlignment = Alignment.Bottom,
                     modifier = Modifier.fillMaxWidth().padding(end = CartMateSpacing.large),
                 ) {
-                    SectionLabel(stringResource(R.string.purchase_history_list), Modifier.weight(1f))
-                    Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.padding(bottom = CartMateSpacing.small)) {
+                    SectionLabel(stringResource(R.string.purchase_history_list))
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.surfaceContainer,
+                        modifier = Modifier.padding(bottom = CartMateSpacing.small),
+                    ) {
                         Text(
                             stringResource(R.string.purchase_history_count, state.rows.size),
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(horizontal = CartMateSpacing.medium, vertical = CartMateSpacing.xSmall),
+                        )
+                    }
+                    Spacer(Modifier.weight(1f))
+                    if (state.rows.isNotEmpty()) {
+                        Text(
+                            stringResource(R.string.purchase_history_switch_label),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(bottom = CartMateSpacing.small),
                         )
                     }
                 }

@@ -36,7 +36,9 @@ import com.cheesecomer.cartmate.ui.theme.CartMateSpacing
 
 /**
  * リスト一覧のカード（docs/design/ui.md「リスト一覧」）。リスト名、備考、件数、進捗バーを表示する。
- * プライベートのリストには鍵アイコンを表示する。家族のメンバーはどのリストでも同じなので、カードにはアバターを出さない
+ * プライベートのリストには鍵アイコンを表示する。家族のメンバーはどのリストでも同じなので、カードにはアバターを出さない。
+ * 買い終わったリストはチェックの印と primary の文字で、登録のないリストは進捗バーを出さずに示し、同じ0件でも見分けられるようにする
+ * （UI レビュー UI001-4）
  */
 @Composable
 fun ListCard(
@@ -57,7 +59,10 @@ fun ListCard(
             .clickable(onClickLabel = stringResource(R.string.lists_open), onClick = onClick)
             // TalkBack 用の操作（並び替え）。clickable と同じ要素に付けないと読み上げの対象にならない
             .semantics { customActions = actions }
-            .heightIn(min = 160.dp)
+            // 進捗バーを出さないカード（登録なし）でも、列の幅いっぱいに広げる
+            .fillMaxWidth()
+            // 備考のあるカードが収まる高さにそろえる。備考のないカードに大きな空白を作らない（UI001-4）
+            .heightIn(min = 136.dp)
             .padding(CartMateSpacing.large),
         verticalArrangement = Arrangement.SpaceBetween,
     ) {
@@ -90,38 +95,48 @@ fun ListCard(
                 )
             }
         }
-        Column(Modifier.padding(top = CartMateSpacing.large)) {
-            Row(verticalAlignment = Alignment.Bottom) {
-                Text(
-                    progress.openCount.toString(),
-                    fontSize = 26.sp,
-                    lineHeight = 28.sp,
-                    style = MaterialTheme.typography.titleLarge,
-                    color = if (progress.status == ListProgress.Status.REMAINING) colors.primary else colors.onSurfaceVariant,
-                )
-                Text(
-                    stringResource(
-                        when (progress.status) {
-                            ListProgress.Status.REMAINING -> R.string.lists_count_remaining
-                            ListProgress.Status.NOT_REGISTERED -> R.string.lists_count_not_registered
-                            ListProgress.Status.DONE -> R.string.lists_count_done
-                        },
-                    ),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = colors.onSurfaceVariant,
-                    modifier = Modifier.padding(start = CartMateSpacing.xSmall, bottom = 2.dp),
+        Column(Modifier.padding(top = CartMateSpacing.medium)) {
+            when (progress.status) {
+                ListProgress.Status.DONE -> Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(painterResource(R.drawable.ic_check_circle), contentDescription = null, tint = colors.primary, modifier = Modifier.size(24.dp))
+                    Text(
+                        stringResource(R.string.lists_done),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = colors.primary,
+                        modifier = Modifier.padding(start = CartMateSpacing.xSmall),
+                    )
+                }
+                else -> Row(verticalAlignment = Alignment.Bottom) {
+                    Text(
+                        progress.openCount.toString(),
+                        fontSize = 24.sp,
+                        lineHeight = 26.sp,
+                        style = MaterialTheme.typography.titleLarge,
+                        color = if (progress.status == ListProgress.Status.REMAINING) colors.primary else colors.onSurfaceVariant,
+                    )
+                    Text(
+                        stringResource(
+                            if (progress.status == ListProgress.Status.REMAINING) R.string.lists_count_remaining else R.string.lists_count_not_registered,
+                        ),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = colors.onSurfaceVariant,
+                        modifier = Modifier.padding(start = CartMateSpacing.xSmall, bottom = 2.dp),
+                    )
+                }
+            }
+            // 登録のないリストには、空の進捗バーを出さない
+            if (progress.status != ListProgress.Status.NOT_REGISTERED) {
+                Spacer(Modifier.height(CartMateSpacing.small))
+                LinearProgressIndicator(
+                    progress = { progress.fraction },
+                    modifier = Modifier.fillMaxWidth().height(6.dp),
+                    color = colors.primary,
+                    trackColor = colors.surfaceContainer,
+                    strokeCap = StrokeCap.Round,
+                    gapSize = 0.dp,
+                    drawStopIndicator = {},
                 )
             }
-            Spacer(Modifier.height(CartMateSpacing.small))
-            LinearProgressIndicator(
-                progress = { progress.fraction },
-                modifier = Modifier.fillMaxWidth().height(6.dp),
-                color = colors.primary,
-                trackColor = colors.surfaceContainer,
-                strokeCap = StrokeCap.Round,
-                gapSize = 0.dp,
-                drawStopIndicator = {},
-            )
         }
     }
 }

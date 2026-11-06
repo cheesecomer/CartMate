@@ -118,7 +118,7 @@ class ListsScreenTest {
 
         composeRule.onNodeWithText("件 のこり").assertIsDisplayed()
         composeRule.onNodeWithText("件 登録なし").assertIsDisplayed()
-        composeRule.onNodeWithText("件 買い終わった！").assertIsDisplayed()
+        composeRule.onNodeWithText("買い終わった！").assertIsDisplayed()
     }
 
     @OptIn(ExperimentalTestApi::class)

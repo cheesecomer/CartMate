@@ -4,6 +4,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -48,7 +49,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.material3.FilledIconButton
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import java.time.format.DateTimeFormatter
@@ -237,7 +237,7 @@ private fun SuggestionRowView(row: SuggestionRow, onOpen: () -> Unit, onAdd: () 
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 64.dp)
+            .heightIn(min = 56.dp)
             .padding(horizontal = CartMateSpacing.large)
             .testTag(AddItemTags.SUGGESTION),
     ) {
@@ -259,12 +259,14 @@ private fun SuggestionRowView(row: SuggestionRow, onOpen: () -> Unit, onAdd: () 
             }
         }
         val description = stringResource(R.string.add_item_add_suggestion, row.label)
-        FilledIconButton(
-            onClick = onAdd,
-            shape = CircleShape,
-            modifier = Modifier.size(48.dp).semantics { contentDescription = description },
-        ) {
-            Icon(painterResource(R.drawable.ic_add), contentDescription = null)
+        // 押せる範囲は 48dp のまま、見える丸は小さくして、候補の名前より目立たせない（UI レビュー UI001-3）
+        IconButton(onClick = onAdd, modifier = Modifier.size(48.dp).semantics { contentDescription = description }) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.size(32.dp).background(colors.primary, CircleShape),
+            ) {
+                Icon(painterResource(R.drawable.ic_add), contentDescription = null, tint = colors.onPrimary, modifier = Modifier.size(20.dp))
+            }
         }
     }
 }

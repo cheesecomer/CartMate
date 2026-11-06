@@ -87,8 +87,9 @@ class ProductDetailScreenTest {
         buy("ケーキ")
         buy("ケーキ")
         setContent("ケーキ")
+        // 画面の下のほうにあり、最初は画面の外にある。スクロールして押す
         composeRule.waitUntil(timeoutMillis = 5_000) {
-            runCatching { composeRule.onNodeWithText("自分の購入をすべて削除（2件）").assertIsDisplayed() }.isSuccess
+            runCatching { composeRule.onNodeWithText("自分の購入をすべて削除（2件）").assertExists() }.isSuccess
         }
 
         composeRule.onNodeWithText("自分の購入をすべて削除（2件）").performScrollTo().performClick()

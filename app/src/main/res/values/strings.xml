@@ -26,7 +26,7 @@
     <string name="lists_open">開く</string>
     <string name="lists_count_remaining">件 のこり</string>
     <string name="lists_count_not_registered">件 登録なし</string>
-    <string name="lists_count_done">件 買い終わった！</string>
+    <string name="lists_done">買い終わった！</string>
     <string name="lists_create_sheet_title">新しいリストを作成</string>
     <string name="lists_name_label">リスト名</string>
     <string name="lists_name_placeholder">例: スーパー、ドラッグストア</string>
@@ -238,9 +238,10 @@
     <string name="suggestion_mode_normal">通常どおり表示</string>
     <string name="suggestion_mode_normal_description">購入の周期に合わせて候補に出します</string>
     <string name="suggestion_mode_temporary">一時的に非表示</string>
-    <string name="suggestion_mode_temporary_description">再購入すると候補に戻ります。商品名の管理の一覧からも外れます</string>
+    <string name="suggestion_mode_temporary_description">次に購入するまで候補に出しません。購入すると自動で戻ります</string>
     <string name="suggestion_mode_always">常に非表示</string>
-    <string name="suggestion_mode_always_description">再購入しても候補に戻りません。購入と購入履歴は今までどおり記録します</string>
+    <string name="suggestion_mode_always_description">購入しても候補に出しません。購入と購入履歴は今までどおり記録します</string>
+    <string name="suggestion_mode_restore">非表示の商品は、商品名の管理の「非表示の商品」に並びます。「通常どおり表示」を選べば、いつでも元に戻せます。</string>
     <string name="rename_notice_always">「%1$s」は常に非表示なので、訂正したあとも候補に出ません</string>
     <string name="rename_notice_normal">「%1$s」にまとめるので、訂正したあとは候補に出ます（常に非表示ではなくなります）</string>
     <string name="merge_products_confirm_always_hidden">「%1$s」は常に非表示なので、まとめた商品も候補に出なくなります。</string>
@@ -253,6 +254,7 @@
     <string name="purchase_history_info_title">周期予測の対象について</string>
     <string name="purchase_history_list">購入記録一覧</string>
     <string name="purchase_history_count">%1$d件</string>
+    <string name="purchase_history_switch_label">周期予測に使用</string>
     <string name="purchase_history_excluded_chip">予測除外</string>
     <string name="purchase_history_empty">購入の記録はありません</string>
     <string name="purchase_delete_title">「%1$s」の購入を削除しますか？</string>
@@ -278,6 +280,8 @@
     <string name="merge_products_remove_only">%1$d件の統合を解除します</string>
     <string name="merge_products_confirm_add">まとめる: %1$s</string>
     <string name="merge_products_confirm_remove">解除する: %1$s</string>
+    <string name="merge_products_confirm_history">まとめた商品の購入履歴は「%1$s」の履歴と合わせて、購入周期の予測に使います。購入の記録と商品名はそのまま残り、解除すれば元に戻ります。</string>
+    <string name="merge_products_confirm_remove_history">解除した商品は、それぞれの購入履歴だけで予測します。</string>
     <string name="merge_products_confirm_action">まとめる</string>
     <string name="merge_products_confirm_title">「%1$s」にまとめる商品を変更しますか？</string>
     <string name="merge_products_confirm_members">「%1$s」にまとめている%2$d件も一緒に移ります。</string>

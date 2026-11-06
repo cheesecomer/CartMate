@@ -530,7 +530,10 @@ private fun ActionRow(
     }
 }
 
-/** サジェストへの出し方（docs/requirements.md §4.3）。通常どおり表示・一時的に非表示・常に非表示から選ぶ */
+/**
+ * サジェストへの出し方（docs/requirements.md §4.3）。通常どおり表示・一時的に非表示・常に非表示から選ぶ。
+ * 非表示にした商品をどこで見つけて、どう戻すかを最後に添える（UI レビュー UI001-7）
+ */
 @Composable
 private fun ModeSelector(mode: ProductMerge.SuggestionMode, onSelect: (ProductMerge.SuggestionMode) -> Unit) {
     val options = listOf(
@@ -555,6 +558,13 @@ private fun ModeSelector(mode: ProductMerge.SuggestionMode, onSelect: (ProductMe
             }
             if (index < options.lastIndex) CardDivider()
         }
+        CardDivider()
+        Text(
+            stringResource(R.string.suggestion_mode_restore),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = CartMateSpacing.large, vertical = CartMateSpacing.medium),
+        )
     }
 }
 
@@ -762,6 +772,8 @@ private fun MergeConfirmDialog(
                     added.filter { it.members.isNotEmpty() }.forEach {
                         Text(stringResource(R.string.merge_products_confirm_members, it.product.displayName, it.members.size))
                     }
+                    // まとめたあとの購入履歴と予測の扱いを、実行前に伝える（UI レビュー UI001-9）
+                    Text(stringResource(R.string.merge_products_confirm_history, target.product.displayName))
                     // まとめた商品は統合先の設定に従う。統合先が常に非表示なら、そのことを伝える
                     if (target.product.suggestionExcluded) {
                         Text(stringResource(R.string.merge_products_confirm_always_hidden, target.product.displayName))
@@ -769,6 +781,7 @@ private fun MergeConfirmDialog(
                 }
                 if (removed.isNotEmpty()) {
                     Text(stringResource(R.string.merge_products_confirm_remove, removed.joinToString("、") { it.displayName }))
+                    Text(stringResource(R.string.merge_products_confirm_remove_history))
                 }
             }
         },
