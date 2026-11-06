@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
@@ -51,6 +52,7 @@ import com.cheesecomer.cartmate.domain.model.ListId
 import com.cheesecomer.cartmate.domain.model.Visibility
 import com.cheesecomer.cartmate.ui.components.OfflineBanner
 import com.cheesecomer.cartmate.ui.components.rememberDraggableOrder
+import com.cheesecomer.cartmate.ui.theme.CartMateColors
 import com.cheesecomer.cartmate.ui.theme.CartMateSpacing
 import com.cheesecomer.cartmate.ui.theme.CartMateTheme
 import sh.calvin.reorderable.ReorderableItem
@@ -82,7 +84,7 @@ fun ListsScreen(
 
 /**
  * その端末で初めてアバターを表示したときだけ、アバターの下に「家族とアカウントの設定はここから」の吹き出しを出す
- * （フィードバック #014）。どこかをタップすると閉じ、二度と出さない
+ * （フィードバック #014）。どこかをタップするか × で閉じ、二度と出さない
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -95,9 +97,34 @@ private fun FamilyHint(show: Boolean, onDismiss: () -> Unit, anchor: @Composable
     }
     TooltipBox(
         positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Below),
-        // 吹き出しの外をタップしても、吹き出し自体をタップしても閉じる
+        // 見た目は docs/design/screens/family-hint。吹き出しの外をタップしても、吹き出し自体や × をタップしても閉じる
         tooltip = {
-            PlainTooltip(Modifier.clickable(onClick = dismiss)) { Text(stringResource(R.string.lists_family_hint)) }
+            PlainTooltip(
+                // 画面の端に付けず、アバターの右端にそろえる
+                modifier = Modifier.padding(end = CartMateSpacing.medium).clickable(onClick = dismiss),
+                caretShape = TooltipDefaults.caretShape(),
+                maxWidth = 220.dp,
+                shape = MaterialTheme.shapes.large,
+                contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+                containerColor = CartMateColors.HintBackground,
+                shadowElevation = 6.dp,
+            ) {
+                Row(Modifier.padding(start = 6.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.Top) {
+                    Text(
+                        stringResource(R.string.lists_family_hint),
+                        modifier = Modifier.weight(1f, fill = false).padding(top = 2.dp),
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                    IconButton(onClick = dismiss, modifier = Modifier.size(24.dp)) {
+                        Icon(
+                            painterResource(R.drawable.ic_close),
+                            contentDescription = stringResource(R.string.action_close),
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.inversePrimary,
+                        )
+                    }
+                }
+            }
         },
         state = tooltipState,
         onDismissRequest = dismiss,

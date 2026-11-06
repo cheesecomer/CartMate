@@ -55,6 +55,9 @@ object CartMateColors {
     /** オフラインバナーの文字とアイコン */
     val WarningBannerText = Color(0xFF6E3917)
 
+    /** 初回の案内の吹き出しの背景。文字は inverseOnSurface、閉じるボタンは inversePrimary */
+    val HintBackground = Color(0xFF2E1F42)
+
     /** 完了した項目の文字と打ち消し線（onSurface の 40%） */
     val TextDisabled = Color(0x661D1B20)
 }

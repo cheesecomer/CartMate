@@ -89,6 +89,21 @@ class ListsFamilyHintTest {
     }
 
     @Test
+    fun 閉じるボタンで閉じて二度と出さない() {
+        val hints = InMemoryHintStore()
+        setContent(hints)
+        composeRule.waitUntil(timeoutMillis = 5_000) { displayed(HINT) }
+
+        composeRule.onNodeWithContentDescription("閉じる").performClick()
+
+        composeRule.waitUntil(timeoutMillis = 5_000) { !displayed(HINT) }
+        composeRule.waitForIdle()
+        assertWithMessage("落ち着いたあとも吹き出しは出ていない").that(displayed(HINT)).isFalse()
+        assertWithMessage("見たことを覚える").that(runBlocking { hints.isShown(Hint.FAMILY_ENTRY) }).isTrue()
+        assertWithMessage("閉じるボタンでは家族画面を開かない").that(openedFamily).isEqualTo(0)
+    }
+
+    @Test
     fun 吹き出しが出ていてもアバターのタップで家族画面を開き_二度と出さない() {
         val hints = InMemoryHintStore()
         setContent(hints)
