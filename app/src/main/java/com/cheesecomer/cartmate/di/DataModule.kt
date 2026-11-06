@@ -17,12 +17,17 @@ import dagger.hilt.components.SingletonComponent
 import java.time.Clock
 import com.cheesecomer.cartmate.data.dictionary.AssetDictionaryProvider
 import com.cheesecomer.cartmate.domain.repository.DictionaryProvider
+import com.cheesecomer.cartmate.ui.hints.HintStore
+import com.cheesecomer.cartmate.ui.hints.SharedPreferencesHintStore
 
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class DataModule {
 
     // インメモリ実装（data/memory/InMemoryStore）は、テストで使う
+    @Binds
+    abstract fun bindHintStore(store: SharedPreferencesHintStore): HintStore
+
     @Binds
     abstract fun bindShoppingListRepository(store: FirestoreShoppingStore): ShoppingListRepository
 

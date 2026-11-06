@@ -15,7 +15,12 @@ import com.cheesecomer.cartmate.domain.repository.OnlineStatus
 import com.cheesecomer.cartmate.domain.repository.PurchaseRepository
 import com.cheesecomer.cartmate.domain.repository.ShoppingListRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import com.cheesecomer.cartmate.ui.hints.Hint
+import com.cheesecomer.cartmate.ui.hints.HintStore
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
@@ -41,6 +46,8 @@ data class ListsUiState(
     val offline: Boolean = false,
     /** 上部バーのアバター。タップで家族画面を開く */
     val account: Account? = null,
+    /** アバターから「家族とアカウントの設定はここから」の吹き出しを出す。その端末で初めてのときだけ（フィードバック #014） */
+    val showFamilyHint: Boolean = false,
 )
 
 @HiltViewModel
@@ -52,7 +59,13 @@ class ListsViewModel @Inject constructor(
     accountRepository: AccountRepository,
     onlineStatus: OnlineStatus,
     suggestionSource: SuggestionSource,
+    private val hintStore: HintStore,
 ) : ViewModel() {
+
+    /** 吹き出しを閉じた。保存が終わる前に一覧を作り直しても、もう出さない */
+    private val familyHintDismissed = MutableStateFlow(false)
+    private val familyHint: Flow<Boolean> =
+        combine(flow { emit(!hintStore.isShown(Hint.FAMILY_ENTRY)) }, familyHintDismissed) { notShown, dismissed -> notShown && !dismissed }
 
     init {
         // リストを開くころにはサジェストの計算が終わっているよう、一覧を表示している間に裏で計算しておく（フィードバック #016）
@@ -95,6 +108,8 @@ class ListsViewModel @Inject constructor(
             )
         }.combine(accountRepository.observeAccount()) { state, account -> state.copy(account = account) }
             .combine(onlineStatus.observeOnline()) { state, online -> state.copy(offline = !online) }
+            // アバターが出ているときだけ、吹き出しを出す
+            .combine(familyHint) { state, hint -> state.copy(showFamilyHint = hint && state.account != null) }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), ListsUiState())
 
     fun createList(name: String, memo: String, visibility: Visibility) {
@@ -102,6 +117,12 @@ class ListsViewModel @Inject constructor(
         if (trimmed.isEmpty() || trimmed.length > ShoppingList.MAX_NAME_LENGTH) return
         val trimmedMemo = memo.trim().take(ShoppingList.MAX_MEMO_LENGTH).ifEmpty { null }
         viewModelScope.launch { listRepository.createList(NewList(trimmed, trimmedMemo, visibility)) }
+    }
+
+    /** 吹き出しを閉じた。その端末では二度と出さない */
+    fun dismissFamilyHint() {
+        familyHintDismissed.value = true
+        viewModelScope.launch { hintStore.markShown(Hint.FAMILY_ENTRY) }
     }
 
     fun moveList(id: ListId, previous: ListId?, next: ListId?) {

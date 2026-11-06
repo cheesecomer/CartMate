@@ -27,6 +27,7 @@
     <string name="lists_count_remaining">件 のこり</string>
     <string name="lists_count_not_registered">件 登録なし</string>
     <string name="lists_done">買い終わった！</string>
+    <string name="lists_family_hint">家族とアカウントの設定は\nここから</string>
     <string name="lists_create_sheet_title">新しいリストを作成</string>
     <string name="lists_name_label">リスト名</string>
     <string name="lists_name_placeholder">例: スーパー、ドラッグストア</string>
@@ -78,6 +79,7 @@
     <string name="add_item_sheet_label">商品名</string>
     <string name="add_item_detail">数量を設定して追加</string>
     <string name="add_item_suggestion_hint">商品名を入力すると候補が出ます</string>
+    <string name="add_item_long_press_hint">長押しで、まとめる・非表示・購入履歴を開けます</string>
     <string name="add_item_add_suggestion">%1$sを追加</string>
     <string name="add_item_note_due">約%1$d日ごと・最後は%2$d日前</string>
     <string name="add_item_note_frequent">%1$d回購入・最後は%2$d日前</string>

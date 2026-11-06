@@ -229,6 +229,8 @@ class ListDetailScreenTest {
         openSheet()
         composeRule.onNodeWithText("商品名を入力すると候補が出ます").assertIsDisplayed()
         composeRule.onNodeWithText("数量を設定して追加").assertDoesNotExist()
+        // 候補がないので、長押しの案内も出さない（フィードバック #014）
+        composeRule.onNodeWithText("長押しで、まとめる・非表示・購入履歴を開けます").assertDoesNotExist()
 
         composeRule.onNodeWithTag(AddItemTags.SHEET_INPUT).performTextInput("豆乳")
 
@@ -253,6 +255,8 @@ class ListDetailScreenTest {
         composeRule.waitUntil(timeoutMillis = 5_000) {
             runCatching { composeRule.onNodeWithText(note).assertIsDisplayed() }.isSuccess
         }
+        // 長押しできることを、候補の一覧の上で伝える（フィードバック #014）
+        composeRule.onNodeWithText("長押しで、まとめる・非表示・購入履歴を開けます").assertIsDisplayed()
 
         composeRule.onNodeWithText(note).performTouchInput { longClick() }
         composeRule.waitForIdle()

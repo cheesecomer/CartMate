@@ -1,5 +1,6 @@
 package com.cheesecomer.cartmate.ui
 
+import com.cheesecomer.cartmate.ui.hints.InMemoryHintStore
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.assertIsDisplayed
@@ -67,7 +68,7 @@ class NavigationTransitionTest {
                 NavHost(navController, startDestination = ListsRoute) {
                     screen<ListsRoute> {
                         val viewModel = viewModel {
-                            ListsViewModel(store, store, store, clock, FixedAccountRepository(null), { flowOf(true) }, SuggestionSource(store, store, store, clock, { flowOf(NormalizationDictionary.EMPTY) }, Dispatchers.Default))
+                            ListsViewModel(store, store, store, clock, FixedAccountRepository(null), { flowOf(true) }, SuggestionSource(store, store, store, clock, { flowOf(NormalizationDictionary.EMPTY) }, Dispatchers.Default), InMemoryHintStore())
                         }
                         ListsScreen(onOpenList = { navController.navigate(ListDetailRoute(it.value)) }, viewModel = viewModel)
                     }

@@ -1,5 +1,12 @@
 package com.cheesecomer.cartmate.ui.lists
 
+import androidx.compose.foundation.clickable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.material3.rememberTooltipState
+import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipAnchorPosition
+import androidx.compose.material3.PlainTooltip
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -69,6 +76,35 @@ fun ListsScreen(
         onOpenFamily = onOpenFamily,
         onCreateList = viewModel::createList,
         onMoveList = viewModel::moveList,
+        onDismissFamilyHint = viewModel::dismissFamilyHint,
+    )
+}
+
+/**
+ * その端末で初めてアバターを表示したときだけ、アバターの下に「家族とアカウントの設定はここから」の吹き出しを出す
+ * （フィードバック #014）。どこかをタップすると閉じ、二度と出さない
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FamilyHint(show: Boolean, onDismiss: () -> Unit, anchor: @Composable () -> Unit) {
+    val tooltipState = rememberTooltipState(isPersistent = true)
+    LaunchedEffect(show) { if (show) tooltipState.show() else tooltipState.dismiss() }
+    val dismiss = {
+        tooltipState.dismiss()
+        onDismiss()
+    }
+    TooltipBox(
+        positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Below),
+        // 吹き出しの外をタップしても、吹き出し自体をタップしても閉じる
+        tooltip = {
+            PlainTooltip(Modifier.clickable(onClick = dismiss)) { Text(stringResource(R.string.lists_family_hint)) }
+        },
+        state = tooltipState,
+        onDismissRequest = dismiss,
+        // 吹き出しを出していても、アバターのタップはそのまま家族画面を開く
+        focusable = false,
+        enableUserInput = false,
+        content = anchor,
     )
 }
 
@@ -80,6 +116,8 @@ fun ListsContent(
     onOpenFamily: () -> Unit,
     onCreateList: (name: String, memo: String, Visibility) -> Unit,
     onMoveList: (ListId, previous: ListId?, next: ListId?) -> Unit,
+    /** アバターの吹き出しを閉じた */
+    onDismissFamilyHint: () -> Unit = {},
 ) {
     var showCreateSheet by rememberSaveable { mutableStateOf(false) }
     val familyLabel = stringResource(R.string.family_open)
@@ -94,13 +132,18 @@ fun ListsContent(
                     actions = {
                         // 自分のアカウントのアバター。家族画面への入口（docs/requirements.md §3.1）
                         state.account?.let { account ->
-                            IconButton(onClick = onOpenFamily) {
-                                Avatar(
-                                    name = account.displayName,
-                                    photoUrl = account.photoUrl,
-                                    size = AvatarSmall,
-                                    modifier = Modifier.semantics { contentDescription = familyLabel },
-                                )
+                            FamilyHint(show = state.showFamilyHint, onDismiss = onDismissFamilyHint) {
+                                IconButton(onClick = {
+                                    if (state.showFamilyHint) onDismissFamilyHint()
+                                    onOpenFamily()
+                                }) {
+                                    Avatar(
+                                        name = account.displayName,
+                                        photoUrl = account.photoUrl,
+                                        size = AvatarSmall,
+                                        modifier = Modifier.semantics { contentDescription = familyLabel },
+                                    )
+                                }
                             }
                         }
                     },

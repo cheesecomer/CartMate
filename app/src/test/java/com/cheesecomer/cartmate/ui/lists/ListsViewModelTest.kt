@@ -1,5 +1,9 @@
 package com.cheesecomer.cartmate.ui.lists
 
+import com.cheesecomer.cartmate.domain.model.Account
+import com.cheesecomer.cartmate.ui.hints.HintStore
+import com.cheesecomer.cartmate.ui.hints.Hint
+import com.cheesecomer.cartmate.ui.hints.InMemoryHintStore
 import kotlinx.coroutines.Dispatchers
 import com.cheesecomer.cartmate.domain.product.NormalizationDictionary
 import com.cheesecomer.cartmate.ui.suggestions.SuggestionSource
@@ -30,7 +34,7 @@ class ListsViewModelTest {
     private val clock = MutableClock()
     private var user = UserId("taro")
     private val store = InMemoryStore(clock) { user }
-    private val viewModel = ListsViewModel(store, store, store, clock, FixedAccountRepository(null), { flowOf(true) }, SuggestionSource(store, store, store, clock, { flowOf(NormalizationDictionary.EMPTY) }, Dispatchers.Default))
+    private val viewModel = ListsViewModel(store, store, store, clock, FixedAccountRepository(null), { flowOf(true) }, SuggestionSource(store, store, store, clock, { flowOf(NormalizationDictionary.EMPTY) }, Dispatchers.Default), InMemoryHintStore())
 
     @Test
     fun `リストを作成すると、作成順に名前・備考・公開範囲・件数とともに表示される`() = runTest {
@@ -52,6 +56,40 @@ class ListsViewModelTest {
             assertThat(lists.map { it.visibility }).containsExactly(Visibility.SHARED, Visibility.PRIVATE).inOrder()
             assertThat(lists[1].memo).isNull()
             assertThat(lists.map { it.progress.openCount }).containsExactly(1, 0).inOrder()
+        }
+    }
+
+    private val account = Account(UserId("taro"), "山田 太郎", "taro@example.com", null)
+
+    private fun viewModelWith(hints: HintStore, account: Account? = this.account) =
+        ListsViewModel(store, store, store, clock, FixedAccountRepository(account), { flowOf(true) }, SuggestionSource(store, store, store, clock, { flowOf(NormalizationDictionary.EMPTY) }, Dispatchers.Default), hints)
+
+    /** フィードバック #014。アバターが家族とアカウントの設定への入口だと分かるように */
+    @Test
+    fun `その端末で初めてなら、アバターの吹き出しを出し、閉じたら二度と出さない`() = runTest {
+        val hints = InMemoryHintStore()
+        val viewModel = viewModelWith(hints)
+        viewModel.uiState.test {
+            assertThat(awaitUntil { !it.loading && it.account != null }.showFamilyHint).isTrue()
+
+            viewModel.dismissFamilyHint()
+
+            assertThat(awaitUntil { !it.showFamilyHint }.showFamilyHint).isFalse()
+            cancelAndIgnoreRemainingEvents()
+        }
+        assertThat(hints.isShown(Hint.FAMILY_ENTRY)).isTrue()
+        // 次にリスト一覧を開いても出さない
+        viewModelWith(hints).uiState.test {
+            assertThat(awaitUntil { !it.loading && it.account != null }.showFamilyHint).isFalse()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `アバターがない（ログインしていない）ときは吹き出しを出さない`() = runTest {
+        viewModelWith(InMemoryHintStore(), account = null).uiState.test {
+            assertThat(awaitUntil { !it.loading }.showFamilyHint).isFalse()
+            cancelAndIgnoreRemainingEvents()
         }
     }
 
@@ -105,7 +143,7 @@ class ListsViewModelTest {
         val itemId = store.addItem(newItem(listId, "牛乳")).id
         store.completeItem(itemId, clock.now)
         clock.advance(Duration.ofHours(25))
-        val viewModel = ListsViewModel(store, store, store, clock, FixedAccountRepository(null), { flowOf(true) }, SuggestionSource(store, store, store, clock, { flowOf(NormalizationDictionary.EMPTY) }, Dispatchers.Default))
+        val viewModel = ListsViewModel(store, store, store, clock, FixedAccountRepository(null), { flowOf(true) }, SuggestionSource(store, store, store, clock, { flowOf(NormalizationDictionary.EMPTY) }, Dispatchers.Default), InMemoryHintStore())
 
         viewModel.uiState.test {
             val progress = awaitUntil { !it.loading }.lists.single().progress

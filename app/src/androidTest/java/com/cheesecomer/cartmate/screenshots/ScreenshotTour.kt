@@ -1,5 +1,7 @@
 package com.cheesecomer.cartmate.screenshots
 
+import com.cheesecomer.cartmate.ui.hints.SharedPreferencesHintStore
+import com.cheesecomer.cartmate.ui.hints.Hint
 import android.graphics.Bitmap
 import android.os.ParcelFileDescriptor
 import android.os.SystemClock
@@ -64,6 +66,8 @@ class ScreenshotTour {
         FirebaseAuth.getInstance().signOut()
         // ストアや README に載せるので、ログイン画面にエミュレータ用のボタンを出さない。ログインは直接する
         FirebaseEmulator.testUserSignInVisible = false
+        // 一度だけ出す案内（アバターの吹き出し）は、見たことにして写さない。take.sh がアプリのデータを消すので、毎回入れる
+        runBlocking { SharedPreferencesHintStore(instrumentation.targetContext).markShown(Hint.FAMILY_ENTRY) }
     }
 
     @After
