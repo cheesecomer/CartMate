@@ -352,7 +352,7 @@ class ProductNamesViewModelTest {
     }
 
     private suspend fun buy(name: String) {
-        val id = store.addItem(newItem(listId, name))
+        val id = store.addItem(newItem(listId, name)).id
         store.completeItem(id, clock.instant())
     }
 

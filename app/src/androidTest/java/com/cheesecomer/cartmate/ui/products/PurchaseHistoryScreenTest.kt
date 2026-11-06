@@ -38,7 +38,7 @@ class PurchaseHistoryScreenTest {
 
     private fun buy(name: String) = runBlocking {
         val listId = store.createList(NewList("スーパー", null, Visibility.SHARED))
-        val id = store.addItem(NewItem(listId, name, 1.0, "個", memo = null, Visibility.SHARED))
+        val id = store.addItem(NewItem(listId, name, 1.0, "個", memo = null, Visibility.SHARED)).id
         store.completeItem(id, clock.instant())
         id
     }

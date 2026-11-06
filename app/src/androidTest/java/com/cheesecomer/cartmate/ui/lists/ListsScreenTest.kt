@@ -111,7 +111,7 @@ class ListsScreenTest {
         val done = createList("イオン")
         runBlocking {
             store.addItem(NewItem(open, "牛乳", 1.0, "本", null, Visibility.SHARED))
-            val item = store.addItem(NewItem(done, "卵", 1.0, "パック", null, Visibility.SHARED))
+            val item = store.addItem(NewItem(done, "卵", 1.0, "パック", null, Visibility.SHARED)).id
             store.completeItem(item, java.time.Instant.now())
         }
         setContent()

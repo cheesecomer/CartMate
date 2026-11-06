@@ -51,7 +51,7 @@ class SuggestionSourceTest {
         val listId = store.createList(NewList("スーパー", null, Visibility.SHARED))
         repeat(3) { index ->
             if (index > 0) clock.advance(Duration.ofDays(10))
-            val id = store.addItem(NewItem(listId, "牛乳", 1.0, "本", null, Visibility.SHARED))
+            val id = store.addItem(NewItem(listId, "牛乳", 1.0, "本", null, Visibility.SHARED)).id
             store.completeItem(id, clock.now)
         }
         clock.advance(Duration.ofDays(8))

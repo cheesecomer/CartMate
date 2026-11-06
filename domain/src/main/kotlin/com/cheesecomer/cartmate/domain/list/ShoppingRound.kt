@@ -7,7 +7,8 @@ import java.time.Instant
 
 /**
  * 1回の買い物（docs/requirements.md §3.2「前回の買い物の片付け」）。買い終わったリスト（未購入が0件）に項目を追加したら、
- * 次の買い物が始まったとみなし、前回のチェック済みの項目を片付ける（リスト詳細と進捗に出さない。購入の記録は残す）
+ * 次の買い物が始まったとみなし、前回のチェック済みの項目を片付ける（リスト詳細と進捗に出さない。購入の記録は残す）。
+ * 最後のチェックから間もなければ、買い忘れか次の買い物かを聞いてから片付ける
  */
 object ShoppingRound {
 
@@ -26,9 +27,32 @@ object ShoppingRound {
         items.filter { it.status == ItemStatus.OPEN || (it.completedAt != null && isShown(it.completedAt, windowStart, clearedAt)) }
 
     /**
-     * 項目を追加するときに、前回のチェック済みを片付けるか。[items] はそのリストの、自分に見えて表示中の項目。
-     * 未購入が0件で、表示中のチェック済みがあるときだけ片付ける（買い物の途中の追加では片付けない）
+     * 最後のチェックからこの長さの間に、買い終わったリストへ追加したら、買い忘れか次の買い物かを聞く（フィードバック #013）。
+     * 買い物から帰ってすぐ買い忘れを足したときに、今買った物が見えなくならないようにする
      */
-    fun clearsOnAdd(items: List<Item>): Boolean =
-        items.none { it.status == ItemStatus.OPEN } && items.any { it.status == ItemStatus.COMPLETED }
+    val FORGOTTEN_WINDOW: Duration = Duration.ofHours(2)
+
+    /** 項目を追加するときの、前回のチェック済みの扱い */
+    enum class OnAdd {
+        /** 片付けない（買い物の途中か、片付けるチェック済みがない） */
+        KEEP,
+
+        /** 買い忘れか次の買い物かを聞く。聞くまでは片付けない */
+        ASK,
+
+        /** 聞かずに片付ける */
+        CLEAR,
+    }
+
+    /**
+     * [now] に項目を追加するときに、前回のチェック済みを片付けるか。[items] はそのリストの、自分に見えて表示中の項目。
+     * 未購入が0件で、表示中のチェック済みがあるときだけ片付ける（買い物の途中の追加では片付けない）。
+     * 最後のチェックから [FORGOTTEN_WINDOW] 以内なら、片付ける前に聞く
+     */
+    fun onAdd(items: List<Item>, now: Instant): OnAdd {
+        if (items.any { it.status == ItemStatus.OPEN }) return OnAdd.KEEP
+        val lastCompleted = items.filter { it.status == ItemStatus.COMPLETED }.mapNotNull { it.completedAt }.maxOrNull()
+            ?: return OnAdd.KEEP
+        return if (lastCompleted.isBefore(now - FORGOTTEN_WINDOW)) OnAdd.CLEAR else OnAdd.ASK
+    }
 }

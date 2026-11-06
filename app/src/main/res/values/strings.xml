@@ -44,6 +44,10 @@
     <string name="detail_edit_list_confirm">変更</string>
     <string name="detail_delete_dialog_title">リストを削除しますか？</string>
     <string name="detail_delete_dialog_message">「%1$s」を削除します。購入の記録は残ります。</string>
+    <string name="detail_round_dialog_title">買い忘れですか？</string>
+    <string name="detail_round_dialog_message">買い忘れなら、チェック済みの商品をそのまま表示します。次の買い物なら、チェック済みを片付けます。</string>
+    <string name="detail_round_forgotten">買い忘れ</string>
+    <string name="detail_round_next">次の買い物</string>
     <string name="detail_cannot_delete_list">のこりの商品があるリストは削除できません</string>
     <string name="detail_progress_badge">のこり %1$d件 / %2$d完了</string>
     <string name="detail_tap_hint">カードをタップして購入完了</string>

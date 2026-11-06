@@ -165,6 +165,7 @@ fun ListDetailScreen(
         onUpdateList = viewModel::updateList,
         onRequestDeleteList = viewModel::canDeleteList,
         onDeleteList = viewModel::deleteList,
+        onAnswerRound = viewModel::answerRound,
     )
 }
 
@@ -185,6 +186,8 @@ fun ListDetailContent(
     /** 削除できるなら true。できなければ理由を伝えて false */
     onRequestDeleteList: () -> Boolean,
     onDeleteList: () -> Unit,
+    /** 買い忘れか次の買い物かの答え。次の買い物なら true */
+    onAnswerRound: (nextShopping: Boolean) -> Unit = {},
 ) {
     var showEditDialog by rememberSaveable { mutableStateOf(false) }
     var showDeleteDialog by rememberSaveable { mutableStateOf(false) }
@@ -286,6 +289,21 @@ fun ListDetailContent(
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteDialog = false }) { Text(stringResource(R.string.action_cancel)) }
+            },
+        )
+    }
+    // 買い終わったリストに、最後のチェックから間もなく追加した（docs/requirements.md §3.2）。項目は追加済みで、片付けるかだけを聞く。
+    // 答えずに閉じたら、元に戻せない片付けはしない
+    if (state.asksRound) {
+        AlertDialog(
+            onDismissRequest = { onAnswerRound(false) },
+            title = { Text(stringResource(R.string.detail_round_dialog_title)) },
+            text = { Text(stringResource(R.string.detail_round_dialog_message)) },
+            confirmButton = {
+                TextButton(onClick = { onAnswerRound(false) }) { Text(stringResource(R.string.detail_round_forgotten)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { onAnswerRound(true) }) { Text(stringResource(R.string.detail_round_next)) }
             },
         )
     }

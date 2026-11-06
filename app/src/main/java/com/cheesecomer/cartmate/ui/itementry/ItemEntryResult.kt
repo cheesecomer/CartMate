@@ -5,6 +5,9 @@ package com.cheesecomer.cartmate.ui.itementry
  */
 enum class ItemEntryResult {
     ADDED,
+
+    /** 追加した。買い終わったリストへの、最後のチェックから間もない追加なので、買い忘れか聞く（[com.cheesecomer.cartmate.domain.model.AddedItem.asksRound]） */
+    ADDED_ASKS_ROUND,
     UPDATED,
     CANCELLED,
 

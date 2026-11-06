@@ -74,6 +74,8 @@ data class ListDetailUiState(
     val suggestions: SheetSuggestions = SheetSuggestions.Loading,
     /** 自分。自分がチェックした項目にだけ、チェックを外す操作を出す */
     val me: UserId? = null,
+    /** 買い終わったリストに追加したので、買い忘れか次の買い物かを聞く（docs/requirements.md §3.2「前回の買い物の片付け」） */
+    val asksRound: Boolean = false,
 ) {
     /** [item] をチェックした人の名前。家族にいない人（退会したメンバー）は null */
     fun checkerName(item: Item): String? = item.completedBy?.let(memberNames::of)
@@ -143,6 +145,7 @@ class ListDetailViewModel @Inject constructor(
     private val listId = ListId(checkNotNull(savedStateHandle.get<String>(ListDetailRoute::listId.name)))
 
     private val addItemState = MutableStateFlow(AddItemState.Initial)
+    private val asksRound = MutableStateFlow(false)
     private val _messages = Channel<DetailMessage>(Channel.BUFFERED)
     /** 画面の操作の結果と、ほかのメンバーのチェック・拒否されたチェックの通知。受け取り始めたときに通知の購読を始める */
     val messages: Flow<DetailMessage> = merge(_messages.receiveAsFlow(), notices())
@@ -170,6 +173,7 @@ class ListDetailViewModel @Inject constructor(
         .combine(lastVisibility.observe(listId)) { state, remembered ->
             state.copy(addVisibility = VisibilityDefaults.initial(state.listVisibility, remembered))
         }
+        .combine(asksRound) { state, asks -> state.copy(asksRound = asks) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), ListDetailUiState())
 
     /**
@@ -233,7 +237,9 @@ class ListDetailViewModel @Inject constructor(
             is AddItemEffect.AddItem -> viewModelScope.launch {
                 val list = listRepository.observeLists().first().firstOrNull { it.id == listId } ?: return@launch
                 val visibility = VisibilityDefaults.initial(list.visibility, lastVisibility.get(listId))
-                itemRepository.addItem(NewItem(listId, effect.name, effect.quantity, effect.unit, effect.memo, visibility))
+                if (itemRepository.addItem(NewItem(listId, effect.name, effect.quantity, effect.unit, effect.memo, visibility)).asksRound) {
+                    asksRound.value = true
+                }
             }
             is AddItemEffect.OpenEntry -> _navigation.trySend(DetailNavigation.OpenEntry(effect.name, effect.quantity, effect.unit))
             is AddItemEffect.OpenProduct -> _navigation.trySend(DetailNavigation.OpenProduct(effect.productId))
@@ -245,11 +251,24 @@ class ListDetailViewModel @Inject constructor(
     fun onEntryResult(result: ItemEntryResult) {
         when (result) {
             ItemEntryResult.ADDED -> onAddItemEvent(AddItemEvent.EntryClosed(added = true))
+            ItemEntryResult.ADDED_ASKS_ROUND -> {
+                onAddItemEvent(AddItemEvent.EntryClosed(added = true))
+                asksRound.value = true
+            }
             ItemEntryResult.CANCELLED -> onAddItemEvent(AddItemEvent.EntryClosed(added = false))
             ItemEntryResult.UPDATED -> Unit
             ItemEntryResult.EDIT_REJECTED_COMPLETED -> _messages.trySend(DetailMessage.CannotEditCompleted)
             ItemEntryResult.EDIT_REJECTED_NOT_FOUND -> _messages.trySend(DetailMessage.EditedItemNotFound)
         }
+    }
+
+    /**
+     * 買い忘れか次の買い物かの答え。次の買い物なら前回のチェック済みを片付ける。買い忘れか、答えずに閉じたら片付けない
+     * （片付けは元に戻せないため、残す方にする）
+     */
+    fun answerRound(nextShopping: Boolean) {
+        asksRound.value = false
+        if (nextShopping) viewModelScope.launch { listRepository.clearRound(listId) }
     }
 
     fun check(item: Item) {

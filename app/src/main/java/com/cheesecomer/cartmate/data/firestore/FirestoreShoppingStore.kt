@@ -1,6 +1,7 @@
 package com.cheesecomer.cartmate.data.firestore
 
 import android.util.Log
+import com.cheesecomer.cartmate.domain.model.AddedItem
 import com.cheesecomer.cartmate.domain.model.Item
 import com.cheesecomer.cartmate.domain.model.ItemId
 import com.cheesecomer.cartmate.domain.model.ItemStatus
@@ -161,6 +162,14 @@ class FirestoreShoppingStore @Inject constructor(
         return DeleteListResult.Deleted
     }
 
+    /** 項目の追加と同じく、片付けは別の書き込みにする（[addItem]）。オフラインでも行える */
+    override suspend fun clearRound(id: ListId) {
+        val scope = session.requireScope()
+        Paths.lists(db, scope.householdId).document(id.value)
+            .update(F.CLEARED_AT, clock.instant().toTimestamp())
+            .logFailure("clearRound")
+    }
+
     // ItemRepository
 
     override fun observeOpenItems(): Flow<List<Item>> = observeVisible(
@@ -186,7 +195,7 @@ class FirestoreShoppingStore @Inject constructor(
         Paths.items(db, scope.householdId).document(id.value).get(Source.CACHE).await().toItem()
     }.getOrNull()
 
-    override suspend fun addItem(newItem: NewItem): ItemId {
+    override suspend fun addItem(newItem: NewItem): AddedItem {
         val scope = session.requireScope()
         val ref = Paths.items(db, scope.householdId).document()
         val listItems = cachedItems(scope, newItem.listId)
@@ -196,12 +205,14 @@ class FirestoreShoppingStore @Inject constructor(
         val shown = ShoppingRound.visible(
             listItems,
             windowStart = now - ShoppingRound.COMPLETED_WINDOW,
-                clearedAt = list?.clearedAt,
+            clearedAt = list?.clearedAt,
         )
+        val onAdd = if (list != null) ShoppingRound.onAdd(shown, now) else ShoppingRound.OnAdd.KEEP
         // 買い終わったリストに追加したら、前回の買い物のチェック済みを片付ける（docs/requirements.md §3.2）。
+        // 最後のチェックから間もなければ片付けず、呼び出し側が買い忘れか聞く（asksRound）。
         // 項目の追加とは別に書く。同じ書き込みにすると、ほかの端末がそのリストを先に削除していた場合などに片付けが拒否され、
         // 追加した項目まで消えてしまう（docs/design/sync.md「リスト削除の競合」）
-        if (list != null && ShoppingRound.clearsOnAdd(shown)) {
+        if (list != null && onAdd == ShoppingRound.OnAdd.CLEAR) {
             Paths.lists(db, scope.householdId).document(list.id.value)
                 .update(F.CLEARED_AT, now.toTimestamp())
                 .logFailure("clearRound")
@@ -225,7 +236,7 @@ class FirestoreShoppingStore @Inject constructor(
                 F.COMPLETED_BY to null,
             ))
         }.commit().logFailure("addItem")
-        return ItemId(ref.id)
+        return AddedItem(ItemId(ref.id), asksRound = onAdd == ShoppingRound.OnAdd.ASK)
     }
 
     /**

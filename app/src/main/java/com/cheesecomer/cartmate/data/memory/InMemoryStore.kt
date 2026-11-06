@@ -1,5 +1,6 @@
 package com.cheesecomer.cartmate.data.memory
 
+import com.cheesecomer.cartmate.domain.model.AddedItem
 import com.cheesecomer.cartmate.domain.model.Item
 import com.cheesecomer.cartmate.domain.model.ItemId
 import com.cheesecomer.cartmate.domain.model.ItemStatus
@@ -137,6 +138,11 @@ class InMemoryStore @Inject constructor(
         }
     }
 
+    override suspend fun clearRound(id: ListId) {
+        val now = clock.instant()
+        data.update { d -> d.lists[id]?.let { d.copy(lists = d.lists + (id to it.copy(clearedAt = now))) } ?: d }
+    }
+
     // ItemRepository
 
     override fun observeOpenItems(): Flow<List<Item>> =
@@ -151,10 +157,11 @@ class InMemoryStore @Inject constructor(
                 .sortedBy(Item::sortKey)
         }.distinctUntilChanged()
 
-    override suspend fun addItem(newItem: NewItem): ItemId {
+    override suspend fun addItem(newItem: NewItem): AddedItem {
         val id = ItemId(newId())
         val now = clock.instant()
         val me = currentUser.currentUserId()
+        var onAdd = ShoppingRound.OnAdd.KEEP
         data.update { d ->
             val item = Item(
                 id = id,
@@ -173,14 +180,15 @@ class InMemoryStore @Inject constructor(
                 completedBy = null,
                 productId = ProductId(NameNormalizer.productId(newItem.inputName)),
             )
-            // 買い終わったリストに追加したら、前回の買い物のチェック済みを片付ける
+            // 買い終わったリストに追加したら、前回の買い物のチェック済みを片付ける。最後のチェックから間もなければ、聞いてから片付ける
             val list = d.lists[newItem.listId]
             val shown = ShoppingRound.visible(
                 d.items.values.filter { it.listId == newItem.listId && it.visible },
                 windowStart = now - ShoppingRound.COMPLETED_WINDOW,
                 clearedAt = list?.clearedAt,
             )
-            val lists = if (list != null && ShoppingRound.clearsOnAdd(shown)) d.lists + (list.id to list.copy(clearedAt = now)) else d.lists
+            onAdd = if (list != null) ShoppingRound.onAdd(shown, now) else ShoppingRound.OnAdd.KEEP
+            val lists = if (list != null && onAdd == ShoppingRound.OnAdd.CLEAR) d.lists + (list.id to list.copy(clearedAt = now)) else d.lists
             // 商品（決定的ID）。新しい商品なら作り、表記ゆれのチップを選んでいれば最初から統合する
             val productId = item.productId!!
             val products = if (productId in d.products) d.products else d.products + (productId to Product(
@@ -193,7 +201,7 @@ class InMemoryStore @Inject constructor(
             ))
             d.copy(items = d.items + (id to item), lists = lists, products = products)
         }
-        return id
+        return AddedItem(id, asksRound = onAdd == ShoppingRound.OnAdd.ASK)
     }
 
     override suspend fun moveItem(id: ItemId, previous: ItemId?, next: ItemId?) {

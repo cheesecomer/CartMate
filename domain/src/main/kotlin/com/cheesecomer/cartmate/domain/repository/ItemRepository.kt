@@ -1,5 +1,6 @@
 package com.cheesecomer.cartmate.domain.repository
 
+import com.cheesecomer.cartmate.domain.model.AddedItem
 import com.cheesecomer.cartmate.domain.model.Item
 import com.cheesecomer.cartmate.domain.model.ItemId
 import com.cheesecomer.cartmate.domain.model.ListId
@@ -18,7 +19,8 @@ interface ItemRepository {
      */
     fun observeListItems(listId: ListId, completedSince: Instant): Flow<List<Item>>
 
-    suspend fun addItem(newItem: NewItem): ItemId
+    /** 末尾に追加する。買い終わったリストへの追加なら、前回の買い物のチェック済みを片付ける（[AddedItem.asksRound]） */
+    suspend fun addItem(newItem: NewItem): AddedItem
 
     /** 未購入の項目の商品名・数量・単位・備考を変更する。チェック済みの項目は変更できない。公開範囲は変えられない */
     suspend fun updateItem(id: ItemId, update: ItemUpdate): UpdateItemResult

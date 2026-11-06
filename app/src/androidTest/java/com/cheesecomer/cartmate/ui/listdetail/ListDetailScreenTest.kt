@@ -242,7 +242,7 @@ class ListDetailScreenTest {
     @Test
     fun 補完の候補には追加済みのリスト名が出て_長押しで商品の画面を開く() {
         val drugstore = runBlocking { store.createList(NewList("薬局", null, Visibility.SHARED)) }
-        val bought = addItem("牛乳")
+        val bought = addItem("牛乳").id
         runBlocking { store.completeItem(bought, clock.instant()) }
         addItem("牛乳", listId = drugstore)
         setContent()
@@ -390,7 +390,7 @@ class ListDetailScreenTest {
 
     @Test
     fun チェック済みの項目をタップするとチェックが外れる() {
-        val itemId = addItem("牛乳")
+        val itemId = addItem("牛乳").id
         runBlocking { store.completeItem(itemId, Instant.now()) }
         setContent()
 
@@ -404,7 +404,7 @@ class ListDetailScreenTest {
 
     @Test
     fun メニューの編集で項目の商品詳細入力画面を開く() {
-        val itemId = addItem("牛乳")
+        val itemId = addItem("牛乳").id
         setContent()
 
         composeRule.onNodeWithContentDescription("牛乳のメニュー").performClick()
@@ -429,7 +429,7 @@ class ListDetailScreenTest {
 
     @Test
     fun チェック済みの項目は元に戻すボタンでチェックを外せる() {
-        val itemId = addItem("牛乳")
+        val itemId = addItem("牛乳").id
         runBlocking { store.completeItem(itemId, Instant.now()) }
         setContent()
 
@@ -442,8 +442,8 @@ class ListDetailScreenTest {
 
     @Test
     fun チェックした人は_自分なら名前ではなくあなた_ほかのメンバーなら名前で表示する() {
-        val milk = addItem("牛乳")
-        val egg = addItem("卵")
+        val milk = addItem("牛乳").id
+        val egg = addItem("卵").id
         runBlocking { store.completeItem(milk, Instant.now()) }
         actor = UserId("hanako")
         runBlocking { store.completeItem(egg, Instant.now()) }
@@ -459,7 +459,7 @@ class ListDetailScreenTest {
 
     @Test
     fun 自分がチェックした項目にも_購入の削除ボタンは出さない() {
-        val itemId = addItem("牛乳")
+        val itemId = addItem("牛乳").id
         runBlocking { store.completeItem(itemId, Instant.now()) }
         setContent()
 
@@ -470,7 +470,7 @@ class ListDetailScreenTest {
     /** チェックを外せるのは、チェックした本人だけ。ほかのメンバーの購入の記録を予測から外させない */
     @Test
     fun ほかのメンバーがチェックした項目は_タップしてもスワイプしてもチェックが外れず_理由を表示する() {
-        val itemId = addItem("牛乳")
+        val itemId = addItem("牛乳").id
         actor = UserId("hanako")
         runBlocking { store.completeItem(itemId, Instant.now()) }
         actor = UserId("taro")
@@ -509,7 +509,7 @@ class ListDetailScreenTest {
     @Test
     fun のこりと完了の件数をバッジで表示する() {
         addItem("牛乳")
-        val egg = addItem("卵")
+        val egg = addItem("卵").id
         runBlocking { store.completeItem(egg, Instant.now()) }
         setContent()
 

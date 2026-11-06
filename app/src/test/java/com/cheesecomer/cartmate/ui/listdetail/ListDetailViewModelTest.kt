@@ -225,7 +225,7 @@ class ListDetailViewModelTest {
 
     @Test
     fun `すでにチェック済みの項目をチェックすると、その旨のメッセージが出る`() = runTest {
-        val itemId = store.addItem(newItem(listId, "牛乳"))
+        val itemId = store.addItem(newItem(listId, "牛乳")).id
         val item = store.observeOpenItems().first().single()
         store.completeItem(itemId, clock.now)
 
@@ -296,9 +296,10 @@ class ListDetailViewModelTest {
     }
 
     @Test
-    fun `買い終わったリストに追加すると、前回のチェック済みを片付けて新しい項目だけを表示する`() = runTest {
-        val milk = store.addItem(newItem(listId, "牛乳"))
+    fun `最後のチェックから2時間を過ぎて買い終わったリストに追加すると、聞かずに前回のチェック済みを片付けて新しい項目だけを表示する`() = runTest {
+        val milk = store.addItem(newItem(listId, "牛乳")).id
         store.completeItem(milk, clock.now)
+        clock.advance(Duration.ofHours(3))
         viewModel.uiState.test {
             assertThat(awaitUntil { it.items.isNotEmpty() }.items.map { it.inputName }).containsExactly("牛乳")
 
@@ -311,9 +312,81 @@ class ListDetailViewModelTest {
         }
     }
 
+    /** フィードバック #013。買い物から帰ってすぐ買い忘れを足したときに、今買った物が見えなくならないようにする */
+    @Test
+    fun `最後のチェックから2時間以内に買い終わったリストに追加すると、片付けずに買い忘れか聞く`() = runTest {
+        val milk = store.addItem(newItem(listId, "牛乳")).id
+        store.completeItem(milk, clock.now)
+        clock.advance(Duration.ofHours(1))
+        viewModel.uiState.test {
+            awaitUntil { it.items.isNotEmpty() }
+            viewModel.onAddItemEvent(AddItemEvent.FieldFocused)
+            viewModel.onAddItemEvent(AddItemEvent.TextChanged("卵"))
+            viewModel.onAddItemEvent(AddItemEvent.Submitted)
+
+            val state = awaitUntil { it.asksRound }
+            assertThat(state.items.map { it.inputName }).containsExactly("牛乳", "卵").inOrder()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `買い忘れと答えると、前回のチェック済みを残して聞くのをやめる`() = runTest {
+        val milk = store.addItem(newItem(listId, "牛乳")).id
+        store.completeItem(milk, clock.now)
+        viewModel.uiState.test {
+            awaitUntil { it.items.isNotEmpty() }
+            viewModel.onAddItemEvent(AddItemEvent.FieldFocused)
+            viewModel.onAddItemEvent(AddItemEvent.TextChanged("卵"))
+            viewModel.onAddItemEvent(AddItemEvent.Submitted)
+            awaitUntil { it.asksRound }
+
+            viewModel.answerRound(nextShopping = false)
+
+            val state = awaitUntil { !it.asksRound }
+            assertThat(state.items.map { it.inputName }).containsExactly("牛乳", "卵").inOrder()
+            // 続けて追加しても、未購入が残っているので聞かない
+            viewModel.onAddItemEvent(AddItemEvent.TextChanged("パン"))
+            viewModel.onAddItemEvent(AddItemEvent.Submitted)
+            val added = awaitUntil { state -> state.items.any { it.inputName == "パン" } }
+            assertThat(added.asksRound).isFalse()
+            assertThat(added.items.map { it.inputName }).containsExactly("牛乳", "卵", "パン").inOrder()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `次の買い物と答えると、前回のチェック済みを片付けて新しい項目だけを表示する`() = runTest {
+        val milk = store.addItem(newItem(listId, "牛乳")).id
+        store.completeItem(milk, clock.now)
+        viewModel.uiState.test {
+            awaitUntil { it.items.isNotEmpty() }
+            viewModel.onAddItemEvent(AddItemEvent.FieldFocused)
+            viewModel.onAddItemEvent(AddItemEvent.TextChanged("卵"))
+            viewModel.onAddItemEvent(AddItemEvent.Submitted)
+            awaitUntil { it.asksRound }
+
+            viewModel.answerRound(nextShopping = true)
+
+            val state = awaitUntil { s -> !s.asksRound && s.items.map { it.inputName } == listOf("卵") }
+            assertThat(state.items.map { it.inputName }).containsExactly("卵")
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `商品詳細入力画面から、買い忘れか聞く追加で戻ると聞く`() = runTest {
+        viewModel.uiState.test {
+            awaitUntil { !it.loading }
+            viewModel.onEntryResult(ItemEntryResult.ADDED_ASKS_ROUND)
+            assertThat(awaitUntil { it.asksRound }.asksRound).isTrue()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
     @Test
     fun `買い物の途中の追加では、チェック済みを残す`() = runTest {
-        val milk = store.addItem(newItem(listId, "牛乳"))
+        val milk = store.addItem(newItem(listId, "牛乳")).id
         store.addItem(newItem(listId, "卵"))
         store.completeItem(milk, clock.now)
         viewModel.uiState.test {
@@ -388,8 +461,8 @@ class ListDetailViewModelTest {
 
     @Test
     fun `開いている間にほかのメンバーがチェックしたら、約3秒分をまとめて知らせる`() = runTest {
-        val milk = store.addItem(newItem(listId, "牛乳"))
-        val egg = store.addItem(newItem(listId, "卵"))
+        val milk = store.addItem(newItem(listId, "牛乳")).id
+        val egg = store.addItem(newItem(listId, "卵")).id
         turbineScope {
             val states = viewModel.uiState.testIn(backgroundScope)
             val messages = viewModel.messages.testIn(backgroundScope)
@@ -408,7 +481,7 @@ class ListDetailViewModelTest {
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
     fun `画面を開いた時点ですでにチェック済みの項目は知らせない`() = runTest {
-        val milk = store.addItem(newItem(listId, "牛乳"))
+        val milk = store.addItem(newItem(listId, "牛乳")).id
         actor = UserId("hanako")
         store.completeItem(milk, clock.now)
         actor = UserId("taro")
@@ -424,7 +497,7 @@ class ListDetailViewModelTest {
 
     @Test
     fun `すでにチェック済みなら、誰がいつチェックしたかを知らせる`() = runTest {
-        val milk = store.addItem(newItem(listId, "牛乳"))
+        val milk = store.addItem(newItem(listId, "牛乳")).id
         turbineScope {
             val states = viewModel.uiState.testIn(backgroundScope)
             val messages = viewModel.messages.testIn(backgroundScope)
@@ -459,7 +532,7 @@ class ListDetailViewModelTest {
 
     @Test
     fun `チェック済みの項目に、チェックした人の名前を出す`() = runTest {
-        val milk = store.addItem(newItem(listId, "牛乳"))
+        val milk = store.addItem(newItem(listId, "牛乳")).id
         actor = UserId("hanako")
         store.completeItem(milk, clock.now)
         actor = UserId("taro")
@@ -489,8 +562,8 @@ class ListDetailViewModelTest {
 
     @Test
     fun `項目を動かすと並び順が変わる`() = runTest {
-        val milk = store.addItem(newItem(listId, "牛乳"))
-        val egg = store.addItem(newItem(listId, "卵"))
+        val milk = store.addItem(newItem(listId, "牛乳")).id
+        val egg = store.addItem(newItem(listId, "卵")).id
         viewModel.uiState.test {
             awaitUntil { it.items.size == 2 }
 
@@ -537,7 +610,7 @@ class ListDetailViewModelTest {
     private suspend fun bought(name: String, times: Int, intervalDays: Long, listId: ListId = this.listId) {
         repeat(times) { index ->
             if (index > 0) clock.advance(java.time.Duration.ofDays(intervalDays))
-            val id = store.addItem(newItem(listId, name, quantity = 1.0, unit = "本"))
+            val id = store.addItem(newItem(listId, name, quantity = 1.0, unit = "本")).id
             store.completeItem(id, clock.instant())
         }
     }
@@ -608,7 +681,7 @@ class ListDetailViewModelTest {
 
     @Test
     fun `ほかのメンバーがチェックした項目は、チェックを外さずに理由を知らせる`() = runTest {
-        val id = store.addItem(newItem(listId, "牛乳"))
+        val id = store.addItem(newItem(listId, "牛乳")).id
         actor = UserId("hanako")
         store.completeItem(id, clock.instant())
         actor = UserId("taro")
@@ -624,7 +697,7 @@ class ListDetailViewModelTest {
 
     @Test
     fun `自分がチェックした項目でも、購入履歴から削除したあとに外そうとすると、すでに外れていると知らせる`() = runTest {
-        val id = store.addItem(newItem(listId, "ケーキ"))
+        val id = store.addItem(newItem(listId, "ケーキ")).id
         store.completeItem(id, clock.instant())
         val item = store.observeListItems(listId, Instant.EPOCH).first().single()
         store.deletePurchase(id)

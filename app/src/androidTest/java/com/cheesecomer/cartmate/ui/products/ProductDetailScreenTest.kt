@@ -39,7 +39,7 @@ class ProductDetailScreenTest {
     /** [name] を1回買った。購入の ID を返す */
     private fun buy(name: String): ItemId = runBlocking {
         val listId = store.createList(NewList("スーパー", null, Visibility.SHARED))
-        val id = store.addItem(NewItem(listId, name, 1.0, "個", memo = null, Visibility.SHARED))
+        val id = store.addItem(NewItem(listId, name, 1.0, "個", memo = null, Visibility.SHARED)).id
         store.completeItem(id, clock.instant())
         id
     }

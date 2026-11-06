@@ -21,6 +21,12 @@ interface ShoppingListRepository {
     suspend fun moveList(id: ListId, previous: ListId?, next: ListId?)
 
     suspend fun deleteList(id: ListId): DeleteListResult
+
+    /**
+     * 前回の買い物のチェック済みを片付ける（docs/requirements.md §3.2）。今までのチェック済みを、リスト詳細と進捗に出さなくする。
+     * 買い忘れか聞いて、次の買い物と答えたときに使う
+     */
+    suspend fun clearRound(id: ListId)
 }
 
 sealed interface UpdateListResult {

@@ -31,7 +31,7 @@ class InMemoryStoreTest {
 
     private suspend fun createListWithItem(): Pair<ListId, ItemId> {
         val listId = store.createList("スーパー")
-        val itemId = store.addItem(newItem(listId, "牛乳", 2.0, "本"))
+        val itemId = store.addItem(newItem(listId, "牛乳", 2.0, "本")).id
         return listId to itemId
     }
 
@@ -131,7 +131,7 @@ class InMemoryStoreTest {
     fun `削除した項目を元に戻すと、削除する前の位置に戻る`() = runTest {
         val listId = store.createList("スーパー")
         store.addItem(newItem(listId, "牛乳"))
-        val egg = store.addItem(newItem(listId, "卵"))
+        val egg = store.addItem(newItem(listId, "卵")).id
         store.addItem(newItem(listId, "パン"))
         val eggItem = store.observeOpenItems().first().single { it.id == egg }
 
@@ -161,9 +161,9 @@ class InMemoryStoreTest {
     @Test
     fun `項目は追加した順に並び、動かすと前後の間に入る。チェック済みの項目も動かせる`() = runTest {
         val listId = store.createList("スーパー")
-        val milk = store.addItem(newItem(listId, "牛乳"))
-        val egg = store.addItem(newItem(listId, "卵"))
-        val bread = store.addItem(newItem(listId, "パン"))
+        val milk = store.addItem(newItem(listId, "牛乳")).id
+        val egg = store.addItem(newItem(listId, "卵")).id
+        val bread = store.addItem(newItem(listId, "パン")).id
         store.completeItem(egg, clock.now)
 
         store.moveItem(bread, previous = null, next = milk)
@@ -176,8 +176,8 @@ class InMemoryStoreTest {
     @Test
     fun `新しい項目は、並び替えたあとでも末尾に追加する`() = runTest {
         val listId = store.createList("スーパー")
-        val milk = store.addItem(newItem(listId, "牛乳"))
-        val egg = store.addItem(newItem(listId, "卵"))
+        val milk = store.addItem(newItem(listId, "牛乳")).id
+        val egg = store.addItem(newItem(listId, "卵")).id
         store.moveItem(milk, previous = egg, next = null)
 
         store.addItem(newItem(listId, "パン"))
@@ -218,11 +218,11 @@ class InMemoryStoreTest {
     fun `リストの項目は、未購入と指定時刻以降のチェック済みを追加した順に返す`() = runTest {
         val listId = store.createList("スーパー")
         val otherListId = store.createList("薬局")
-        val old = store.addItem(newItem(listId, "古いチェック済み"))
+        val old = store.addItem(newItem(listId, "古いチェック済み")).id
         clock.advance(Duration.ofSeconds(1))
         store.addItem(newItem(listId, "牛乳"))
         clock.advance(Duration.ofSeconds(1))
-        val checked = store.addItem(newItem(listId, "卵"))
+        val checked = store.addItem(newItem(listId, "卵")).id
         clock.advance(Duration.ofSeconds(1))
         store.addItem(newItem(listId, "パン"))
         store.addItem(newItem(otherListId, "目薬"))
@@ -299,7 +299,7 @@ class InMemoryStoreTest {
     fun `共有のリストにあるプライベートな項目と、その購入の記録は、登録した本人にだけ見える`() = runTest {
         val listId = store.createList("スーパー")
         store.addItem(newItem(listId, "牛乳"))
-        val gift = store.addItem(newItem(listId, "プレゼント", memo = "誕生日", visibility = Visibility.PRIVATE))
+        val gift = store.addItem(newItem(listId, "プレゼント", memo = "誕生日", visibility = Visibility.PRIVATE)).id
         store.completeItem(gift, clock.now)
 
         val purchase = store.observePurchases(Instant.EPOCH).first().single()

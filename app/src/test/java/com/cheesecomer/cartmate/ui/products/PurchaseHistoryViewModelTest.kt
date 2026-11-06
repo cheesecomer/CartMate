@@ -35,7 +35,7 @@ class PurchaseHistoryViewModelTest {
     private val listId = runBlocking { store.createList("スーパー") }
 
     private suspend fun buy(name: String) {
-        val id = store.addItem(newItem(listId, name, quantity = 1.0, unit = "本"))
+        val id = store.addItem(newItem(listId, name, quantity = 1.0, unit = "本")).id
         store.completeItem(id, clock.instant())
         clock.advance(Duration.ofDays(1))
     }

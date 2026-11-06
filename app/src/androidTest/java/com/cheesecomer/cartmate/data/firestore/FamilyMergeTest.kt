@@ -60,7 +60,7 @@ class FamilyMergeTest {
         taro.db.waitForPendingWrites().await()
         val first = hanako.store.createList(NewList("スーパー", memo = null, Visibility.SHARED))
         val second = hanako.store.createList(NewList("ひみつ", memo = null, Visibility.PRIVATE))
-        val item = hanako.store.addItem(NewItem(first, "牛乳", 1.0, "本", memo = null, Visibility.SHARED))
+        val item = hanako.store.addItem(NewItem(first, "牛乳", 1.0, "本", memo = null, Visibility.SHARED)).id
         hanako.db.waitForPendingWrites().await()
 
         val invite = taro.households.createInvite("太郎")
@@ -81,9 +81,9 @@ class FamilyMergeTest {
         // hanako は自分しかいない家族で買い物をしていた
         val listId = hanako.store.createList(NewList("スーパー", memo = null, Visibility.SHARED))
         fun item(name: String, visibility: Visibility) = NewItem(listId, name, 1.0, "個", memo = null, visibility)
-        val shared = hanako.store.addItem(item("牛乳", Visibility.SHARED))
-        val private = hanako.store.addItem(item("目薬", Visibility.PRIVATE))
-        val revoked = hanako.store.addItem(item("卵", Visibility.SHARED))
+        val shared = hanako.store.addItem(item("牛乳", Visibility.SHARED)).id
+        val private = hanako.store.addItem(item("目薬", Visibility.PRIVATE)).id
+        val revoked = hanako.store.addItem(item("卵", Visibility.SHARED)).id
         listOf(shared, private, revoked).forEach { hanako.store.completeItem(it, Instant.now()) }
         hanako.store.reopenItem(revoked)
         hanako.db.waitForPendingWrites().await()

@@ -79,7 +79,7 @@ class ConcurrencyTest {
         assertThat(hanako.households.join(invite, hanako.account)).isEqualTo(JoinResult.Joined)
         hanako.awaitHousehold(householdId)
         val listId = taro.store.createList(NewList("スーパー", memo = null, Visibility.SHARED))
-        val itemId = taro.store.addItem(NewItem(listId, "牛乳", 1.0, "本", memo = null, Visibility.SHARED))
+        val itemId = taro.store.addItem(NewItem(listId, "牛乳", 1.0, "本", memo = null, Visibility.SHARED)).id
         taro.settle()
         // チェックはリスト名を端末のキャッシュから写すので、リストも届くまで待つ（アプリではリスト詳細を開いている）
         hanako.store.observeLists().awaitFirst { lists -> lists.any { it.id == listId } }
@@ -189,7 +189,7 @@ class ConcurrencyTest {
         val (first, second) = if (deleteFirst) f.taro to f.hanako else f.hanako to f.taro
         second.offline()
         val deleted = f.taro.store.deleteList(f.listId)
-        val added = f.hanako.store.addItem(NewItem(f.listId, "卵", 1.0, "パック", memo = null, Visibility.SHARED))
+        val added = f.hanako.store.addItem(NewItem(f.listId, "卵", 1.0, "パック", memo = null, Visibility.SHARED)).id
         first.settle()
         second.online()
         settle(f.taro, f.hanako)

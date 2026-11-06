@@ -68,11 +68,11 @@ class ListsViewModelTest {
     fun `のこり・登録なし・買い終わったの状態と、直近24時間の完了の件数を表示する`() = runTest {
         store.createList("新しい")
         val doneList = store.createList("買い終わり")
-        val doneItem = store.addItem(newItem(doneList, "牛乳"))
+        val doneItem = store.addItem(newItem(doneList, "牛乳")).id
         store.completeItem(doneItem, clock.now)
         val openList = store.createList("のこりあり")
         store.addItem(newItem(openList, "卵"))
-        val checked = store.addItem(newItem(openList, "パン"))
+        val checked = store.addItem(newItem(openList, "パン")).id
         store.completeItem(checked, clock.now)
 
         viewModel.uiState.test {
@@ -88,7 +88,7 @@ class ListsViewModelTest {
         // 削除と同時に、ほかの端末で項目が追加された
         val listId = store.createList("スーパー")
         store.deleteList(listId)
-        val itemId = store.addItem(newItem(listId, "牛乳"))
+        val itemId = store.addItem(newItem(listId, "牛乳")).id
 
         viewModel.uiState.test {
             assertThat(awaitUntil { !it.loading }.lists.map { it.name }).containsExactly("スーパー")
@@ -102,7 +102,7 @@ class ListsViewModelTest {
     @Test
     fun `24時間より前の完了は件数に数えないが、買い終わったリストのまま`() = runTest {
         val listId = store.createList("スーパー")
-        val itemId = store.addItem(newItem(listId, "牛乳"))
+        val itemId = store.addItem(newItem(listId, "牛乳")).id
         store.completeItem(itemId, clock.now)
         clock.advance(Duration.ofHours(25))
         val viewModel = ListsViewModel(store, store, store, clock, FixedAccountRepository(null), { flowOf(true) }, SuggestionSource(store, store, store, clock, { flowOf(NormalizationDictionary.EMPTY) }, Dispatchers.Default))
@@ -117,7 +117,7 @@ class ListsViewModelTest {
     @Test
     fun `購入を取り消して記録がなくなったリストは、登録なしに戻る`() = runTest {
         val listId = store.createList("スーパー")
-        val itemId = store.addItem(newItem(listId, "牛乳"))
+        val itemId = store.addItem(newItem(listId, "牛乳")).id
         store.completeItem(itemId, clock.now)
         store.reopenItem(itemId)
         store.deleteItem(itemId)

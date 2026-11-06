@@ -189,7 +189,7 @@ tools/screenshots/take.sh            # docs/screenshots を置き換える。引
 
 ## キーボードのタイミングに依存するテスト
 
-シートとソフトキーボードの表示の順番を確かめるテスト（`AddItemSheetKeyboardTest`、`CreateListSheetKeyboardTest`）には `@KeyboardTimingTest` を付け、通常の `connectedDebugAndroidTest` からは外しています。キーボードの起動が遅い端末（起動したばかりのエミュレータや、テストを続けて実行して遅くなったエミュレータ）では、アプリがキーボードを待つ上限を過ぎてシートを先に出すため、アプリに問題がなくても失敗することがあるためです。
+シートとソフトキーボードの表示の順番を確かめるテスト（`AddItemSheetKeyboardTest`、`CreateListSheetKeyboardTest`）と、買い忘れかを聞くダイアログに答えたあとキーボードと入力欄に戻ることを確かめるテスト（`ListDetailRoundTest` の一部）には `@KeyboardTimingTest` を付け、通常の `connectedDebugAndroidTest` からは外しています。キーボードの起動が遅い端末（起動したばかりのエミュレータや、テストを続けて実行して遅くなったエミュレータ）では、アプリがキーボードを待つ上限を過ぎてシートを先に出すため、アプリに問題がなくても失敗することがあるためです。
 
 シートやキーボードまわりを変更したときは、エミュレータを起動して落ち着かせてから、次のコマンドでこのテストだけを実行します。
 

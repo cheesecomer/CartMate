@@ -196,13 +196,25 @@ class ItemEntryViewModelTest {
     @Test
     fun `編集ではチップを出さない`() = runTest {
         store.addItem(newItem(listId, "牛乳"))
-        val itemId = store.addItem(newItem(listId, "牛乳 1L"))
+        val itemId = store.addItem(newItem(listId, "牛乳 1L")).id
         store.applyMergeChanges(listOf(ProductMerge.Change.Unmerge(store.observeProducts().first().first { it.displayName == "牛乳 1L" }.id)))
         val viewModel = viewModel(itemId = itemId)
         viewModel.mergeChip.test {
             assertThat(awaitItem()).isNull()
             cancelAndIgnoreRemainingEvents()
         }
+    }
+
+    @Test
+    fun `最後のチェックから間もなく買い終わったリストに追加すると、片付けずに買い忘れか聞く結果で戻る`() = runTest {
+        val milk = store.addItem(newItem(listId, "牛乳")).id
+        store.completeItem(milk, clock.now)
+        val viewModel = viewModel(name = "卵")
+        viewModel.results.test {
+            viewModel.confirm()
+            assertThat(awaitItem()).isEqualTo(ItemEntryResult.ADDED_ASKS_ROUND)
+        }
+        assertThat(store.observeLists().first().single { it.id == listId }.clearedAt).isNull()
     }
 
     @Test
@@ -226,7 +238,7 @@ class ItemEntryViewModelTest {
 
     @Test
     fun `編集は項目の内容を初期値にし、確定すると内容が変わる。公開範囲は変えられない`() = runTest {
-        val itemId = store.addItem(newItem(listId, "牛乳", 1.0, "本", memo = "無調整"))
+        val itemId = store.addItem(newItem(listId, "牛乳", 1.0, "本", memo = "無調整")).id
         val viewModel = viewModel(itemId = itemId)
         val entry = viewModel.uiState.value.entry!!
         assertThat(listOf(entry.name, entry.quantity, entry.unit, entry.memo)).containsExactly("牛乳", "1", "本", "無調整").inOrder()
@@ -245,7 +257,7 @@ class ItemEntryViewModelTest {
 
     @Test
     fun `編集中にチェックされた項目は更新せず、その結果を返す`() = runTest {
-        val itemId = store.addItem(newItem(listId, "牛乳", 1.0, "本"))
+        val itemId = store.addItem(newItem(listId, "牛乳", 1.0, "本")).id
         val viewModel = viewModel(itemId = itemId)
         store.completeItem(itemId, clock.now)
 
@@ -268,7 +280,7 @@ class ItemEntryViewModelTest {
     fun `新しい商品では、前回の購入と過去の備考を候補として出す`() = runTest {
         repeat(3) { index ->
             if (index > 0) clock.advance(java.time.Duration.ofDays(14))
-            val id = store.addItem(newItem(listId, "卵", quantity = 1.0, unit = "パック", memo = if (index == 2) "赤玉" else "特売なら2個"))
+            val id = store.addItem(newItem(listId, "卵", quantity = 1.0, unit = "パック", memo = if (index == 2) "赤玉" else "特売なら2個")).id
             store.completeItem(id, clock.instant())
         }
         clock.advance(java.time.Duration.ofDays(2))

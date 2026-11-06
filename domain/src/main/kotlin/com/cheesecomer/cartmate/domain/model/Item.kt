@@ -44,3 +44,9 @@ data class NewItem(
      */
     val mergeInto: ProductId? = null,
 )
+
+/**
+ * 追加した項目。[asksRound] が true なら、買い終わったリストに最後のチェックから間もなく追加したため、前回のチェック済みを
+ * まだ片付けていない。買い忘れか次の買い物かを聞き、次の買い物なら片付ける（docs/requirements.md §3.2「前回の買い物の片付け」）
+ */
+data class AddedItem(val id: ItemId, val asksRound: Boolean = false)

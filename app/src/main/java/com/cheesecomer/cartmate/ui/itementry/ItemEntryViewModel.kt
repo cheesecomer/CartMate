@@ -212,8 +212,8 @@ class ItemEntryViewModel @Inject constructor(
                 if (entry.visibilitySelectable) lastVisibility.set(listId, values.visibility)
                 // チップを選んでいれば、新しい商品を最初から候補の商品に統合する
                 val mergeInto = mergeChip.value?.takeIf { it.selected }?.candidateId
-                itemRepository.addItem(NewItem(listId, values.name, values.quantity, values.unit, values.memo, values.visibility, mergeInto))
-                _results.send(ItemEntryResult.ADDED)
+                val added = itemRepository.addItem(NewItem(listId, values.name, values.quantity, values.unit, values.memo, values.visibility, mergeInto))
+                _results.send(if (added.asksRound) ItemEntryResult.ADDED_ASKS_ROUND else ItemEntryResult.ADDED)
             } else {
                 val update = ItemUpdate(values.name, values.quantity, values.unit, values.memo)
                 val result = when (itemRepository.updateItem(editing, update)) {

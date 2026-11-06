@@ -61,19 +61,31 @@ class ShoppingRoundTest {
     }
 
     @Test
-    fun `買い終わったリストに追加すると、前回のチェック済みを片付ける`() {
-        val items = listOf(item("牛乳", ItemStatus.COMPLETED, now), item("卵", ItemStatus.COMPLETED, now))
-        assertThat(ShoppingRound.clearsOnAdd(items)).isTrue()
+    fun `最後のチェックから2時間を過ぎて買い終わったリストに追加すると、聞かずに片付ける`() {
+        val items = listOf(
+            item("牛乳", ItemStatus.COMPLETED, now - Duration.ofHours(5)),
+            item("卵", ItemStatus.COMPLETED, now - Duration.ofHours(2).plusSeconds(1)),
+        )
+        assertThat(ShoppingRound.onAdd(items, now)).isEqualTo(ShoppingRound.OnAdd.CLEAR)
+    }
+
+    @Test
+    fun `最後のチェックから2時間以内に買い終わったリストに追加すると、買い忘れか聞く`() {
+        val items = listOf(
+            item("牛乳", ItemStatus.COMPLETED, now - Duration.ofHours(5)),
+            item("卵", ItemStatus.COMPLETED, now - Duration.ofHours(2)),
+        )
+        assertThat(ShoppingRound.onAdd(items, now)).isEqualTo(ShoppingRound.OnAdd.ASK)
     }
 
     @Test
     fun `買い物の途中（未購入が残っている）の追加では片付けない`() {
-        val items = listOf(item("牛乳", ItemStatus.COMPLETED, now), item("卵", ItemStatus.OPEN))
-        assertThat(ShoppingRound.clearsOnAdd(items)).isFalse()
+        val items = listOf(item("牛乳", ItemStatus.COMPLETED, now - Duration.ofHours(5)), item("卵", ItemStatus.OPEN))
+        assertThat(ShoppingRound.onAdd(items, now)).isEqualTo(ShoppingRound.OnAdd.KEEP)
     }
 
     @Test
     fun `表示中のチェック済みがなければ片付けない`() {
-        assertThat(ShoppingRound.clearsOnAdd(emptyList())).isFalse()
+        assertThat(ShoppingRound.onAdd(emptyList(), now)).isEqualTo(ShoppingRound.OnAdd.KEEP)
     }
 }
