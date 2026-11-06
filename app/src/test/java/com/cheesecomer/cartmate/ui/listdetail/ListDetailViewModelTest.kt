@@ -1,7 +1,8 @@
 package com.cheesecomer.cartmate.ui.listdetail
 
 import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.job
 import org.junit.jupiter.api.AfterEach
 import com.cheesecomer.cartmate.domain.repository.DictionaryProvider
 import kotlinx.coroutines.Dispatchers
@@ -79,9 +80,15 @@ class ListDetailViewModelTest {
     private val viewModels = mutableListOf<ListDetailViewModel>()
     private val viewModel = viewModelFor(listId)
 
+    /**
+     * 止まりきるまで待ってから、Dispatchers.Main を戻す（MainDispatcherExtension は @AfterEach のあとに戻す）。
+     * テストの Main は UnconfinedTestDispatcher なので、ほかのスレッド（Turbine の待ち時間など）から再開された
+     * コルーチンはそのスレッドで動き続ける。cancel だけでは止まる途中のまま次へ進み、Main を戻したあとに後始末で
+     * Main を使って、別のテストが失敗していた
+     */
     @AfterEach
-    fun cancelViewModels() {
-        viewModels.forEach { it.viewModelScope.cancel() }
+    fun cancelViewModels() = runBlocking {
+        viewModels.forEach { it.viewModelScope.coroutineContext.job.cancelAndJoin() }
     }
 
     private fun viewModelFor(
@@ -324,7 +331,8 @@ class ListDetailViewModelTest {
             viewModel.onAddItemEvent(AddItemEvent.TextChanged("卵"))
             viewModel.onAddItemEvent(AddItemEvent.Submitted)
 
-            val state = awaitUntil { it.asksRound }
+            // 聞くかどうかと項目の一覧は別々に届くので、両方がそろうまで待つ
+            val state = awaitUntil { s -> s.asksRound && s.items.any { it.inputName == "卵" } }
             assertThat(state.items.map { it.inputName }).containsExactly("牛乳", "卵").inOrder()
             cancelAndIgnoreRemainingEvents()
         }
@@ -343,7 +351,8 @@ class ListDetailViewModelTest {
 
             viewModel.answerRound(nextShopping = false)
 
-            val state = awaitUntil { !it.asksRound }
+            // 聞くかどうかと項目の一覧は別々に届くので、両方がそろうまで待つ
+            val state = awaitUntil { s -> !s.asksRound && s.items.any { it.inputName == "卵" } }
             assertThat(state.items.map { it.inputName }).containsExactly("牛乳", "卵").inOrder()
             // 続けて追加しても、未購入が残っているので聞かない
             viewModel.onAddItemEvent(AddItemEvent.TextChanged("パン"))
