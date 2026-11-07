@@ -120,6 +120,50 @@ fun OnboardingContent(
     }
 }
 
+/**
+ * サーバーに読み取りを断られて、所属が分からない（フィードバック #020）。家族の作成・参加には進めない（書き込みも断られる）。
+ * 読めるようになれば、画面は自動で切り替わる
+ */
+@Composable
+fun UnavailableScreen(viewModel: OnboardingViewModel = hiltViewModel()) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    UnavailableContent(
+        account = state.account,
+        onSignOut = {
+            scope.launch { GoogleSignIn.clear(context) }
+            viewModel.signOut()
+        },
+    )
+}
+
+@Composable
+fun UnavailableContent(account: Account?, onSignOut: () -> Unit) {
+    Surface(color = MaterialTheme.colorScheme.surface, modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .safeDrawingPadding()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = CartMateSpacing.large, vertical = CartMateSpacing.large),
+        ) {
+            account?.let { AccountBar(it, onSignOut) }
+            Spacer(Modifier.height(CartMateSpacing.large))
+            Text(
+                text = stringResource(R.string.unavailable_title),
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Spacer(Modifier.height(CartMateSpacing.medium))
+            Text(
+                text = stringResource(R.string.unavailable_message),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
 @Composable
 private fun AccountBar(account: Account, onSignOut: () -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {

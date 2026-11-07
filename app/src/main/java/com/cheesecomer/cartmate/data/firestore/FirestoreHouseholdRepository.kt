@@ -60,9 +60,10 @@ class FirestoreHouseholdRepository @Inject constructor(
 
     override fun observeMembership(): Flow<Membership> = session.uid.flatMapLatest { uid ->
         if (uid == null) return@flatMapLatest emptyFlow()
-        session.householdId
-            .flatMapLatest { householdId ->
-                if (householdId == null) flowOf(Membership(null, null))
+        session.ownHousehold
+            .flatMapLatest { (householdId, denied) ->
+                if (denied) flowOf(Membership(null, null, denied = true))
+                else if (householdId == null) flowOf(Membership(null, null))
                 else memberPresence(
                     listen = {
                         Paths.member(db, householdId, uid).snapshotFlow()
@@ -71,9 +72,16 @@ class FirestoreHouseholdRepository @Inject constructor(
                     },
                     awaitPendingWrites = ::awaitPendingWrites,
                     onError = ::logListenError,
-                ).map { Membership(householdId, it) }
+                ).map { isMember ->
+                    // 自分の users まで断られるなら、外されたのではなく、端末やアプリを確認できていない（フィードバック #020）
+                    if (!isMember && ownUserDenied(uid)) Membership(null, null, denied = true)
+                    else Membership(householdId, isMember)
+                }
             }
     }
+
+    private suspend fun ownUserDenied(uid: String): Boolean =
+        runCatching { Paths.user(db, uid).get(Source.SERVER).await() }.exceptionOrNull()?.isPermissionDenied == true
 
     override fun observeMembers(): Flow<List<Member>> = householdId.flatMapLatest { householdId ->
         if (householdId == null) flowOf(emptyList())

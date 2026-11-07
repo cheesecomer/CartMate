@@ -44,27 +44,29 @@ class FirestoreSession @Inject constructor(
     }.distinctUntilChanged().shareIn(sharing, SharingStarted.Eagerly, replay = 1)
 
     /** 自分の users の householdId。どのユーザーの値かを付けて共有する */
-    private val userHousehold: Flow<UserValue<HouseholdId?>> = uid.flatMapLatest { uid ->
-        if (uid == null) flowOf(UserValue<HouseholdId?>(null, null))
-        // 自分の users は拒否されないので、denied は流れない。通信の問題などでは購読し直す
-        else recoverListen(
+    private val userHousehold: Flow<UserValue<OwnHousehold>> = uid.flatMapLatest { uid ->
+        if (uid == null) flowOf(UserValue(null, OwnHousehold(null)))
+        // 自分の users は本人なら拒否されない。拒否されたら、端末やアプリを確認できていない（ownHousehold）
+        else ownHousehold(
             listen = {
                 Paths.user(db, uid).snapshotFlow()
                     // まだ分からない（キャッシュにないだけ）間は流さない
                     .filter { documentPresence(it.exists(), it.metadata.isFromCache) != null }
-                    .map { it.getString(F.HOUSEHOLD_ID)?.let(::HouseholdId) }
+                    .map { OwnHousehold(it.getString(F.HOUSEHOLD_ID)?.let(::HouseholdId)) }
             },
-            denied = null,
             awaitPendingWrites = { db.waitForPendingWrites().await() },
             onError = { Log.w("FirestoreSession", "listen failed", it) },
         ).map { UserValue(uid, it) }
     }.shareIn(sharing, SharingStarted.Eagerly, replay = 1)
 
     /**
-     * 今ログインしているユーザーの所属する家族。共有している購読から、そのつど取り出す
+     * 今ログインしているユーザーの所属。共有している購読から、そのつど取り出す
      * （取り出したものを共有すると、ログインやアカウントの切り替えのあとに、前のユーザーの値が残るため）
      */
-    val householdId: Flow<HouseholdId?> = currentUserValue(uid, userHousehold)
+    val ownHousehold: Flow<OwnHousehold> = currentUserValue(uid, userHousehold)
+
+    /** 今ログインしているユーザーの所属する家族。読み取りを断られている間は null */
+    val householdId: Flow<HouseholdId?> = ownHousehold.map { it.householdId }.distinctUntilChanged()
 
     /** ログイン中のユーザーと所属する家族。どちらかがなければ null */
     val scope: Flow<Scope?> = combine(uid, householdId) { uid, householdId ->

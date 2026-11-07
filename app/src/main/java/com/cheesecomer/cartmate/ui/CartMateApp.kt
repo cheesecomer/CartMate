@@ -21,6 +21,7 @@ import com.cheesecomer.cartmate.domain.family.Destination
 import com.cheesecomer.cartmate.ui.join.JoinCodeRoute
 import com.cheesecomer.cartmate.ui.join.JoinConfirmRoute
 import com.cheesecomer.cartmate.ui.onboarding.OnboardingScreen
+import com.cheesecomer.cartmate.ui.onboarding.UnavailableScreen
 import com.cheesecomer.cartmate.ui.signin.GoogleSignIn
 import com.cheesecomer.cartmate.ui.signin.SignInScreen
 import kotlinx.coroutines.launch
@@ -52,6 +53,7 @@ fun CartMateApp(viewModel: AppViewModel = hiltViewModel()) {
         Destination.Loading -> Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface))
         Destination.Login -> SignInScreen()
         is Destination.Onboarding -> OnboardingNavHost(removed = current.removed, pending = viewModel.pendingNavigation)
+        Destination.Unavailable -> UnavailableScreen()
         // 家族が変わったら（合流など）、画面の履歴を作り直す
         is Destination.Lists -> key(current.householdId) {
             CartMateNavHost(

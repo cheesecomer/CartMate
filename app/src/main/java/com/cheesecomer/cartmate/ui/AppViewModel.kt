@@ -69,7 +69,7 @@ class AppViewModel @Inject constructor(
         .flatMapLatest { signedIn ->
             if (!signedIn) flowOf(Destination.Login)
             else householdRepository.observeMembership().map {
-                StartDestination.of(signedIn = true, householdId = it.householdId, isMember = it.isMember)
+                StartDestination.of(signedIn = true, householdId = it.householdId, isMember = it.isMember, denied = it.denied)
             }
         }
         .distinctUntilChanged()

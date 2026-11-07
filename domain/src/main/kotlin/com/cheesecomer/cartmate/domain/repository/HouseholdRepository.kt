@@ -62,9 +62,10 @@ interface HouseholdRepository : MemberDirectory {
 
 /**
  * 自分の所属。[householdId] は users/{uid}.householdId、[isMember] はその家族に自分の members があるか
- * （家族に参加していないか、まだ読めていなければ null）
+ * （家族に参加していないか、まだ読めていなければ null）。[denied] は、サーバーに読み取りを断られて所属が分からない
+ * （App Check など。フィードバック #020）
  */
-data class Membership(val householdId: HouseholdId?, val isMember: Boolean?)
+data class Membership(val householdId: HouseholdId?, val isMember: Boolean?, val denied: Boolean = false)
 
 sealed interface JoinResult {
     data object Joined : JoinResult

@@ -99,6 +99,7 @@ Firebase App Check（Play Integrity）を導入します。招待コードの総
 
 - リリース版は Play Integrity、デバッグ版はデバッグ用のプロバイダを使います（`app/src/release`、`app/src/debug` の `AppCheckSetup`）。デバッグ版は、起動時に Logcat に出るトークン（「App Check debug token」）を Firebase コンソールの App Check に登録します（[release.md](../release.md#app-check-の強制)）。
 - Firestore での App Check の強制は、Play Console にアプリを登録して Play Integrity を Firebase とつないでから有効にします。それまでは強制しません（強制すると、登録のない端末から読み書きできなくなるため）。
+- 確認できない端末やアプリでは、アプリは「サーバーに接続できません」を表示します（[ui.md](ui.md#最初に表示する画面)。フィードバック #020）。
 
 ## リポジトリに含めないもの
 
