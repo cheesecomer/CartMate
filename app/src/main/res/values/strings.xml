@@ -136,7 +136,7 @@
     <string name="onboarding_removed_title">共有が取り消されました</string>
     <string name="onboarding_removed_message">新しく家族と共有するか、招待コードで参加してください</string>
     <string name="unavailable_title">サーバーに接続できません</string>
-    <string name="unavailable_message">このアプリを確認できなかったため、データを読み込めません。Google Play から入れたアプリをお使いください。\n\n確認できるようになると、自動で画面が切り替わります。</string>
+    <string name="unavailable_message">このアプリを確認できなかったため、データを読み込めません。Google Play から入れたアプリをお使いください。\n\n解消したら、アプリを最近使ったアプリの一覧から閉じて、開き直してください。</string>
     <string name="onboarding_create_failed">家族を作成できませんでした。通信状態を確かめて、もう一度お試しください</string>
     <string name="action_sign_out">ログアウト</string>
     <string name="offline_unavailable">オフラインのため、この操作はできません</string>

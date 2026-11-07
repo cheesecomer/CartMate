@@ -15,7 +15,8 @@ data class OwnHousehold(val householdId: HouseholdId?, val denied: Boolean = fal
  * 自分の users（[listen]）から所属を読む。自分の users は本人なら必ず読めるので、断られたのは家族がないからではなく、
  * 端末やアプリを確認できない（App Check のデバッグ用トークンが未登録など）ため。家族がないとは流さず、断られたと流す
  * （家族の作成・参加の画面に進めても、書き込みも断られて先へ進めない。フィードバック #020）。
- * 確認できるようになれば読めるので、[deniedRetry] ごとに読み直す
+ * 確認できるようになれば読めるので、[deniedRetry] ごとに読み直す（ただし App Check の SDK は、確認に失敗すると
+ * そのプロセスの間は最大で1日やり直さないので、すぐに読めるようになるのは開き直したとき）
  */
 fun ownHousehold(
     listen: () -> Flow<OwnHousehold>,

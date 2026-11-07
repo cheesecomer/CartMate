@@ -122,7 +122,8 @@ fun OnboardingContent(
 
 /**
  * サーバーに読み取りを断られて、所属が分からない（フィードバック #020）。家族の作成・参加には進めない（書き込みも断られる）。
- * 読めるようになれば、画面は自動で切り替わる
+ * 読めるようになれば画面は切り替わるが、App Check の SDK は確認に失敗すると、そのプロセスの間は最大で1日やり直さない。
+ * そのため、開き直すよう案内する
  */
 @Composable
 fun UnavailableScreen(viewModel: OnboardingViewModel = hiltViewModel()) {

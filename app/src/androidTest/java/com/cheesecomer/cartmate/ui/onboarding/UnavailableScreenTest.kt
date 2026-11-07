@@ -34,7 +34,7 @@ class UnavailableScreenTest {
         }
 
         composeRule.onNodeWithText("サーバーに接続できません").assertIsDisplayed()
-        composeRule.onNodeWithText("自動で画面が切り替わります", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("開き直してください", substring = true).assertIsDisplayed()
         composeRule.onNodeWithText("家族と共有する").assertDoesNotExist()
         composeRule.onNodeWithText("招待コードで参加する").assertDoesNotExist()
 
