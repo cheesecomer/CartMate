@@ -207,7 +207,7 @@ class ListDetailViewModelTest {
     }
 
     @Test
-    fun `チェックしても同じ位置に残り、元に戻せるメッセージが出る。元に戻すと購入が無効になる`() = runTest {
+    fun `チェックしても同じ位置に残り、メッセージは出ない。チェックを外すと購入が無効になる`() = runTest {
         store.addItem(newItem(listId, "牛乳"))
         clock.advance(Duration.ofSeconds(1))
         store.addItem(newItem(listId, "卵"))
@@ -218,14 +218,16 @@ class ListDetailViewModelTest {
 
             viewModel.check(item)
 
-            assertThat(messages.awaitItem()).isEqualTo(DetailMessage.Checked(item))
             val afterCheck = states.awaitUntil { it.items.first().status == ItemStatus.COMPLETED }
             assertThat(afterCheck.items.map { it.inputName }).containsExactly("牛乳", "卵").inOrder()
+            // 自分のチェックは、画面のカードから外せるので知らせない（フィードバック #019）
+            messages.expectNoEvents()
 
             viewModel.uncheck(item)
 
             states.awaitUntil { it.items.first().status == ItemStatus.OPEN }
             assertThat(store.observePurchases(Instant.EPOCH).first().single().active).isFalse()
+            messages.expectNoEvents()
             states.cancelAndIgnoreRemainingEvents()
         }
     }

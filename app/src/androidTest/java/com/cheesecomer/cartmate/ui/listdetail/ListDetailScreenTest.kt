@@ -135,6 +135,13 @@ class ListDetailScreenTest {
     private fun activePurchaseCount() =
         runBlocking { store.observePurchases(Instant.EPOCH).first().count { it.active } }
 
+    /** 画面が落ち着くまで待つ（Snackbar は出るまでに少しかかる） */
+    private fun settle() {
+        composeRule.waitForIdle()
+        Thread.sleep(1_000)
+        composeRule.waitForIdle()
+    }
+
     /**
      * 項目が多いとき、一覧のカードが商品追加欄の下（ナビゲーションバーの部分）から透けて見えない（フィードバック #009）。
      * 商品追加欄の背景は画面の下端まで覆い、一番下までスクロールすると最後の項目が商品追加欄より上に全部見える。
@@ -318,9 +325,7 @@ class ListDetailScreenTest {
         composeRule.onNodeWithText("牛乳").performTouchInput { swipeLeft() }
 
         // 画面が落ち着いたあとも、未購入のまま一覧にある
-        composeRule.waitForIdle()
-        Thread.sleep(1_000)
-        composeRule.waitForIdle()
+        settle()
         assertThat(openItemNames()).containsExactly("牛乳")
         assertThat(activePurchaseCount()).isEqualTo(0)
         composeRule.onNodeWithText("牛乳").assertIsDisplayed()
@@ -347,19 +352,27 @@ class ListDetailScreenTest {
         composeRule.onNodeWithText("牛乳").assertIsDisplayed()
     }
 
+    /** 自分のチェックとチェックを外す操作では、通知を出さない。外すのはカードからできる（フィードバック #019） */
     @Test
-    fun 右スワイプでチェックし_Snackbarの元に戻すで未購入に戻る() {
+    fun タップや右スワイプでチェックしても_チェックを外しても_Snackbarを出さない() {
         addItem("牛乳")
+        addItem("卵")
         setContent()
 
-        composeRule.onNodeWithText("牛乳").performTouchInput { swipeRight() }
+        composeRule.onNodeWithText("牛乳").performClick()
+        composeRule.onNodeWithText("卵").performTouchInput { swipeRight() }
         composeRule.waitUntil { openItemNames().isEmpty() }
+        settle()
+        composeRule.onNodeWithText("チェックしました", substring = true).assertDoesNotExist()
+        snackbarUndo().assertDoesNotExist()
 
-        snackbarUndo().performClick()
-        composeRule.waitUntil { openItemNames() == listOf("牛乳") }
-        // 元に戻した項目が、もう一度チェックされないこと
-        composeRule.waitForIdle()
-        assertThat(openItemNames()).containsExactly("牛乳")
+        composeRule.onNodeWithContentDescription("牛乳のチェックを外す").performClick()
+        composeRule.onNodeWithText("卵").performClick()
+        composeRule.waitUntil { openItemNames().size == 2 }
+        settle()
+        composeRule.onNodeWithText("チェックを外しました", substring = true).assertDoesNotExist()
+        snackbarUndo().assertDoesNotExist()
+        assertThat(openItemNames()).containsExactly("牛乳", "卵")
         assertThat(activePurchaseCount()).isEqualTo(0)
     }
 

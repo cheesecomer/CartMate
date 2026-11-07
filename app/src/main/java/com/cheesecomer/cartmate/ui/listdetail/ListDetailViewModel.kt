@@ -94,8 +94,6 @@ data class ListDetailUiState(
 
 /** Snackbar で一度だけ表示するメッセージ */
 sealed interface DetailMessage {
-    /** チェックした。元に戻せる */
-    data class Checked(val item: Item) : DetailMessage
     /** 削除した。元に戻せる */
     data class Deleted(val item: Item) : DetailMessage
     /** すでにチェック済みだった。「牛乳は 花子さんが 10:02 にチェック済みです」。[checkerName] が null なら退会したメンバー */
@@ -271,10 +269,11 @@ class ListDetailViewModel @Inject constructor(
         if (nextShopping) viewModelScope.launch { listRepository.clearRound(listId) }
     }
 
+    /** チェックする。できたことは知らせない。チェックを外すのはカードからできる（フィードバック #019） */
     fun check(item: Item) {
         viewModelScope.launch {
             when (val result = itemRepository.completeItem(item.id, checkedAt = clock.instant())) {
-                CompleteResult.Completed -> _messages.send(DetailMessage.Checked(item))
+                CompleteResult.Completed -> Unit
                 is CompleteResult.AlreadyCompleted -> {
                     val names = memberDirectory.observeNames().first()
                     _messages.send(DetailMessage.AlreadyCompleted(item.inputName, names.of(result.by), result.at))
@@ -285,12 +284,11 @@ class ListDetailViewModel @Inject constructor(
     }
 
     /**
-     * チェックを外す（Undo を含む）。ほかのメンバーがチェックした項目は外さずに理由を知らせる
+     * チェックを外す（Undo）。ほかのメンバーがチェックした項目は外さずに理由を知らせる
      * （その人の購入の記録を予測から外させない。docs/design/sync.md「Undo」）
      */
     fun uncheck(item: Item) {
         viewModelScope.launch {
-            // Snackbar の Undo はチェックする前の項目（completedBy なし）を渡す。自分のチェックなのでそのまま外す
             val checker = item.completedBy
             if (checker != null && checker != currentUser.currentUserId()) {
                 _messages.send(DetailMessage.CheckedByOther(memberDirectory.observeNames().first().of(checker)))

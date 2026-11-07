@@ -110,9 +110,6 @@ fun ListDetailScreen(
             snackbarHostState.currentSnackbarData?.dismiss()
             launch {
                 val (text, undo) = when (message) {
-                    is DetailMessage.Checked ->
-                        resources.getString(R.string.detail_checked_message, message.item.inputName) to
-                            { viewModel.uncheck(message.item) }
                     is DetailMessage.Deleted ->
                         resources.getString(R.string.detail_deleted_message, message.item.inputName) to
                             { viewModel.undoDelete(message.item) }

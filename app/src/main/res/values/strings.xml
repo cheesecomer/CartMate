@@ -57,7 +57,6 @@
     <string name="detail_uncheck">チェックを外す</string>
     <string name="detail_item_menu">%1$sのメニュー</string>
     <string name="detail_uncheck_item">%1$sのチェックを外す</string>
-    <string name="detail_checked_message">%1$s をチェックしました</string>
     <string name="detail_deleted_message">%1$s を削除しました</string>
     <string name="detail_already_completed">%1$sは %2$sさんが %3$s にチェック済みです</string>
     <string name="detail_already_completed_by_former">%1$sは 退会したメンバーが %2$s にチェック済みです</string>

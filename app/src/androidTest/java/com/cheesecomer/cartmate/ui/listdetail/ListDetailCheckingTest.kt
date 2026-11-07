@@ -8,6 +8,7 @@ import androidx.compose.ui.test.hasScrollToNodeAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -115,7 +116,7 @@ class ListDetailCheckingTest {
     private fun statusOf(name: String) =
         runBlocking { store.observeListItems(listId, Instant.EPOCH).first() }.single { it.inputName == name }.status
 
-    /** チェックの Snackbar やカードの切り替えが落ち着くまで待つ */
+    /** カードの切り替えや Snackbar が落ち着くまで待つ */
     private fun settle() {
         composeRule.waitForIdle()
         Thread.sleep(SETTLE_MILLIS)
@@ -208,20 +209,21 @@ class ListDetailCheckingTest {
         assertWithMessage("2件目のチェックのあと、商品13の位置").that(topOf("商品13")).isWithin(1f).of(before)
     }
 
+    /** 自分のチェックでは通知を出さない（#019）ので、通知を出す削除で確かめる */
     @Test
-    fun チェックの通知が出ている間も_一番下の項目をタップしてチェックできる() {
+    fun 通知が出ている間も_一番下の項目をタップしてチェックできる() {
         setContent(itemCount = 20)
         scrollToEnd()
 
-        composeRule.onNodeWithText("商品19").performClick()
-        // 通知の「元に戻す」が出ている（チェックしたカードにも「元に戻す」のボタンがあるので、2つ以上）
+        composeRule.onNodeWithContentDescription("商品19のメニュー").performClick()
+        composeRule.onNodeWithText("削除").performClick()
         composeRule.waitUntil(timeoutMillis = 5_000) {
-            composeRule.onAllNodesWithText("元に戻す").fetchSemanticsNodes().size >= 2
+            composeRule.onAllNodesWithText("商品19 を削除しました", substring = true).fetchSemanticsNodes().isNotEmpty()
         }
 
         // 通知は商品追加欄の範囲に出て、一覧のカードにかぶらない
         val bar = composeRule.onNodeWithTag(AddItemTags.BAR).fetchSemanticsNode().boundsInRoot
-        val notice = composeRule.onNodeWithText("商品19 をチェックしました", substring = true).fetchSemanticsNode().boundsInRoot
+        val notice = composeRule.onNodeWithText("商品19 を削除しました", substring = true).fetchSemanticsNode().boundsInRoot
         assertWithMessage("通知の上端（%s）が商品追加欄の上端（%s）より上にある", notice.top, bar.top).that(notice.top).isAtLeast(bar.top)
 
         composeRule.onNodeWithText("商品20").performClick()
