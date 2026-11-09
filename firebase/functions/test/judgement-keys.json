@@ -1,0 +1,80 @@
+[
+  {
+    "normalizedName": "胡麻ドレ",
+    "qualifiers": {},
+    "key": "732ddabf6ba1f2b2cd33bd1148327e10"
+  },
+  {
+    "normalizedName": "ごまドレッシング",
+    "qualifiers": {},
+    "key": "4f04ee4fe231789b96295b0bd6fe0287"
+  },
+  {
+    "normalizedName": "ポカリ",
+    "qualifiers": {
+      "form": [
+        "飲料"
+      ],
+      "volume": [
+        "2000ml"
+      ]
+    },
+    "key": "8e5c2ab88242d2276a1568471d300a4a"
+  },
+  {
+    "normalizedName": "ポカリ",
+    "qualifiers": {
+      "volume": [
+        "2000ml"
+      ],
+      "form": [
+        "飲料"
+      ]
+    },
+    "key": "8e5c2ab88242d2276a1568471d300a4a"
+  },
+  {
+    "normalizedName": "アタックzero",
+    "qualifiers": {
+      "variant": [
+        "詰め替え"
+      ]
+    },
+    "key": "b9d745d686ff784a3fbd68379efb9cf1"
+  },
+  {
+    "normalizedName": "ゴミ袋",
+    "qualifiers": {
+      "use": [
+        "燃えるゴミ"
+      ],
+      "volume": [
+        "45000ml",
+        "30000ml"
+      ]
+    },
+    "key": "317cd779dd7a86940cc599a72a9d519a"
+  },
+  {
+    "normalizedName": "ゴミ袋",
+    "qualifiers": {
+      "use": [
+        "燃えるゴミ"
+      ],
+      "volume": [
+        "30000ml",
+        "45000ml"
+      ]
+    },
+    "key": "317cd779dd7a86940cc599a72a9d519a"
+  },
+  {
+    "normalizedName": "coffee 🫘",
+    "qualifiers": {
+      "form": [
+        "粉末"
+      ]
+    },
+    "key": "71ec48b0f6c43b7e238f42edfa748683"
+  }
+]

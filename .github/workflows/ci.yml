@@ -84,3 +84,34 @@ jobs:
 
       - name: rules-test（Firestore Emulator）
         run: npm test
+
+  functions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: firebase/functions
+    steps:
+      - uses: actions/checkout@v7
+
+      # Firestore Emulator は Java で動く
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+
+      # 本番の実行環境（firebase.json の nodejs22）と合わせる
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: firebase/functions/package-lock.json
+
+      - run: npm ci
+
+      - name: 型の確認
+        run: npm run build
+
+      # 外部の AI は偽物にする。API キーは使わない
+      - name: 関数のテスト（Firestore Emulator）
+        run: npm test

@@ -135,6 +135,9 @@ npx firebase emulators:exec --only firestore,auth --project demo-cartmate \
 - domain の JVM テスト: 偽の AI の判定を与えて、候補にする条件（品目が同じ、属性に矛盾がない、統合禁止に当たらない、信頼度）と、判定の順序（手動の訂正・統合禁止・辞書を覆さない）を確かめる。
 - rules-test: `nameJudgements`・`aiUsage`・`config/ai` をアプリから書けず、判定は家族のメンバーだけが読める。
 - 関数のテスト（エミュレータ、外部 API は偽物）: ログイン・App Check・メンバーの確認、入力と応答の形の検証、月1ドルと家族ごとの上限、止める設定、同じキーの二重の問い合わせを防ぐこと。
+  - `firebase/functions` で `npm test` を実行します（Firestore のエミュレータを起動し、`vitest` を流す）。CI でも流します。
+  - 関数の処理（`judgeName`）に、偽の AI と固定の時刻を渡して確かめます。App Check の強制は、呼び出し可能な関数を HTTP の呼び出しのように動かして、トークンのない呼び出しが処理の前に拒否されることで確かめます。
+  - 判定のキーは、アプリと関数で同じ組（`firebase/functions/test/judgement-keys.json`）を使って確かめます。
 - 精度: AI の判定の正例・負例の一覧を、本物の API で一度に流して正解率を見る（CI では流さない。モデルやプロンプトを変えるときに使う）。
 
 ## テストデータ
