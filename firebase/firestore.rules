@@ -370,6 +370,20 @@ service cloud.firestore {
           return changed().hasOnly(['dictionaryOptOut']) && request.resource.data.dictionaryOptOut is bool;
         }
       }
+
+      // AI の名寄せの判定（docs/design/data-model.md「AI の名寄せ」）。関数（Admin SDK）だけが書き、家族のメンバーが読む
+      match /nameJudgements/{key} {
+        allow read: if isMember(hid);
+        allow write: if false;
+      }
+    }
+
+    // AI の使用量と、止める設定。関数だけが読み書きする
+    match /aiUsage/{month} {
+      allow read, write: if false;
+    }
+    match /config/{doc} {
+      allow read, write: if false;
     }
   }
 }

@@ -57,20 +57,29 @@ households/{hid}/purchases/{purchaseId}      # purchaseId = itemId
 ### AI の名寄せ（フェーズ6）
 
 ```
-households/{hid}/nameJudgements/{key}       # key = 正規化した商品名と、規則で読み取った属性から決まるハッシュ
-  normalizedName, qualifiers: map            # 判定した名前と属性（形態・用途・種類・容量）
+households/{hid}/nameJudgements/{key}       # key = 正規化した商品名と、規則で読み取った属性から決まるハッシュ（下記）
+  normalizedName                             # 判定した名前（NameNormalizer.normalizedName）
+  qualifiers: map<kind, array<string>>       # 判定した属性（kind は form・use・variant・volume。値は辞書の値と、ml か g にそろえた容量）
   status: "pending" | "done" | "failed"
-  item?, form?, volume?, use?, variant?      # AI が答えた品目（日本語の標準名）と属性
-  confidence?: number, reason?: string       # 信頼度と、判定の理由（短い文）
+  failure?: "disabled" | "limit" | "invalid" | "unavailable"   # failed の理由（止める設定、上限、応答の形が違う、通信や API の失敗）
+  item?, form?, volume?, use?, variant?      # AI が答えた品目（日本語の標準名）と属性。分からなければ null
+  confidence?: number, reason?: string       # 信頼度（0〜1）と、判定の理由（短い文）
   judgeVersion: string                       # モデルとプロンプトのバージョン。変わったら古い判定は使わない
-  dictionaryVersion: string, judgedAt        # 判定したときの辞書のバージョンと日時
+  dictionaryVersion: string                  # 判定を頼んだ端末の辞書のバージョン
+  requestedAt, judgedAt?                     # 場所を取った日時と、判定が終わった日時
 
-aiUsage/{yyyymm}                             # 月ごとの使用量。関数だけが読み書きする
+aiUsage/{yyyymm}                             # 月ごとの使用量（UTC の月）。関数だけが読み書きする
   costMicroUsd, calls, households: map<hid, count>
+  notified: map<"80" | "100", bool>          # 上限の80%と100%の知らせを出したか（月に一度だけ出す）
 
 config/ai                                    # 関数だけが読む。Firebase のコンソールで切り替える
   enabled: bool, monthlyBudgetMicroUsd, perHouseholdMonthlyCalls
 ```
+
+- **判定のキー**: 正規化した名前と属性を、`v1` の行、名前の行、`kind=value` の行（並べ替えたもの）の順に改行でつなぎ、SHA-256 の16進の先頭32文字にします。アプリ（`domain` の `JudgementKey`）と関数で同じものを計算し、同じ入力と結果の組で両方をテストします。関数はアプリから受け取ったキーを使わず、自分で計算します。
+- **問い合わせ直す条件**: 判定がないとき、判定のバージョンが違うとき、`pending` のまま5分たったとき（関数が途中で止まった）、`failed` から1日たったときです。関数が場所を取るときにも同じ条件を確かめます。
+- 判定には、誰が頼んだかを持ちません。家族の中で共有するキャッシュで、個人に結び付ける必要がないためです（アカウントの削除で消す必要もない）。合流では写しません。必要になれば合流先で問い合わせ直します。
+- 「この候補を出さない」は、Firestore に置かず、端末の中に保存します（[suggestions.md](suggestions.md#ai-による名寄せの候補フェーズ6)）。
 
 ## 設計判断
 
