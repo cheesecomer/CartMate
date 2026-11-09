@@ -58,8 +58,8 @@ android {
         applicationId = "com.cheesecomer.cartmate"
         minSdk = 26
         targetSdk = 37
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = 3
+        versionName = "0.3.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // キーボードの表示のタイミングに依存するテストは、通常の実行から外す。Firebase のエミュレータが必要なテストは、
