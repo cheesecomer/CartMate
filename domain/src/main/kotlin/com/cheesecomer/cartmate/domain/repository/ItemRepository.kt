@@ -7,9 +7,15 @@ import com.cheesecomer.cartmate.domain.model.ListId
 import com.cheesecomer.cartmate.domain.model.NewItem
 import com.cheesecomer.cartmate.domain.model.UserId
 import kotlinx.coroutines.flow.Flow
+import java.time.Duration
 import java.time.Instant
 
 interface ItemRepository {
+    companion object {
+        /** [observeRecentItems] がさかのぼる期間。リスト詳細がチェック済みの項目を表示する期間（直近24時間）と同じ */
+        val RECENT_WINDOW: Duration = Duration.ofHours(24)
+    }
+
     /** 家族のすべてのリストの未購入項目。他のメンバーのプライベートな項目は含まない（以下の Flow も同じ） */
     fun observeOpenItems(): Flow<List<Item>>
 
@@ -18,6 +24,12 @@ interface ItemRepository {
      * チェック済みの項目も元の位置に表示するため、両方を1つの一覧として返す
      */
     fun observeListItems(listId: ListId, completedSince: Instant): Flow<List<Item>>
+
+    /**
+     * 家族のすべてのリストの、未購入の項目と最近チェックされた項目。チェック済みは、購読を始めた時刻から
+     * [RECENT_WINDOW] さかのぼった以降にチェックされたもの。表示する側で、表示する期間に絞る
+     */
+    fun observeRecentItems(): Flow<List<Item>>
 
     /** 末尾に追加する。買い終わったリストへの追加なら、前回の買い物のチェック済みを片付ける（[AddedItem.asksRound]） */
     suspend fun addItem(newItem: NewItem): AddedItem

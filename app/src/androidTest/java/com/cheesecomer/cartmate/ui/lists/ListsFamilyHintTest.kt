@@ -50,6 +50,7 @@ class ListsFamilyHintTest {
             { flowOf(true) },
             SuggestionSource(store, store, store, clock, { flowOf(NormalizationDictionary.EMPTY) }, Dispatchers.Default),
             hints,
+            { flowOf(emptyList()) },
         )
         composeRule.setContent {
             CartMateTheme { ListsScreen(onOpenList = {}, onOpenFamily = { openedFamily++ }, viewModel = viewModel) }

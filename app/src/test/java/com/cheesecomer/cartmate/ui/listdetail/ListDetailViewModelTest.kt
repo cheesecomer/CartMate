@@ -132,11 +132,15 @@ class ListDetailViewModelTest {
         }
     }
 
-    /** 開いた直後の白紙（フィードバック #021） */
+    /** 開いた直後の白紙、チェック済みの項目があとから現れる（フィードバック #021） */
     @Test
-    fun `項目の購読が届く前は、リスト名と、読み込み済みの未購入の項目を並び順で出す`() = runTest {
+    fun `項目の購読が届く前は、リスト名と、読み込み済みの未購入とチェック済みの項目とチェックした人を、並び順で出す`() = runTest {
         store.addItem(newItem(listId, "牛乳"))
-        store.addItem(newItem(listId, "パン"))
+        actor = UserId("hanako")
+        val bread = store.addItem(newItem(listId, "パン")).id
+        store.completeItem(bread, clock.now)
+        actor = UserId("taro")
+        store.addItem(newItem(listId, "卵"))
         store.addItem(newItem(otherListId, "目薬"))
         listItemsArrived.value = false
 
@@ -144,25 +148,8 @@ class ListDetailViewModelTest {
         assertThat(viewModel.uiState.value.listName).isEqualTo("スーパー")
         viewModel.uiState.test {
             val state = awaitUntil { !it.loading }
-            assertThat(state.items.map { it.inputName }).containsExactly("牛乳", "パン").inOrder()
-            cancelAndIgnoreRemainingEvents()
-        }
-    }
-
-    @Test
-    fun `項目の購読が届く前に、先に出せる未購入の項目がなければ、項目がないとは出さずに待つ`() = runTest {
-        val bread = store.addItem(newItem(listId, "パン"))
-        store.completeItem(bread.id, checkedAt = clock.instant())
-        listItemsArrived.value = false
-
-        val viewModel = viewModelFor(listId, listName = "スーパー")
-        viewModel.uiState.test {
-            assertThat(awaitItem().loading).isTrue()
-            expectNoEvents()
-
-            listItemsArrived.value = true
-            val state = awaitUntil { !it.loading }
-            assertThat(state.items.map { it.inputName }).containsExactly("パン")
+            assertThat(state.items.map { it.inputName }).containsExactly("牛乳", "パン", "卵").inOrder()
+            assertThat(state.checkerName(state.items.single { it.inputName == "パン" })).isEqualTo("山田 花子")
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -447,8 +434,6 @@ class ListDetailViewModelTest {
         store.addItem(newItem(listId, "卵"))
         store.completeItem(milk, clock.now)
         viewModel.uiState.test {
-            // 読み込みが済んでから（読み込むまでは、チェック済みを除いた未購入の項目だけを先に出す。フィードバック #021）
-            awaitUntil { state -> state.items.any { it.inputName == "牛乳" } }
             store.addItem(newItem(listId, "パン"))
 
             val items = awaitUntil { state -> state.items.any { it.inputName == "パン" } }.items

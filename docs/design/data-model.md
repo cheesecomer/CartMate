@@ -115,7 +115,7 @@ config/ai                                    # 関数だけが読む。Firebase 
 
 共有とプライベートを2本に分けるのは、ルールで読めない可能性のあるドキュメントを含むクエリが拒否されるためです。Firestore の OR クエリ（`visibility == "shared" or createdBy == 自分`）がルールで許可されることを実装時に確認できれば、1本にまとめます。
 
-複合インデックスは、上のクエリ（`visibility` と `createdBy` / `purchasedBy`、リスト詳細の `listId`・`status`・`checkedAt`）に必要なものだけを作ります。定義は `firebase/firestore.indexes.json` にあります。等号の条件のフィールドはアルファベット順に並べ、範囲の条件のフィールドを最後に置きます（Firestore が求める並びと合わせるため）。
+複合インデックスは、上のクエリ（`visibility` と `createdBy` / `purchasedBy`、リスト詳細の `listId`・`status`・`checkedAt`、リスト一覧で読んでおく家族の最近の項目の `status`・`checkedAt`）に必要なものだけを作ります。定義は `firebase/firestore.indexes.json` にあります。等号の条件のフィールドはアルファベット順に並べ、範囲の条件のフィールドを最後に置きます（Firestore が求める並びと合わせるため）。
 
 ### 購入履歴の取得範囲（365日）
 

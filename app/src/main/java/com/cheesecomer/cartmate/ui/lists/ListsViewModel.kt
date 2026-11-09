@@ -24,6 +24,10 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.flow.map
+import com.cheesecomer.cartmate.domain.model.ItemStatus
+import com.cheesecomer.cartmate.domain.repository.MemberDirectory
 import kotlinx.coroutines.launch
 import java.time.Clock
 import java.time.Duration
@@ -60,6 +64,7 @@ class ListsViewModel @Inject constructor(
     onlineStatus: OnlineStatus,
     suggestionSource: SuggestionSource,
     private val hintStore: HintStore,
+    memberDirectory: MemberDirectory,
 ) : ViewModel() {
 
     /** 吹き出しを閉じた。保存が終わる前に一覧を作り直しても、もう出さない */
@@ -75,7 +80,9 @@ class ListsViewModel @Inject constructor(
     val uiState: StateFlow<ListsUiState> =
         combine(
             listRepository.observeLists(),
-            itemRepository.observeOpenItems(),
+            // 未購入の件数は、最近チェックした項目も含む購読から数える。この購読と、チェックした人の名前を、一覧を表示している
+            // 間に読んでおき、開いたリスト詳細ですぐに使う（フィードバック #021）
+            itemRepository.observeRecentItems().map { items -> items.filter { it.status == ItemStatus.OPEN } },
             // 予測と同じ範囲（直近365日）の購入の記録で、買い終わったリストかどうかを判定する
             purchaseRepository.observePurchases(since = clock.instant().minus(PURCHASE_WINDOW)),
         ) { lists, openItems, purchases ->
@@ -110,6 +117,8 @@ class ListsViewModel @Inject constructor(
             .combine(onlineStatus.observeOnline()) { state, online -> state.copy(offline = !online) }
             // アバターが出ているときだけ、吹き出しを出す
             .combine(familyHint) { state, hint -> state.copy(showFamilyHint = hint && state.account != null) }
+            // 名前は使わない。読んでおくだけで、一覧の表示は待たせない
+            .combine(memberDirectory.observeNames().map { }.onStart { emit(Unit) }) { state, _ -> state }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), ListsUiState())
 
     fun createList(name: String, memo: String, visibility: Visibility) {

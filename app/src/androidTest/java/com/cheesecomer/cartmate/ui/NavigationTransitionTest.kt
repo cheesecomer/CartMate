@@ -100,7 +100,7 @@ class NavigationTransitionTest {
                 ScreenNavHost(navController, startDestination = ListsRoute) {
                     screen<ListsRoute> {
                         val viewModel = viewModel {
-                            ListsViewModel(store, store, store, clock, FixedAccountRepository(null), { flowOf(true) }, SuggestionSource(store, store, store, clock, { flowOf(NormalizationDictionary.EMPTY) }, Dispatchers.Default), InMemoryHintStore())
+                            ListsViewModel(store, store, store, clock, FixedAccountRepository(null), { flowOf(true) }, SuggestionSource(store, store, store, clock, { flowOf(NormalizationDictionary.EMPTY) }, Dispatchers.Default), InMemoryHintStore(), { flowOf(emptyList()) })
                         }
                         ListsScreen(onOpenList = { navController.navigate(ListDetailRoute(it.id.value, it.name)) }, viewModel = viewModel)
                     }
@@ -181,9 +181,12 @@ class NavigationTransitionTest {
         assertWithMessage("戻った直後のタップが無視され、リスト詳細が開かなかった").that(opened).isTrue()
     }
 
-    /** 開いた直後に白紙になる（フィードバック #021）。リスト一覧で読み込み済みのリスト名と未購入の項目を、すぐに出す */
+    /**
+     * 開いた直後に白紙になる、チェック済みが遅れて現れる（フィードバック #021）。リスト一覧で読み込み済みのリスト名と、
+     * 未購入・チェック済みの項目を、すぐに出す
+     */
     @Test
-    fun リストを開くと_項目の購読が届く前から_リスト名と未購入の項目が表示され_届いたあとはチェック済みも加わる() {
+    fun リストを開くと_項目の購読が届く前から_リスト名と未購入とチェック済みの項目が表示され_届いたあとも変わらない() {
         val listId = showLists()
         val bread = runBlocking { store.addItem(NewItem(listId, "パン", 1.0, "個", null, Visibility.SHARED)) }
         runBlocking { store.completeItem(bread.id, checkedAt = clock.instant()) }
@@ -195,18 +198,17 @@ class NavigationTransitionTest {
         val shown = runCatching {
             composeRule.onNodeWithText("スーパー").assertIsDisplayed()
             composeRule.onNodeWithText("牛乳").assertIsDisplayed()
+            composeRule.onNodeWithText("パン").assertIsDisplayed()
         }.isSuccess
-        assertWithMessage("項目の購読が届くまで、リスト名と未購入の項目が表示されなかった").that(shown).isTrue()
+        assertWithMessage("項目の購読が届くまで、リスト名と未購入・チェック済みの項目が表示されなかった").that(shown).isTrue()
 
         listItemsArrived.value = true
         composeRule.waitForIdle()
 
-        // 画面が落ち着いたあと: 未購入の項目は表示されたまま、チェック済みの項目が加わる
+        // 画面が落ち着いたあと: 同じ表示のまま
         composeRule.onNodeWithText("スーパー").assertIsDisplayed()
         composeRule.onNodeWithText("牛乳").assertIsDisplayed()
-        composeRule.waitUntil(timeoutMillis = 5_000) {
-            runCatching { composeRule.onNodeWithText("パン").assertIsDisplayed() }.isSuccess
-        }
+        composeRule.onNodeWithText("パン").assertIsDisplayed()
     }
 
     private companion object {

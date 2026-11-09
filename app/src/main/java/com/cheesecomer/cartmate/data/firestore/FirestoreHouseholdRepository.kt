@@ -27,6 +27,9 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapNotNull
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
 import java.security.SecureRandom
 import java.time.Clock
@@ -45,6 +48,7 @@ class FirestoreHouseholdRepository @Inject constructor(
 ) : HouseholdRepository {
 
     private val random = SecureRandom()
+    private val background = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private val householdId: Flow<HouseholdId?> get() = session.householdId
 
@@ -83,7 +87,8 @@ class FirestoreHouseholdRepository @Inject constructor(
     private suspend fun ownUserDenied(uid: String): Boolean =
         runCatching { Paths.user(db, uid).get(Source.SERVER).await() }.exceptionOrNull()?.isPermissionDenied == true
 
-    override fun observeMembers(): Flow<List<Member>> = householdId.flatMapLatest { householdId ->
+    // リスト詳細が、チェックした人の名前を待たずに出せるよう共有する（フィードバック #021）
+    private val members: Flow<List<Member>> = householdId.flatMapLatest { householdId ->
         if (householdId == null) flowOf(emptyList())
         else recoverListen(
             listen = {
@@ -94,9 +99,11 @@ class FirestoreHouseholdRepository @Inject constructor(
             awaitPendingWrites = ::awaitPendingWrites,
             onError = ::logListenError,
         )
-    }
+    }.shareWhileObserved(background)
 
-    override fun observeAliases(): Flow<Map<UserId, String>> = session.uid.flatMapLatest { uid ->
+    override fun observeMembers(): Flow<List<Member>> = members
+
+    private val aliases: Flow<Map<UserId, String>> = session.uid.flatMapLatest { uid ->
         if (uid == null) flowOf(emptyMap())
         else recoverListen(
             listen = {
@@ -110,7 +117,9 @@ class FirestoreHouseholdRepository @Inject constructor(
             awaitPendingWrites = ::awaitPendingWrites,
             onError = ::logListenError,
         )
-    }
+    }.shareWhileObserved(background)
+
+    override fun observeAliases(): Flow<Map<UserId, String>> = aliases
 
     /** 本人だけが読める users と、家族全員が読める members の両方に書く。オフラインでも行えるよう、完了を待たない */
     override suspend fun setNickname(nickname: String?) {

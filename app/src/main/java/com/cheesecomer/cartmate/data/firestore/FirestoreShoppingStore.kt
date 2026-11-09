@@ -38,8 +38,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.tasks.await
 import java.time.Instant
 import javax.inject.Inject
@@ -71,14 +69,6 @@ class FirestoreShoppingStore @Inject constructor(
 ) : ShoppingListRepository, ItemRepository, PurchaseRepository {
 
     private val background = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-
-    /**
-     * 購読している画面が1つでもある間は、購読を1本にまとめ、最新の結果をアプリ内に持っておく。あとから購読した画面には、
-     * 端末のキャッシュを読み直さずにすぐ渡す（リスト一覧から開いたリスト詳細が、白紙にならない。フィードバック #021）。
-     * どの画面も購読していなくなったら止めて、持っていた結果も捨てる（古い結果を渡さない）
-     */
-    private fun <T> Flow<T>.shareWhileObserved(): Flow<T> =
-        shareIn(background, SharingStarted.WhileSubscribed(replayExpirationMillis = 0), replay = 1)
 
     /** 共有と自分のプライベートの2本の購読を1つにまとめる */
     private fun <T> observeVisible(
@@ -116,7 +106,7 @@ class FirestoreShoppingStore @Inject constructor(
         shared = { Paths.lists(db, it.householdId).visibleShared() },
         private = { Paths.lists(db, it.householdId).visiblePrivate(it.uid) },
         map = { it.toShoppingList() },
-    ).mapSorted { it.sortKey }.shareWhileObserved()
+    ).mapSorted { it.sortKey }.shareWhileObserved(background)
 
     override fun observeLists(): Flow<List<ShoppingList>> = lists
 
@@ -190,9 +180,21 @@ class FirestoreShoppingStore @Inject constructor(
         shared = { Paths.items(db, it.householdId).whereEqualTo(F.STATUS, V.OPEN).visibleShared() },
         private = { Paths.items(db, it.householdId).whereEqualTo(F.STATUS, V.OPEN).visiblePrivate(it.uid) },
         map = { it.toItem() },
-    ).mapSorted { it.createdAt }.shareWhileObserved()
+    ).mapSorted { it.createdAt }.shareWhileObserved(background)
 
     override fun observeOpenItems(): Flow<List<Item>> = openItems
+
+    /** 購読を始めた時刻から、さかのぼる期間を決める（[ItemRepository.observeRecentItems]） */
+    private val recentItems: Flow<List<Item>> = observeAll(
+        queries = {
+            val since = clock.instant().minus(ItemRepository.RECENT_WINDOW)
+            val items = Paths.items(db, it.householdId)
+            items.visibleShared().listItemQueries(since) + items.visiblePrivate(it.uid).listItemQueries(since)
+        },
+        map = { it.toItem() },
+    ).mapSorted { it.sortKey }.shareWhileObserved(background)
+
+    override fun observeRecentItems(): Flow<List<Item>> = recentItems
 
     override fun observeListItems(listId: ListId, completedSince: Instant): Flow<List<Item>> = observeAll(
         queries = {

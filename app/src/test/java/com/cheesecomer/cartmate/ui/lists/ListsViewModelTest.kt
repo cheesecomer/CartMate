@@ -34,7 +34,7 @@ class ListsViewModelTest {
     private val clock = MutableClock()
     private var user = UserId("taro")
     private val store = InMemoryStore(clock) { user }
-    private val viewModel = ListsViewModel(store, store, store, clock, FixedAccountRepository(null), { flowOf(true) }, SuggestionSource(store, store, store, clock, { flowOf(NormalizationDictionary.EMPTY) }, Dispatchers.Default), InMemoryHintStore())
+    private val viewModel = ListsViewModel(store, store, store, clock, FixedAccountRepository(null), { flowOf(true) }, SuggestionSource(store, store, store, clock, { flowOf(NormalizationDictionary.EMPTY) }, Dispatchers.Default), InMemoryHintStore(), { flowOf(emptyList()) })
 
     @Test
     fun `リストを作成すると、作成順に名前・備考・公開範囲・件数とともに表示される`() = runTest {
@@ -62,7 +62,7 @@ class ListsViewModelTest {
     private val account = Account(UserId("taro"), "山田 太郎", "taro@example.com", null)
 
     private fun viewModelWith(hints: HintStore, account: Account? = this.account) =
-        ListsViewModel(store, store, store, clock, FixedAccountRepository(account), { flowOf(true) }, SuggestionSource(store, store, store, clock, { flowOf(NormalizationDictionary.EMPTY) }, Dispatchers.Default), hints)
+        ListsViewModel(store, store, store, clock, FixedAccountRepository(account), { flowOf(true) }, SuggestionSource(store, store, store, clock, { flowOf(NormalizationDictionary.EMPTY) }, Dispatchers.Default), hints, { flowOf(emptyList()) })
 
     /** フィードバック #014。アバターが家族とアカウントの設定への入口だと分かるように */
     @Test
@@ -143,7 +143,7 @@ class ListsViewModelTest {
         val itemId = store.addItem(newItem(listId, "牛乳")).id
         store.completeItem(itemId, clock.now)
         clock.advance(Duration.ofHours(25))
-        val viewModel = ListsViewModel(store, store, store, clock, FixedAccountRepository(null), { flowOf(true) }, SuggestionSource(store, store, store, clock, { flowOf(NormalizationDictionary.EMPTY) }, Dispatchers.Default), InMemoryHintStore())
+        val viewModel = ListsViewModel(store, store, store, clock, FixedAccountRepository(null), { flowOf(true) }, SuggestionSource(store, store, store, clock, { flowOf(NormalizationDictionary.EMPTY) }, Dispatchers.Default), InMemoryHintStore(), { flowOf(emptyList()) })
 
         viewModel.uiState.test {
             val progress = awaitUntil { !it.loading }.lists.single().progress

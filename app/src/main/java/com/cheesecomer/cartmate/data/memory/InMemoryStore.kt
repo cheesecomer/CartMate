@@ -149,6 +149,15 @@ class InMemoryStore @Inject constructor(
         data.map { d -> d.items.values.filter { it.status == ItemStatus.OPEN && it.visible }.sortedBy(Item::createdAt) }
             .distinctUntilChanged()
 
+    override fun observeRecentItems(): Flow<List<Item>> {
+        val since = clock.instant().minus(ItemRepository.RECENT_WINDOW)
+        return data.map { d ->
+            d.items.values
+                .filter { it.visible && (it.status == ItemStatus.OPEN || it.completedAt!! >= since) }
+                .sortedBy(Item::sortKey)
+        }.distinctUntilChanged()
+    }
+
     override fun observeListItems(listId: ListId, completedSince: Instant): Flow<List<Item>> =
         data.map { d ->
             d.items.values

@@ -38,7 +38,6 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.map
@@ -180,9 +179,9 @@ class ListDetailViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), ListDetailUiState(listName = routeListName))
 
     /**
-     * 項目と、チェックした人の名前。端末のキャッシュから項目の購読が届くまでは、リスト一覧で読み込み済みの未購入の項目を
-     * 先に出す（開いた直後に白紙にしない。フィードバック #021）。チェック済みの項目は、購読が届いたときに加わる。
-     * 先に出せる未購入の項目がなければ、項目がないと一瞬出さないよう、購読が届くのを待つ
+     * 項目と、チェックした人の名前。端末のキャッシュから項目の購読が届くまでは、リスト一覧を表示している間に読んでおいた
+     * 家族の未購入と最近チェックした項目、メンバーの名前から、このリストの分を先に出す（開いた直後に白紙にせず、
+     * チェック済みの項目もあとから現れない。フィードバック #021）。読んでおいたものがなければ、購読が届くのを待つ
      */
     private fun listItems(): Flow<Pair<List<Item>, MemberNames>> {
         val loaded = combine(
@@ -190,10 +189,11 @@ class ListDetailViewModel @Inject constructor(
             members,
             ::Pair,
         )
-        val preview = itemRepository.observeOpenItems()
-            .map { items -> items.filter { it.listId == listId }.sortedBy(Item::sortKey) }
-            .filter { it.isNotEmpty() }
-            .map { it to MemberNames(emptyList()) }
+        val preview = combine(
+            itemRepository.observeRecentItems().map { items -> items.filter { it.listId == listId } },
+            members,
+            ::Pair,
+        )
         return loaded.precededBy(preview)
     }
 
