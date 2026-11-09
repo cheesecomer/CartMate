@@ -31,7 +31,7 @@ data class NameJudgement(
 
     companion object {
         /** 関数の JUDGE_VERSION（firebase/functions/src/ai.ts）と同じ。モデルかプロンプトを変えたら両方を上げる */
-        const val CURRENT_VERSION = "gpt-6-luna/1"
+        const val CURRENT_VERSION = "gpt-6-luna/2"
 
         /** pending のまま、これだけたったら問い合わせ直してよい（関数の PENDING_TIMEOUT_MS と同じ） */
         val PENDING_TIMEOUT: Duration = Duration.ofMinutes(5)
