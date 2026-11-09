@@ -137,6 +137,9 @@ dependencies {
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.auth)
     implementation(libs.firebase.firestore)
+    // AI の名寄せの関数を HTTPS で呼び、App Check のトークンを付ける（data/functions/CallableFunctions）
+    implementation(libs.firebase.appcheck)
+    implementation(libs.kotlinx.serialization.json)
     // App Check。リリース版は Play Integrity、デバッグ版はデバッグ用のプロバイダ（src/debug, src/release の AppCheckSetup）
     releaseImplementation(libs.firebase.appcheck.playintegrity)
     debugImplementation(libs.firebase.appcheck.debug)

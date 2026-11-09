@@ -9,6 +9,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.flow
 import com.cheesecomer.cartmate.domain.product.NormalizationDictionary
+import com.cheesecomer.cartmate.ui.suggestions.JudgementRequester
 import com.cheesecomer.cartmate.ui.suggestions.SuggestionSource
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
@@ -103,6 +104,7 @@ class ListDetailViewModelTest {
         listId: ListId,
         dictionary: DictionaryProvider = DictionaryProvider { flowOf(NormalizationDictionary.EMPTY) },
         listName: String = "",
+        judgementRequester: JudgementRequester = JudgementRequester.NONE,
     ) = ListDetailViewModel(
         savedStateHandle = SavedStateHandle(mapOf("listId" to listId.value, "listName" to listName)),
         listRepository = store,
@@ -116,6 +118,7 @@ class ListDetailViewModelTest {
         currentUser = { UserId("taro") },
         memberDirectory = { members },
         suggestionSource = SuggestionSource(store, store, store, clock, dictionary, Dispatchers.Main),
+        judgementRequester = judgementRequester,
     ).also(viewModels::add)
 
     /** リストを開いたときの表示の遅れ（フィードバック #016）。重いサジェストの計算を待たずに、項目を出す */
@@ -261,6 +264,26 @@ class ListDetailViewModelTest {
             states.awaitUntil { it.items.first().status == ItemStatus.OPEN }
             assertThat(store.observePurchases(Instant.EPOCH).first().single().active).isFalse()
             messages.expectNoEvents()
+            states.cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    /** 購入のあとに AI の判定を頼む（docs/design/suggestions.md「問い合わせる条件」） */
+    @Test
+    fun `チェックして購入を記録したら、AI の判定を頼む。すでにチェック済みなら頼まない`() = runTest {
+        store.addItem(newItem(listId, "胡麻ドレ"))
+        val purchased = mutableListOf<String>()
+        val viewModel = viewModelFor(listId, judgementRequester = { purchased += it.inputName })
+        turbineScope {
+            val states = viewModel.uiState.testIn(backgroundScope)
+            val item = states.awaitUntil { it.items.size == 1 }.items.single()
+            viewModel.check(item)
+            states.awaitUntil { it.items.single().status == ItemStatus.COMPLETED }
+            assertThat(purchased).containsExactly("胡麻ドレ")
+            // 開いていた画面の古い項目でもう一度チェックしても、記録は増えないので頼まない
+            viewModel.check(item)
+            testScheduler.advanceUntilIdle()
+            assertThat(purchased).containsExactly("胡麻ドレ")
             states.cancelAndIgnoreRemainingEvents()
         }
     }

@@ -1,5 +1,9 @@
 package com.cheesecomer.cartmate.di
 
+import com.cheesecomer.cartmate.ui.suggestions.AiCandidateSource
+import com.cheesecomer.cartmate.ui.suggestions.JudgedAiCandidateSource
+import com.cheesecomer.cartmate.ui.suggestions.JudgementRequester
+import com.cheesecomer.cartmate.ui.suggestions.NameJudgementRequester
 import com.cheesecomer.cartmate.data.firestore.FirestoreProductRepository
 import com.cheesecomer.cartmate.data.firestore.FirestoreShoppingStore
 import com.cheesecomer.cartmate.domain.model.UserId
@@ -43,6 +47,13 @@ abstract class DataModule {
     // 同梱の名寄せ辞書（docs/design/suggestions.md「名寄せ辞書」）
     @Binds
     abstract fun bindDictionaryProvider(provider: AssetDictionaryProvider): DictionaryProvider
+
+    // AI の名寄せ（docs/design/suggestions.md「AI による名寄せの候補」）
+    @Binds
+    abstract fun bindJudgementRequester(requester: NameJudgementRequester): JudgementRequester
+
+    @Binds
+    abstract fun bindAiCandidateSource(source: JudgedAiCandidateSource): AiCandidateSource
 
     companion object {
         @Provides

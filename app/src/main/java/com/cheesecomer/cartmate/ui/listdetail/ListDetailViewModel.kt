@@ -5,6 +5,7 @@ import com.cheesecomer.cartmate.domain.model.UserId
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.distinctUntilChanged
+import com.cheesecomer.cartmate.ui.suggestions.JudgementRequester
 import com.cheesecomer.cartmate.ui.suggestions.SuggestionSource
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
@@ -138,6 +139,8 @@ class ListDetailViewModel @Inject constructor(
     private val currentUser: CurrentUserProvider,
     private val memberDirectory: MemberDirectory,
     suggestionSource: SuggestionSource,
+    /** 購入のあとに AI の判定を頼む（docs/design/suggestions.md「問い合わせる条件」） */
+    private val judgementRequester: JudgementRequester = JudgementRequester.NONE,
 ) : ViewModel() {
 
     private val members: Flow<MemberNames> = memberDirectory.observeNames()
@@ -296,7 +299,7 @@ class ListDetailViewModel @Inject constructor(
     fun check(item: Item) {
         viewModelScope.launch {
             when (val result = itemRepository.completeItem(item.id, checkedAt = clock.instant())) {
-                CompleteResult.Completed -> Unit
+                CompleteResult.Completed -> judgementRequester.onPurchased(item)
                 is CompleteResult.AlreadyCompleted -> {
                     val names = memberDirectory.observeNames().first()
                     _messages.send(DetailMessage.AlreadyCompleted(item.inputName, names.of(result.by), result.at))

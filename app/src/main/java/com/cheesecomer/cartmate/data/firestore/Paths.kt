@@ -29,6 +29,9 @@ object Paths {
     fun products(db: FirebaseFirestore, id: HouseholdId): CollectionReference = household(db, id).collection("products")
 
     fun purchases(db: FirebaseFirestore, id: HouseholdId): CollectionReference = household(db, id).collection("purchases")
+
+    /** AI の名寄せの判定（関数だけが書く） */
+    fun nameJudgements(db: FirebaseFirestore, id: HouseholdId): CollectionReference = household(db, id).collection("nameJudgements")
 }
 
 /** フィールド名 */

@@ -269,6 +269,14 @@ private fun MergeOption(chip: MergeChip, onToggle: () -> Unit) {
                 style = MaterialTheme.typography.bodySmall,
                 color = colors.onSurfaceVariant,
             )
+            // AI の候補は、なぜ候補になったかを添える
+            chip.ai?.reasons?.forEach { reason ->
+                Text(
+                    stringResource(R.string.ai_merge_chip_label, reason.text),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.onSurfaceVariant,
+                )
+            }
         }
     }
 }

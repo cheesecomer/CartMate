@@ -10,6 +10,10 @@ import com.cheesecomer.cartmate.domain.product.ProductMerge
 import com.cheesecomer.cartmate.testing.MainDispatcherExtension
 import com.cheesecomer.cartmate.testing.MutableClock
 import com.cheesecomer.cartmate.testing.awaitUntil
+import com.cheesecomer.cartmate.testing.FakeAiDismissalRepository
+import com.cheesecomer.cartmate.testing.FakeNameJudgementRepository
+import com.cheesecomer.cartmate.ui.suggestions.JudgedAiCandidateSource
+import java.time.Duration
 import com.cheesecomer.cartmate.testing.createList
 import com.cheesecomer.cartmate.testing.newItem
 import com.google.common.truth.Truth.assertThat
@@ -44,6 +48,43 @@ class ProductNamesViewModelTest {
 
     private fun detail(id: ProductId) =
         ProductDetailViewModel(SavedStateHandle(mapOf("productId" to id.value)), catalog, store, store, { UserId("taro") }, clock)
+
+    @Test
+    fun `AI の候補を一覧の上に出し、選ぶとまとめて知らせ、出さないにすると消える`() = runTest {
+        val judgements = FakeNameJudgementRepository()
+        val dismissals = FakeAiDismissalRepository()
+        for (name in listOf("胡麻ドレ", "セサミドレ")) {
+            val id = store.addItem(newItem(listId, name)).id
+            store.completeItem(id, clock.instant())
+            clock.advance(Duration.ofMinutes(1))
+            judgements.judge(store.observeProducts().first().single { it.displayName == name }, "ごまドレッシング")
+        }
+        val source = JudgedAiCandidateSource(store, store, store, { flowOf(NormalizationDictionary.EMPTY) }, judgements, dismissals, clock)
+        val viewModel = ProductNamesViewModel(catalog, source) { flowOf(emptyList()) }
+        viewModel.lists.test {
+            val candidate = awaitUntil { it != null && it.aiCandidates.isNotEmpty() }!!.aiCandidates.single()
+            assertThat(candidate.source.displayName).isEqualTo("セサミドレ")
+            assertThat(candidate.target.displayName).isEqualTo("胡麻ドレ")
+
+            // 検索欄で絞り込むと、どちらかの名前に当たる候補だけ
+            viewModel.search("牛乳")
+            assertThat(awaitUntil { it?.query == "牛乳" }!!.aiCandidates).isEmpty()
+            viewModel.search("せさみ")
+            assertThat(awaitUntil { it?.query == "せさみ" }!!.aiCandidates).hasSize(1)
+            viewModel.search("")
+
+            viewModel.dismissAiCandidate(candidate)
+            assertThat(awaitUntil { it?.query == "" && it.aiCandidates.isEmpty() }!!.aiCandidates).isEmpty()
+            assertThat(dismissals.dismissed.value).containsExactly(candidate.pair)
+
+            dismissals.dismissed.value = emptySet()
+            viewModel.mergeAiCandidate(awaitUntil { it!!.aiCandidates.isNotEmpty() }!!.aiCandidates.single())
+            assertThat(viewModel.events.first()).isEqualTo(ProductNamesViewModel.Event.Merged("セサミドレ", "胡麻ドレ"))
+            val after = awaitUntil { it!!.aiCandidates.isEmpty() && it.entries.size == 1 }!!
+            assertThat(after.entries.single().members.map { it.displayName }).containsExactly("セサミドレ")
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
 
     @Test
     fun `一覧には未統合の商品を出し、まとめている商品の件数を添える`() = runTest {

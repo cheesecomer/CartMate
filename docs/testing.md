@@ -138,7 +138,9 @@ npx firebase emulators:exec --only firestore,auth --project demo-cartmate \
   - `firebase/functions` で `npm test` を実行します（Firestore のエミュレータを起動し、`vitest` を流す）。CI でも流します。
   - 関数の処理（`judgeName`）に、偽の AI と固定の時刻を渡して確かめます。App Check の強制は、呼び出し可能な関数を HTTP の呼び出しのように動かして、トークンのない呼び出しが処理の前に拒否されることで確かめます。
   - 判定のキーは、アプリと関数で同じ組（`firebase/functions/test/judgement-keys.json`）を使って確かめます。
-- 精度: AI の判定の正例・負例の一覧を、本物の API で一度に流して正解率を見る（CI では流さない。モデルやプロンプトを変えるときに使う）。
+- アプリの単体テスト: 購入のあとに判定を頼むこと（共有の項目だけ、判定があれば頼まない、通信できるまで待つ、二重に頼まない）と、商品名の管理・表記ゆれのチップの AI の候補（`AiJudgementsTest`、`ProductNamesViewModelTest`、`ItemEntryViewModelTest`）。偽の判定のリポジトリを使う。
+- Compose UI テスト: 商品名の管理の「AI の候補」の表示と、「まとめる」「この候補を出さない」のあとの状態（`ProductNamesAiCandidatesTest`）。
+- 精度: AI の判定の正例・負例の一覧を、本物の API で一度に流して正解率を見る（CI では流さない。モデルやプロンプトを変えるときに使う。`firebase/functions` で `npm run eval`。[suggestions.md](design/suggestions.md#ai-による名寄せの候補フェーズ6)）。
 
 ## テストデータ
 

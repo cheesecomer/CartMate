@@ -11,8 +11,10 @@ import androidx.lifecycle.viewModelScope
 import com.cheesecomer.cartmate.domain.model.Product
 import com.cheesecomer.cartmate.domain.model.ProductId
 import com.cheesecomer.cartmate.domain.text.NameNormalizer
+import com.cheesecomer.cartmate.domain.product.AiCandidates
 import com.cheesecomer.cartmate.domain.product.ProductMerge
 import com.cheesecomer.cartmate.domain.repository.ProductRepository
+import com.cheesecomer.cartmate.ui.suggestions.AiCandidateSource
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -22,6 +24,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
@@ -34,7 +37,12 @@ private const val STOP_TIMEOUT_MILLIS = 5_000L
 
 /** 「商品名の管理」の一覧（docs/requirements.md §3.5「商品名の管理」）。未統合の商品を並べ、検索欄で絞り込む */
 @HiltViewModel
-class ProductNamesViewModel @Inject constructor(catalog: ProductCatalog, memberDirectory: MemberDirectory) : ViewModel() {
+class ProductNamesViewModel @Inject constructor(
+    catalog: ProductCatalog,
+    /** AI の名寄せの候補（docs/design/suggestions.md「候補にする条件」） */
+    private val aiCandidates: AiCandidateSource = AiCandidateSource.NONE,
+    memberDirectory: MemberDirectory,
+) : ViewModel() {
 
     /** 非表示の商品と、非表示にした人（家族にいない人は null） */
     data class HiddenEntry(val entry: ProductMerge.Entry, val byName: String?)
@@ -44,12 +52,19 @@ class ProductNamesViewModel @Inject constructor(catalog: ProductCatalog, memberD
         val hidden: List<HiddenEntry>,
         /** 検索欄の文字。空なら絞り込まない */
         val query: String = "",
+        /** AI の候補。検索欄で絞り込んでいるときは、どちらかの名前が当たるものだけ */
+        val aiCandidates: List<AiCandidates.Candidate> = emptyList(),
     )
 
     private val query = MutableStateFlow("")
 
     /** 一覧と、一番下の「非表示の商品」（一時的に非表示と常に非表示）。どちらも検索欄で絞り込む。読み込み中は null */
-    val lists: StateFlow<Lists?> = combine(catalog.observe(), memberDirectory.observeNames(), query) { snapshot, names, query ->
+    val lists: StateFlow<Lists?> = combine(
+        catalog.observe(),
+        memberDirectory.observeNames(),
+        query,
+        aiCandidates.observe().onStart { emit(emptyList()) },
+    ) { snapshot, names, query, candidates ->
         Lists(
             entries = ProductMerge.entries(snapshot.products, snapshot.visibleIds, snapshot.dictionary, snapshot.hidden)
                 .filter { with(ProductMerge) { it.matches(query) } },
@@ -60,11 +75,38 @@ class ProductNamesViewModel @Inject constructor(catalog: ProductCatalog, memberD
                     HiddenEntry(entry, by?.let(names::of))
                 },
             query = query,
+            aiCandidates = candidates.filter { candidate ->
+                query.isBlank() || listOf(candidate.source, candidate.target).any { it.searchKey.contains(NameNormalizer.searchKey(query)) }
+            },
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), null)
 
     fun search(text: String) {
         query.value = text
+    }
+
+    sealed interface Event {
+        /** AI の候補を選んでまとめた */
+        data class Merged(val source: String, val target: String) : Event
+
+        /** まとめられなかった（ほかのメンバーが先に統合関係を変えていた など） */
+        data object MergeFailed : Event
+    }
+
+    private val _events = Channel<Event>(Channel.BUFFERED)
+    val events: Flow<Event> = _events.receiveAsFlow()
+
+    /** AI の候補を選んで、まとめる。解除は商品の画面からできるので、確認は出さない */
+    fun mergeAiCandidate(candidate: AiCandidates.Candidate) {
+        viewModelScope.launch {
+            val event = if (aiCandidates.merge(candidate)) Event.Merged(candidate.source.displayName, candidate.target.displayName) else Event.MergeFailed
+            _events.send(event)
+        }
+    }
+
+    /** 「この候補を出さない」 */
+    fun dismissAiCandidate(candidate: AiCandidates.Candidate) {
+        viewModelScope.launch { aiCandidates.dismiss(candidate.pair) }
     }
 }
 

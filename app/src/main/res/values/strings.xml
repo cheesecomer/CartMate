@@ -232,6 +232,15 @@
     <string name="product_detail_not_found">この商品は見つかりません</string>
     <string name="product_detail_gone">「%1$s」は購入の記録がなくなったため、商品名の管理から外れました</string>
     <string name="product_names_hidden">非表示の商品（%1$d件）</string>
+    <!-- AI の名寄せの候補（docs/design/ui.md「商品名の管理」） -->
+    <string name="ai_candidates_title">AI の候補（%1$d件）</string>
+    <string name="ai_candidate_merge_title">「%1$s」を「%2$s」にまとめる</string>
+    <string name="ai_candidate_reason">AI：%1$s</string>
+    <string name="ai_candidate_merge">まとめる</string>
+    <string name="ai_candidate_dismiss">この候補を出さない</string>
+    <string name="ai_candidate_merged">「%1$s」を「%2$s」にまとめました。商品の画面から解除できます</string>
+    <string name="ai_candidate_merge_failed">まとめられませんでした。一覧を確かめてください</string>
+    <string name="ai_merge_chip_label">AI の候補：%1$s</string>
     <string name="product_detail_other_section">商品名の変更と削除</string>
     <string name="product_delete_mine">自分の購入をすべて削除（%1$d件）</string>
     <string name="product_delete_mine_description">自分がチェックしたこの商品の購入を、チェック済みの項目ごとまとめて削除します</string>

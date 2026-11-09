@@ -53,6 +53,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -67,6 +68,7 @@ import com.cheesecomer.cartmate.R
 import com.cheesecomer.cartmate.domain.model.Item
 import com.cheesecomer.cartmate.domain.model.Product
 import com.cheesecomer.cartmate.domain.model.ProductId
+import com.cheesecomer.cartmate.domain.product.AiCandidates
 import com.cheesecomer.cartmate.domain.product.ProductMerge
 import com.cheesecomer.cartmate.domain.suggest.PurchaseHistory
 import com.cheesecomer.cartmate.domain.text.NameNormalizer
@@ -93,12 +95,40 @@ data class MergeProductsRoute(val targetId: String)
 @Composable
 fun ProductNamesScreen(onBack: () -> Unit, onOpen: (ProductId) -> Unit, viewModel: ProductNamesViewModel = hiltViewModel()) {
     val lists by viewModel.lists.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val resources = LocalResources.current
+    LaunchedEffect(viewModel) {
+        viewModel.events.collect { event ->
+            val message = when (event) {
+                is ProductNamesViewModel.Event.Merged -> resources.getString(R.string.ai_candidate_merged, event.source, event.target)
+                ProductNamesViewModel.Event.MergeFailed -> resources.getString(R.string.ai_candidate_merge_failed)
+            }
+            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+        }
+    }
     ProductScaffold(title = stringResource(R.string.product_merge_title), onBack = onBack) {
         val loaded = lists ?: return@ProductScaffold
         var showHidden by rememberSaveable { mutableStateOf(false) }
         LazyColumn(Modifier.fillMaxSize()) {
             item(key = "search") {
                 SearchField(loaded.query, viewModel::search, stringResource(R.string.product_names_search_hint))
+            }
+            // AI の候補は一覧の上に出す。選んだものだけをまとめる（docs/design/suggestions.md「候補にする条件」）
+            if (loaded.aiCandidates.isNotEmpty()) {
+                item(key = "ai-title") {
+                    SectionLabel(stringResource(R.string.ai_candidates_title, loaded.aiCandidates.size), Modifier.padding(bottom = CartMateSpacing.xSmall))
+                }
+                itemsIndexed(loaded.aiCandidates, key = { _, candidate -> "ai-" + candidate.pair.encode() }) { index, candidate ->
+                    AiCandidateRow(
+                        candidate,
+                        onMerge = { viewModel.mergeAiCandidate(candidate) },
+                        onDismiss = { viewModel.dismissAiCandidate(candidate) },
+                        first = index == 0,
+                        last = index == loaded.aiCandidates.lastIndex,
+                    )
+                }
+            }
+            item(key = "count") {
                 SectionLabel(stringResource(R.string.product_names_count, loaded.entries.size), Modifier.padding(bottom = CartMateSpacing.xSmall))
             }
             if (loaded.entries.isEmpty()) {
@@ -153,6 +183,39 @@ fun ProductNamesScreen(onBack: () -> Unit, onOpen: (ProductId) -> Unit, viewMode
             }
             item(key = "bottom") { Spacer(Modifier.height(CartMateSpacing.xLarge)) }
         }
+    }
+}
+
+/** AI の候補の行。どれをどれにまとめるかと、AI の判定の理由、「この候補を出さない」と「まとめる」 */
+@Composable
+private fun AiCandidateRow(candidate: AiCandidates.Candidate, onMerge: () -> Unit, onDismiss: () -> Unit, first: Boolean, last: Boolean) {
+    Column(Modifier.listCardSegment(first, last)) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .padding(start = CartMateSpacing.xLarge, end = CartMateSpacing.large, top = CartMateSpacing.medium),
+        ) {
+            Text(
+                stringResource(R.string.ai_candidate_merge_title, candidate.source.displayName, candidate.target.displayName),
+                style = MaterialTheme.typography.titleMedium,
+            )
+            for (reason in candidate.reasons) {
+                Text(
+                    stringResource(R.string.ai_candidate_reason, reason.text),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(CartMateSpacing.small, Alignment.End),
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth().padding(vertical = CartMateSpacing.small),
+            ) {
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.ai_candidate_dismiss)) }
+                FilledTonalButton(onClick = onMerge) { Text(stringResource(R.string.ai_candidate_merge)) }
+            }
+        }
+        if (!last) CardDivider()
     }
 }
 

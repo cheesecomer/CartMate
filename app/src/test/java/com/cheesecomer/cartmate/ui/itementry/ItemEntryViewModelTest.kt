@@ -24,6 +24,11 @@ import kotlinx.coroutines.flow.flowOf
 import com.cheesecomer.cartmate.domain.product.NormalizationDictionary
 import com.cheesecomer.cartmate.domain.product.ProductMerge
 import com.cheesecomer.cartmate.testing.awaitUntil
+import com.cheesecomer.cartmate.testing.FakeAiDismissalRepository
+import com.cheesecomer.cartmate.testing.FakeNameJudgementRepository
+import com.cheesecomer.cartmate.ui.suggestions.AiCandidateSource
+import com.cheesecomer.cartmate.ui.suggestions.JudgedAiCandidateSource
+import java.time.Duration
 
 class ItemEntryViewModelTest {
 
@@ -42,6 +47,7 @@ class ItemEntryViewModelTest {
         name: String = "",
         quantity: String? = null,
         unit: String? = null,
+        aiCandidates: AiCandidateSource = AiCandidateSource.NONE,
     ) = ItemEntryViewModel(
         savedStateHandle = SavedStateHandle(
             mapOf("listId" to listId.value, "itemId" to itemId?.value, "name" to name, "quantity" to quantity, "unit" to unit),
@@ -55,6 +61,7 @@ class ItemEntryViewModelTest {
         purchaseRepository = store,
         dictionaryProvider = { flowOf(NormalizationDictionary.EMPTY) },
         suggestionSource = SuggestionSource(store, store, store, clock, { flowOf(NormalizationDictionary.EMPTY) }, Dispatchers.Main),
+        aiCandidates = aiCandidates,
     )
 
     private suspend fun listItems(listId: ListId = this.listId) = store.observeListItems(listId, Instant.EPOCH).first()
@@ -121,6 +128,60 @@ class ItemEntryViewModelTest {
             assertThat(chip.selected).isFalse()
             cancelAndIgnoreRemainingEvents()
         }
+    }
+
+    /** [names] を共有の項目で購入し、どれも AI の品目を「ごまドレッシング」とした候補の元 */
+    private suspend fun judgedSource(vararg names: String): AiCandidateSource {
+        val judgements = FakeNameJudgementRepository()
+        for (name in names) {
+            val id = store.addItem(newItem(listId, name)).id
+            store.completeItem(id, clock.instant())
+            clock.advance(Duration.ofMinutes(1))
+            judgements.judge(store.observeProducts().first().single { it.displayName == name }, "ごまドレッシング")
+        }
+        return JudgedAiCandidateSource(store, store, store, { flowOf(NormalizationDictionary.EMPTY) }, judgements, FakeAiDismissalRepository(), clock)
+    }
+
+    @Test
+    fun `すでにある商品の名前で、AI の候補が1つに決まれば、理由を添えたチップを出す`() = runTest {
+        val source = judgedSource("胡麻ドレ", "セサミドレ")
+        val viewModel = viewModel(name = "セサミドレ", aiCandidates = source)
+        viewModel.mergeChip.test {
+            val chip = awaitUntil { it != null }!!
+            assertThat(chip.candidateName).isEqualTo("胡麻ドレ")
+            assertThat(chip.selected).isFalse()
+            assertThat(chip.ai?.reasons?.map { it.text }).containsExactly("セサミドレはごまドレッシング", "胡麻ドレはごまドレッシング")
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `AI のチップを選んで追加すると、すでにある商品どうしをまとめる`() = runTest {
+        val source = judgedSource("胡麻ドレ", "セサミドレ")
+        val viewModel = viewModel(name = "セサミドレ", aiCandidates = source)
+        viewModel.mergeChip.test {
+            awaitUntil { it != null }
+            viewModel.toggleMerge()
+            awaitUntil { it?.selected == true }
+            cancelAndIgnoreRemainingEvents()
+        }
+        viewModel.confirm()
+        viewModel.results.first()
+        val products = store.observeProducts().first().associateBy { it.displayName }
+        assertThat(products.getValue("セサミドレ").mergedInto).isEqualTo(products.getValue("胡麻ドレ").id)
+    }
+
+    @Test
+    fun `AI のチップを選ばずに追加すれば、まとめない`() = runTest {
+        val source = judgedSource("胡麻ドレ", "セサミドレ")
+        val viewModel = viewModel(name = "セサミドレ", aiCandidates = source)
+        viewModel.mergeChip.test {
+            awaitUntil { it != null }
+            cancelAndIgnoreRemainingEvents()
+        }
+        viewModel.confirm()
+        viewModel.results.first()
+        assertThat(store.observeProducts().first().all { it.mergedInto == null }).isTrue()
     }
 
     @Test

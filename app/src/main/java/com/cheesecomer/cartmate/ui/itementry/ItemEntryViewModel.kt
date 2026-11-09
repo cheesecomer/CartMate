@@ -36,7 +36,11 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import com.cheesecomer.cartmate.domain.model.ProductId
+import com.cheesecomer.cartmate.domain.product.AiCandidates
 import com.cheesecomer.cartmate.domain.product.MergeCandidates
+import com.cheesecomer.cartmate.domain.text.NameNormalizer
+import com.cheesecomer.cartmate.ui.suggestions.AiCandidateSource
+import kotlinx.coroutines.flow.onStart
 import com.cheesecomer.cartmate.domain.product.ProductGraph
 import com.cheesecomer.cartmate.domain.product.ProductHiding
 import com.cheesecomer.cartmate.domain.product.ProductUsage
@@ -65,8 +69,16 @@ data class EntryHistory(
     val memoCandidates: List<String>,
 )
 
-/** 表記ゆれのチップ「『[candidateName]』と同じ商品として扱う」 */
-data class MergeChip(val candidateId: ProductId, val candidateName: String, val selected: Boolean)
+/**
+ * 表記ゆれのチップ「『[candidateName]』と同じ商品として扱う」。[ai] は AI の候補のとき（入力した名前の商品がすでにあり、
+ * AI の判定で同じ品目の商品が見つかった。docs/design/suggestions.md「候補にする条件」）
+ */
+data class MergeChip(
+    val candidateId: ProductId,
+    val candidateName: String,
+    val selected: Boolean,
+    val ai: AiCandidates.Candidate? = null,
+)
 
 data class ItemEntryUiState(
     val listName: String = "",
@@ -87,6 +99,8 @@ class ItemEntryViewModel @Inject constructor(
     purchaseRepository: PurchaseRepository,
     dictionaryProvider: DictionaryProvider,
     suggestionSource: SuggestionSource,
+    /** AI の名寄せの候補 */
+    private val aiCandidates: AiCandidateSource = AiCandidateSource.NONE,
 ) : ViewModel() {
 
     /** 「追加先: スーパー（共有リスト 3人）」の人数 */
@@ -108,11 +122,8 @@ class ItemEntryViewModel @Inject constructor(
         purchaseRepository.observePurchases(since = clock.instant().minus(PURCHASE_WINDOW)),
     ) { items, purchases -> ProductUsage.of(items, purchases) }
 
-    /**
-     * 表記ゆれのチップ（docs/design/suggestions.md「表記ゆれの紐付け」）。新しい商品の追加で、入力した名前が新しい商品のときだけ出す。
-     * 初期状態は未選択
-     */
-    val mergeChip: StateFlow<MergeChip?> = combine(
+    /** 規則の候補のチップ。新しい商品の追加で、入力した名前が新しい商品のときだけ出す */
+    private val ruleChip: Flow<MergeChip?> = combine(
         _uiState,
         productRepository.observeProducts(),
         productUsage,
@@ -131,7 +142,33 @@ class ItemEntryViewModel @Inject constructor(
         val candidate = MergeCandidates.find(entry.name, visible, products, dictionary)
             ?: return@combine null
         MergeChip(candidate.id, candidate.displayName, selected = selected == candidate.id)
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), null)
+    }
+
+    /**
+     * AI の候補のチップ。新しい項目の追加で、入力した名前の商品がすでにあり、その商品に AI の候補が1つに決まるときだけ出す
+     * （新しい名前は、まだ判定がないので出ない）
+     */
+    private val aiChip: Flow<MergeChip?> = combine(
+        _uiState.map { state -> state.entry?.takeIf { it.editing == null }?.name?.trim() }.distinctUntilChanged(),
+        productRepository.observeProducts(),
+        aiCandidates.observe().onStart { emit(emptyList()) },
+        selectedCandidate,
+    ) { name, products, candidates, selected ->
+        if (name.isNullOrEmpty()) return@combine null
+        val id = ProductId(NameNormalizer.productId(name))
+        if (products.none { it.id == id }) return@combine null
+        val root = ProductGraph(products).resolve(id)
+        val candidate = AiCandidates.forProduct(root, candidates) ?: return@combine null
+        val other = if (candidate.source.id == root) candidate.target else candidate.source
+        MergeChip(other.id, other.displayName, selected = selected == other.id, ai = candidate)
+    }
+
+    /**
+     * 表記ゆれのチップ（docs/design/suggestions.md「表記ゆれの紐付け」）。新しい商品の追加で、入力した名前が新しい商品のときは規則の候補、
+     * すでにある商品のときは AI の候補を出す。初期状態は未選択
+     */
+    val mergeChip: StateFlow<MergeChip?> = combine(ruleChip, aiChip) { rule, ai -> rule ?: ai }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), null)
 
     /** 前回の購入と備考の候補。新しい商品の追加で、商品名があるときだけ（編集では出さない） */
     val history: StateFlow<EntryHistory?> = combine(
@@ -210,9 +247,11 @@ class ItemEntryViewModel @Inject constructor(
             if (editing == null) {
                 // 選んだ公開範囲を、このリストでの次の追加の初期値にする
                 if (entry.visibilitySelectable) lastVisibility.set(listId, values.visibility)
-                // チップを選んでいれば、新しい商品を最初から候補の商品に統合する
-                val mergeInto = mergeChip.value?.takeIf { it.selected }?.candidateId
+                // チップを選んでいれば、新しい商品を最初から候補の商品に統合する。AI の候補なら、すでにある商品どうしをまとめる
+                val chip = mergeChip.value?.takeIf { it.selected }
+                val mergeInto = chip?.takeIf { it.ai == null }?.candidateId
                 val added = itemRepository.addItem(NewItem(listId, values.name, values.quantity, values.unit, values.memo, values.visibility, mergeInto))
+                chip?.ai?.let { aiCandidates.merge(it) }
                 _results.send(if (added.asksRound) ItemEntryResult.ADDED_ASKS_ROUND else ItemEntryResult.ADDED)
             } else {
                 val update = ItemUpdate(values.name, values.quantity, values.unit, values.memo)

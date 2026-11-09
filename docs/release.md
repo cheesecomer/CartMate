@@ -67,7 +67,7 @@ Play Console の「ポリシーとプログラム > アプリのコンテンツ�
 
 ## データセーフティ
 
-アプリの依存は Firebase Authentication・Cloud Firestore・App Check（Play Integrity）だけで、広告・解析・Firebase Installations は入っていません（`./gradlew :app:dependencies --configuration releaseRuntimeClasspath` で確かめる）。
+アプリの依存は Firebase Authentication・Cloud Firestore・App Check（Play Integrity）だけで、広告・解析・Firebase Installations は入っていません（`./gradlew :app:dependencies --configuration releaseRuntimeClasspath` で確かめる）。Cloud Functions は SDK を使わずに HTTPS で呼びます（SDK が Installations を持ち込むため）。
 
 - データを収集する: はい。第三者と共有する: いいえ（Firebase は処理の委託先で、共有に当たらない）。
 - 送信中のデータの暗号化: はい（HTTPS）。
@@ -87,7 +87,12 @@ Play Console の「ポリシーとプログラム > アプリのコンテンツ�
 - おおよその位置情報: Firebase Authentication は IP アドレスを不正防止に使うが、位置の推定には使わないため。
 - デバイスまたはその他の ID: Firebase Installations を含まず、Play Integrity のトークンは端末の識別子ではないため。
 
-取得する情報を変えたら、プライバシーポリシーと一緒に直します。フェーズ6で商品名を外部の AI API に送るようになったら、両方に加えます。
+取得する情報を変えたら、プライバシーポリシーと一緒に直します。
+
+フェーズ6からは、共有の項目で購入した商品名と、備考から規則で読み取った属性を、OpenAI の API（委託先）に送ります（[ai-setup.md](ai-setup.md)）。
+
+- データセーフティでは「アプリのアクティビティ > その他のユーザー作成コンテンツ」の目的に「アプリの機能」があるので、項目は増えません。OpenAI はアプリの代わりに処理する委託先なので、第三者との共有には当たりません。
+- プライバシーポリシーには、送るものと送らないもの、応答を保存させないことを書いています（`firebase/hosting/privacy/index.html`）。関数と同じタイミングで公開します。
 
 ## App Check の強制
 
