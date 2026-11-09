@@ -60,6 +60,14 @@ npx --prefix rules-test firebase functions:secrets:set OPENAI_API_KEY
 ```
 
 - 初回は Secret Manager の API を有効にするか聞かれるので、有効にします。
+- 登録できたかは、次のコマンドで確かめます。キーの値は表示されず、版の一覧が出ます。版が1つあり、状態が `ENABLED` なら登録できています。
+
+  ```sh
+  npx --prefix rules-test firebase functions:secrets:get OPENAI_API_KEY
+  ```
+
+  Google Cloud コンソールの「セキュリティ > Secret Manager」で、`OPENAI_API_KEY` の版を見ても確かめられます。値を表示する操作（`functions:secrets:access` や、コンソールの「シークレットの値を表示」）は、画面やログにキーが残るので使いません。
+- キーそのものが使えるかは、デプロイのあとに「完了の確認」の手順で確かめます。
 - 登録したキーは関数（`judgeName`）だけが読めます。デプロイのときに、関数のサービス アカウントに読み取りの権限が付きます。
 - キーを作り直したら、同じコマンドで新しい版を登録し、関数をデプロイし直します（関数は、デプロイしたときの版を読むため）。古い版は `firebase functions:secrets:prune` で消します。
 
