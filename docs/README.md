@@ -18,5 +18,6 @@
 | [testing.md](testing.md) | テスト戦略 |
 | [roadmap.md](roadmap.md) | 実装フェーズ |
 | [release.md](release.md) | Play Console への登録、署名、データセーフティ、App Check の強制の手順 |
+| [ai-setup.md](ai-setup.md) | AI の名寄せの準備（Blaze、予算アラート、API キー、イメージの自動削除、`config/ai`、デプロイ）の手順 |
 
 振る舞いを変える場合は、まず requirements.md を更新し、それから該当する設計資料を更新します。デザインの資料どうしで食い違う場合の優先順位は [design/ui.md](design/ui.md#見た目の基準) にあります。
