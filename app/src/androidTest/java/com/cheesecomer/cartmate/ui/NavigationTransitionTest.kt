@@ -13,7 +13,6 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.rememberNavController
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.cheesecomer.cartmate.data.memory.FixedAccountRepository
@@ -37,6 +36,14 @@ import com.google.common.truth.Truth.assertWithMessage
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.take
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import com.cheesecomer.cartmate.domain.model.Item
+import com.cheesecomer.cartmate.domain.repository.ItemRepository
 import kotlinx.coroutines.runBlocking
 import org.junit.Rule
 import org.junit.Test
@@ -46,8 +53,10 @@ import java.time.Instant
 
 /**
  * 画面の遷移中のタップ（フィードバック #015・#017）。遷移のアニメーションの間は、離れようとしている画面もまだ表示されているので、
- * そこへのタップで項目がチェックされたり、もう一度戻ってリスト一覧まで消えたりしないこと。アプリと同じ [screen] で行き先を作る
+ * そこへのタップで項目がチェックされたり、もう一度戻ってリスト一覧まで消えたりしないこと。
+ * あわせて、リストを開く速さ（フィードバック #021）。アプリと同じ [ScreenNavHost] と [screen] で行き先を作る
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(AndroidJUnit4::class)
 class NavigationTransitionTest {
 
@@ -59,23 +68,46 @@ class NavigationTransitionTest {
     private val suggestions = SuggestionSource(store, store, store, clock, { flowOf(NormalizationDictionary.EMPTY) }, Dispatchers.Default)
     private val lastVisibility = LastVisibilityStore()
 
+    /** false の間は、リスト詳細の項目の購読が届かない（端末のキャッシュの読み込みに時間がかかっている） */
+    private val listItemsArrived = MutableStateFlow(true)
+    private val items = object : ItemRepository by store {
+        override fun observeListItems(listId: ListId, completedSince: Instant): Flow<List<Item>> =
+            listItemsArrived.filter { it }.take(1).flatMapLatest { store.observeListItems(listId, completedSince) }
+    }
+
+    /** リスト一覧の「スーパー」のカードの位置 */
+    private var listCard = Offset.Zero
+
     private fun setUp(): ListId {
+        val listId = showLists()
+        listCard = centerOf(composeRule.onNodeWithText("スーパー").fetchSemanticsNode().boundsInRoot)
+        // リスト詳細を開き、遷移が終わるまで待つ
+        composeRule.onNodeWithText("スーパー").performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            runCatching { composeRule.onNodeWithText("牛乳").assertIsDisplayed() }.isSuccess
+        }
+        composeRule.waitForIdle()
+        return listId
+    }
+
+    /** 牛乳のあるリスト「スーパー」を作り、リスト一覧を表示する */
+    private fun showLists(): ListId {
         val listId = runBlocking { store.createList(NewList("スーパー", null, Visibility.SHARED)) }
         runBlocking { store.addItem(NewItem(listId, "牛乳", 1.0, "本", null, Visibility.SHARED)) }
         composeRule.setContent {
             val navController = rememberNavController()
             CartMateTheme {
-                NavHost(navController, startDestination = ListsRoute) {
+                ScreenNavHost(navController, startDestination = ListsRoute) {
                     screen<ListsRoute> {
                         val viewModel = viewModel {
                             ListsViewModel(store, store, store, clock, FixedAccountRepository(null), { flowOf(true) }, SuggestionSource(store, store, store, clock, { flowOf(NormalizationDictionary.EMPTY) }, Dispatchers.Default), InMemoryHintStore())
                         }
-                        ListsScreen(onOpenList = { navController.navigate(ListDetailRoute(it.value)) }, viewModel = viewModel)
+                        ListsScreen(onOpenList = { navController.navigate(ListDetailRoute(it.id.value, it.name)) }, viewModel = viewModel)
                     }
                     screen<ListDetailRoute> {
                         val viewModel = viewModel {
                             ListDetailViewModel(
-                                createSavedStateHandle(), store, store, lastVisibility, clock,
+                                createSavedStateHandle(), store, items, lastVisibility, clock,
                                 { UserId("taro") }, { flowOf(emptyList()) }, suggestions,
                             )
                         }
@@ -89,11 +121,6 @@ class NavigationTransitionTest {
                     }
                 }
             }
-        }
-        // リスト詳細を開き、遷移が終わるまで待つ
-        composeRule.onNodeWithText("スーパー").performClick()
-        composeRule.waitUntil(timeoutMillis = 5_000) {
-            runCatching { composeRule.onNodeWithText("牛乳").assertIsDisplayed() }.isSuccess
         }
         composeRule.waitForIdle()
         return listId
@@ -138,8 +165,54 @@ class NavigationTransitionTest {
         composeRule.onNodeWithText("スーパー").assertIsDisplayed()
     }
 
+    /** 戻った直後のタップが効かず、開くのが遅い（フィードバック #021） */
+    @Test
+    fun リスト詳細から戻って0_4秒後にリストをタップすると_リスト詳細が開く() {
+        setUp()
+        composeRule.mainClock.autoAdvance = false
+        composeRule.onNodeWithContentDescription("戻る").performClick()
+        composeRule.mainClock.advanceTimeBy(TAP_AFTER_BACK_MILLIS)
+        composeRule.onRoot().performTouchInput { click(listCard) }
+        composeRule.mainClock.autoAdvance = true
+        composeRule.waitForIdle()
+
+        // 画面が落ち着いたあと: リスト詳細が開いている
+        val opened = runCatching { composeRule.onNodeWithText("牛乳").assertIsDisplayed() }.isSuccess
+        assertWithMessage("戻った直後のタップが無視され、リスト詳細が開かなかった").that(opened).isTrue()
+    }
+
+    /** 開いた直後に白紙になる（フィードバック #021）。リスト一覧で読み込み済みのリスト名と未購入の項目を、すぐに出す */
+    @Test
+    fun リストを開くと_項目の購読が届く前から_リスト名と未購入の項目が表示され_届いたあとはチェック済みも加わる() {
+        val listId = showLists()
+        val bread = runBlocking { store.addItem(NewItem(listId, "パン", 1.0, "個", null, Visibility.SHARED)) }
+        runBlocking { store.completeItem(bread.id, checkedAt = clock.instant()) }
+        listItemsArrived.value = false
+
+        composeRule.onNodeWithText("スーパー").performClick()
+        composeRule.waitForIdle()
+
+        val shown = runCatching {
+            composeRule.onNodeWithText("スーパー").assertIsDisplayed()
+            composeRule.onNodeWithText("牛乳").assertIsDisplayed()
+        }.isSuccess
+        assertWithMessage("項目の購読が届くまで、リスト名と未購入の項目が表示されなかった").that(shown).isTrue()
+
+        listItemsArrived.value = true
+        composeRule.waitForIdle()
+
+        // 画面が落ち着いたあと: 未購入の項目は表示されたまま、チェック済みの項目が加わる
+        composeRule.onNodeWithText("スーパー").assertIsDisplayed()
+        composeRule.onNodeWithText("牛乳").assertIsDisplayed()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            runCatching { composeRule.onNodeWithText("パン").assertIsDisplayed() }.isSuccess
+        }
+    }
+
     private companion object {
-        /** 遷移のアニメーション（700ms）の途中 */
+        /** 遷移のアニメーション（0.3秒）の途中 */
         const val TRANSITION_MIDWAY_MILLIS = 200L
+        /** 遷移のアニメーション（0.3秒）が終わった少しあと */
+        const val TAP_AFTER_BACK_MILLIS = 400L
     }
 }

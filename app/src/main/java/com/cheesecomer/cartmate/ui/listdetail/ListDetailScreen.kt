@@ -82,8 +82,9 @@ import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 import java.time.Instant
 
+/** [listName] は開く前の画面で表示していたリスト名。読み込みを待たずに、最初の画面からタイトルに出す（フィードバック #021） */
 @Serializable
-data class ListDetailRoute(val listId: String)
+data class ListDetailRoute(val listId: String, val listName: String = "")
 
 /**
  * @param entryResults 商品詳細入力画面から戻ったときの結果

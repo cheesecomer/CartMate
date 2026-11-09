@@ -38,6 +38,8 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.tasks.await
 import java.time.Instant
 import javax.inject.Inject
@@ -67,6 +69,16 @@ class FirestoreShoppingStore @Inject constructor(
     private val db: FirebaseFirestore,
     private val clock: Clock,
 ) : ShoppingListRepository, ItemRepository, PurchaseRepository {
+
+    private val background = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    /**
+     * 購読している画面が1つでもある間は、購読を1本にまとめ、最新の結果をアプリ内に持っておく。あとから購読した画面には、
+     * 端末のキャッシュを読み直さずにすぐ渡す（リスト一覧から開いたリスト詳細が、白紙にならない。フィードバック #021）。
+     * どの画面も購読していなくなったら止めて、持っていた結果も捨てる（古い結果を渡さない）
+     */
+    private fun <T> Flow<T>.shareWhileObserved(): Flow<T> =
+        shareIn(background, SharingStarted.WhileSubscribed(replayExpirationMillis = 0), replay = 1)
 
     /** 共有と自分のプライベートの2本の購読を1つにまとめる */
     private fun <T> observeVisible(
@@ -100,11 +112,13 @@ class FirestoreShoppingStore @Inject constructor(
 
     // ShoppingListRepository
 
-    override fun observeLists(): Flow<List<ShoppingList>> = observeVisible(
+    private val lists: Flow<List<ShoppingList>> = observeVisible(
         shared = { Paths.lists(db, it.householdId).visibleShared() },
         private = { Paths.lists(db, it.householdId).visiblePrivate(it.uid) },
         map = { it.toShoppingList() },
-    ).mapSorted { it.sortKey }
+    ).mapSorted { it.sortKey }.shareWhileObserved()
+
+    override fun observeLists(): Flow<List<ShoppingList>> = lists
 
     private suspend fun cachedLists(scope: FirestoreSession.Scope): List<ShoppingList> {
         val lists = Paths.lists(db, scope.householdId)
@@ -172,11 +186,13 @@ class FirestoreShoppingStore @Inject constructor(
 
     // ItemRepository
 
-    override fun observeOpenItems(): Flow<List<Item>> = observeVisible(
+    private val openItems: Flow<List<Item>> = observeVisible(
         shared = { Paths.items(db, it.householdId).whereEqualTo(F.STATUS, V.OPEN).visibleShared() },
         private = { Paths.items(db, it.householdId).whereEqualTo(F.STATUS, V.OPEN).visiblePrivate(it.uid) },
         map = { it.toItem() },
-    ).mapSorted { it.createdAt }
+    ).mapSorted { it.createdAt }.shareWhileObserved()
+
+    override fun observeOpenItems(): Flow<List<Item>> = openItems
 
     override fun observeListItems(listId: ListId, completedSince: Instant): Flow<List<Item>> = observeAll(
         queries = {
@@ -388,7 +404,6 @@ class FirestoreShoppingStore @Inject constructor(
     }
 
     private val rejectedChecks = MutableSharedFlow<RejectedCheck>(extraBufferCapacity = 16)
-    private val background = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun observeRejectedChecks(): Flow<RejectedCheck> = rejectedChecks
 

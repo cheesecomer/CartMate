@@ -67,7 +67,7 @@ import com.cheesecomer.cartmate.ui.components.AvatarSmall
 
 @Composable
 fun ListsScreen(
-    onOpenList: (ListId) -> Unit,
+    onOpenList: (ListSummary) -> Unit,
     onOpenFamily: () -> Unit = {},
     viewModel: ListsViewModel = hiltViewModel(),
 ) {
@@ -139,7 +139,7 @@ private fun FamilyHint(show: Boolean, onDismiss: () -> Unit, anchor: @Composable
 @Composable
 fun ListsContent(
     state: ListsUiState,
-    onOpenList: (ListId) -> Unit,
+    onOpenList: (ListSummary) -> Unit,
     onOpenFamily: () -> Unit,
     onCreateList: (name: String, memo: String, Visibility) -> Unit,
     onMoveList: (ListId, previous: ListId?, next: ListId?) -> Unit,
@@ -222,7 +222,7 @@ fun ListsContent(
 @Composable
 private fun ListGrid(
     lists: List<ListSummary>,
-    onOpenList: (ListId) -> Unit,
+    onOpenList: (ListSummary) -> Unit,
     onMoveList: (ListId, previous: ListId?, next: ListId?) -> Unit,
     contentPadding: PaddingValues,
 ) {
@@ -258,7 +258,7 @@ private fun ListGrid(
             ReorderableItem(reorderState, key = list.id.value) { dragging ->
                 ListCard(
                     list = list,
-                    onClick = { onOpenList(list.id) },
+                    onClick = { onOpenList(list) },
                     dragging = dragging,
                     modifier = Modifier.longPressDraggableHandle(
                         onDragStarted = { order.startDrag() },

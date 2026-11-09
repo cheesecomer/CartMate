@@ -38,6 +38,9 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
@@ -141,6 +144,8 @@ class ListDetailViewModel @Inject constructor(
     private val members: Flow<MemberNames> = memberDirectory.observeNames()
 
     private val listId = ListId(checkNotNull(savedStateHandle.get<String>(ListDetailRoute::listId.name)))
+    /** 開く前の画面で表示していたリスト名。読み込みを待たずに、最初の画面からタイトルに出す（フィードバック #021） */
+    private val routeListName = savedStateHandle.get<String>(ListDetailRoute::listName.name).orEmpty()
 
     private val addItemState = MutableStateFlow(AddItemState.Initial)
     private val asksRound = MutableStateFlow(false)
@@ -152,9 +157,9 @@ class ListDetailViewModel @Inject constructor(
 
     val uiState: StateFlow<ListDetailUiState> = combine(
         listRepository.observeLists().map { lists -> lists.firstOrNull { it.id == listId } },
-        itemRepository.observeListItems(listId, completedSince = clock.instant().minus(COMPLETED_WINDOW)),
+        listItems(),
         addItemState,
-    ) { listOrDeleted, items, addItem ->
+    ) { listOrDeleted, (items, names), addItem ->
         // 削除したリストでも、未購入の項目が残っている間は開ける（docs/design/sync.md「リスト削除の競合」）
         val list = listOrDeleted?.takeIf { ListDisplay.isShown(it, items.count { item -> item.status == ItemStatus.OPEN }) }
         ListDetailUiState(
@@ -165,14 +170,32 @@ class ListDetailViewModel @Inject constructor(
             items = ShoppingRound.visible(items, windowStart = clock.instant().minus(COMPLETED_WINDOW), clearedAt = list?.clearedAt),
             addItem = addItem,
             loading = false,
+            memberNames = names,
         )
-    }.combine(members) { state, names -> state.copy(memberNames = names) }
-        .combine(suggestions(suggestionSource)) { state, suggestions -> state.copy(suggestions = suggestions, me = currentUser.currentUserId()) }
+    }.combine(suggestions(suggestionSource)) { state, suggestions -> state.copy(suggestions = suggestions, me = currentUser.currentUserId()) }
         .combine(lastVisibility.observe(listId)) { state, remembered ->
             state.copy(addVisibility = VisibilityDefaults.initial(state.listVisibility, remembered))
         }
         .combine(asksRound) { state, asks -> state.copy(asksRound = asks) }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), ListDetailUiState())
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), ListDetailUiState(listName = routeListName))
+
+    /**
+     * 項目と、チェックした人の名前。端末のキャッシュから項目の購読が届くまでは、リスト一覧で読み込み済みの未購入の項目を
+     * 先に出す（開いた直後に白紙にしない。フィードバック #021）。チェック済みの項目は、購読が届いたときに加わる。
+     * 先に出せる未購入の項目がなければ、項目がないと一瞬出さないよう、購読が届くのを待つ
+     */
+    private fun listItems(): Flow<Pair<List<Item>, MemberNames>> {
+        val loaded = combine(
+            itemRepository.observeListItems(listId, completedSince = clock.instant().minus(COMPLETED_WINDOW)),
+            members,
+            ::Pair,
+        )
+        val preview = itemRepository.observeOpenItems()
+            .map { items -> items.filter { it.listId == listId }.sortedBy(Item::sortKey) }
+            .filter { it.isNotEmpty() }
+            .map { it to MemberNames(emptyList()) }
+        return loaded.precededBy(preview)
+    }
 
     /**
      * 開いている間に、ほかのメンバーがチェックしたら、約3秒分をチェックした人ごとに1件にまとめて知らせる
@@ -342,6 +365,15 @@ class ListDetailViewModel @Inject constructor(
                 // 通信の問題など
                 null -> _messages.send(DetailMessage.Failed)
             }
+        }
+    }
+
+    /** この Flow の最初の値が届くまでは、[preview] の最初の値を流す。届いたら [preview] はやめる */
+    private fun <T> Flow<T>.precededBy(preview: Flow<T>): Flow<T> = channelFlow {
+        val early = launch { preview.firstOrNull()?.let { send(it) } }
+        collect {
+            early.cancelAndJoin()
+            send(it)
         }
     }
 

@@ -1,5 +1,8 @@
 package com.cheesecomer.cartmate.ui
 
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.collectAsState
@@ -14,6 +17,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
+import androidx.navigation.NavHostController
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -60,11 +64,11 @@ fun CartMateNavHost(pending: PendingNavigation, onDeleteAccount: () -> Unit) {
     LaunchedEffect(joinCode) {
         pending.consumeJoin()?.let { navController.navigate(JoinConfirmRoute(it)) }
     }
-    NavHost(navController = navController, startDestination = ListsRoute) {
+    ScreenNavHost(navController = navController, startDestination = ListsRoute) {
         // 遷移の操作は、その画面が操作中（RESUMED）のときだけ行う。遷移の途中に重なった操作で、2回戻ったり2回開いたりしない
         screen<ListsRoute> { entry ->
             ListsScreen(
-                onOpenList = { entry.whenResumed { navController.navigate(ListDetailRoute(it.value)) } },
+                onOpenList = { entry.whenResumed { navController.navigate(ListDetailRoute(it.id.value, it.name)) } },
                 onOpenFamily = { entry.whenResumed { navController.navigate(FamilyRoute) } },
             )
         }
@@ -150,7 +154,25 @@ fun NavGraphBuilder.joinGraph(navController: NavController) {
 }
 
 /**
- * 画面の行き先。遷移のアニメーション（約0.7秒のクロスフェード）の間は、離れようとしている画面もまだ表示されていて、
+ * 画面の切り替えのアニメーションを含めた NavHost。テストでも、アプリと同じ切り替えで確かめる。
+ * 切り替えの間はタップを受けない（[screen]）ので、既定の約0.7秒のクロスフェードでは、戻った直後のタップが無視されて
+ * 遅く感じる（フィードバック #021）。短いクロスフェードにする
+ */
+@Composable
+fun ScreenNavHost(navController: NavHostController, startDestination: Any, builder: NavGraphBuilder.() -> Unit) {
+    NavHost(
+        navController = navController,
+        startDestination = startDestination,
+        enterTransition = { fadeIn(tween(SCREEN_TRANSITION_MILLIS)) },
+        exitTransition = { fadeOut(tween(SCREEN_TRANSITION_MILLIS)) },
+        builder = builder,
+    )
+}
+
+private const val SCREEN_TRANSITION_MILLIS = 300
+
+/**
+ * 画面の行き先。遷移のアニメーション（約0.3秒のクロスフェード。[ScreenNavHost]）の間は、離れようとしている画面もまだ表示されていて、
  * 戻るときはそちらが手前にあるので、タップを受けてしまう（戻った直後の一覧へのタップで項目がチェックされる、
  * 一覧のタイトルの位置のタップでもう一度戻って白紙になる。フィードバック #015・#017）。
  * そこで、操作中（RESUMED）でない画面は入力を受けない。遷移の間のタップは、どちらの画面にも届かない

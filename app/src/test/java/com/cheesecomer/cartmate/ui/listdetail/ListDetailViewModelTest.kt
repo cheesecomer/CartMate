@@ -32,6 +32,10 @@ import com.cheesecomer.cartmate.ui.itementry.ItemEntryResult
 import com.cheesecomer.cartmate.ui.itementry.LastVisibilityStore
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.flow.first
+import com.cheesecomer.cartmate.domain.model.Item
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.take
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
@@ -73,6 +77,9 @@ class ListDetailViewModelTest {
 
     private val lastVisibility = LastVisibilityStore()
 
+    /** false の間は、リスト詳細の項目の購読が届かない（端末のキャッシュの読み込みに時間がかかっている） */
+    private val listItemsArrived = MutableStateFlow(true)
+
     /**
      * テストで作った ViewModel。テストの終わりに止める。項目はサジェストの計算を待たずに出るので、テストが終わった時点で
      * 計算が残っていることがあり、止めないと Dispatchers.Main を戻したあとに動いて、次のテストで失敗する
@@ -91,14 +98,18 @@ class ListDetailViewModelTest {
         viewModels.forEach { it.viewModelScope.coroutineContext.job.cancelAndJoin() }
     }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     private fun viewModelFor(
         listId: ListId,
         dictionary: DictionaryProvider = DictionaryProvider { flowOf(NormalizationDictionary.EMPTY) },
+        listName: String = "",
     ) = ListDetailViewModel(
-        savedStateHandle = SavedStateHandle(mapOf("listId" to listId.value)),
+        savedStateHandle = SavedStateHandle(mapOf("listId" to listId.value, "listName" to listName)),
         listRepository = store,
         itemRepository = object : ItemRepository by store {
             override fun observeRejectedChecks(): Flow<RejectedCheck> = rejectedChecks
+            override fun observeListItems(listId: ListId, completedSince: Instant): Flow<List<Item>> =
+                listItemsArrived.filter { it }.take(1).flatMapLatest { store.observeListItems(listId, completedSince) }
         },
         lastVisibility = lastVisibility,
         clock = clock,
@@ -117,6 +128,41 @@ class ListDetailViewModelTest {
             val state = awaitUntil { !it.loading }
             assertThat(state.items.map { it.inputName }).containsExactly("牛乳")
             assertThat(state.suggestions).isEqualTo(SheetSuggestions.Loading)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    /** 開いた直後の白紙（フィードバック #021） */
+    @Test
+    fun `項目の購読が届く前は、リスト名と、読み込み済みの未購入の項目を並び順で出す`() = runTest {
+        store.addItem(newItem(listId, "牛乳"))
+        store.addItem(newItem(listId, "パン"))
+        store.addItem(newItem(otherListId, "目薬"))
+        listItemsArrived.value = false
+
+        val viewModel = viewModelFor(listId, listName = "スーパー")
+        assertThat(viewModel.uiState.value.listName).isEqualTo("スーパー")
+        viewModel.uiState.test {
+            val state = awaitUntil { !it.loading }
+            assertThat(state.items.map { it.inputName }).containsExactly("牛乳", "パン").inOrder()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `項目の購読が届く前に、先に出せる未購入の項目がなければ、項目がないとは出さずに待つ`() = runTest {
+        val bread = store.addItem(newItem(listId, "パン"))
+        store.completeItem(bread.id, checkedAt = clock.instant())
+        listItemsArrived.value = false
+
+        val viewModel = viewModelFor(listId, listName = "スーパー")
+        viewModel.uiState.test {
+            assertThat(awaitItem().loading).isTrue()
+            expectNoEvents()
+
+            listItemsArrived.value = true
+            val state = awaitUntil { !it.loading }
+            assertThat(state.items.map { it.inputName }).containsExactly("パン")
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -401,6 +447,8 @@ class ListDetailViewModelTest {
         store.addItem(newItem(listId, "卵"))
         store.completeItem(milk, clock.now)
         viewModel.uiState.test {
+            // 読み込みが済んでから（読み込むまでは、チェック済みを除いた未購入の項目だけを先に出す。フィードバック #021）
+            awaitUntil { state -> state.items.any { it.inputName == "牛乳" } }
             store.addItem(newItem(listId, "パン"))
 
             val items = awaitUntil { state -> state.items.any { it.inputName == "パン" } }.items
