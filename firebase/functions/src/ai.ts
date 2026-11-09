@@ -4,8 +4,8 @@ import type { Qualifiers } from "./key.js";
 /** モデル（docs/design/suggestions.md「費用」） */
 export const MODEL = "gpt-6-luna";
 
-/** モデルかプロンプトを変えたら上げる。古い判定は使われなくなり、次に必要になったときに問い合わせ直す */
-export const JUDGE_VERSION = `${MODEL}/1`;
+/** モデルかプロンプトを変えたら上げる。古い判定は使われなくなり、次に必要になったときに問い合わせ直す。アプリの NameJudgement.CURRENT_VERSION も同じ値にする（JudgementKeyTest で確かめる） */
+export const JUDGE_VERSION = "gpt-6-luna/1";
 
 /** 100万トークンあたりの米ドル（2026-11-09 に確かめた gpt-6-luna の標準の料金）を、1トークンあたりの100万分の1ドルにしたもの */
 export const PRICE_MICRO_USD = { input: 0.1, cachedInput: 0.01, output: 0.5 };
@@ -69,11 +69,12 @@ export function costMicroUsd(usage: AiUsage): number {
   );
 }
 
-/** OpenAI の Responses API で判定する */
-export function openAiClient(apiKey: string): AiClient {
-  const client = new OpenAI({ apiKey, timeout: 15_000, maxRetries: 1 });
+/** OpenAI の Responses API で判定する。クライアントは AI を呼ぶときに作る（止める設定や上限で呼ばないときは、キーを読まない） */
+export function openAiClient(apiKey: () => string): AiClient {
+  let client: OpenAI | undefined;
   return {
     async judge(input) {
+      client ??= new OpenAI({ apiKey: apiKey(), timeout: 15_000, maxRetries: 1 });
       const response = await client.responses.create({
         model: MODEL,
         instructions: INSTRUCTIONS,

@@ -20,5 +20,5 @@ export const judgeName = onCall(
     timeoutSeconds: 60,
     memory: "256MiB",
   },
-  (request) => judge(request, { db: getFirestore(), ai: openAiClient(OPENAI_API_KEY.value()), now: () => new Date() }),
+  (request) => judge(request, { db: getFirestore(), ai: openAiClient(() => OPENAI_API_KEY.value()), now: () => new Date() }),
 );

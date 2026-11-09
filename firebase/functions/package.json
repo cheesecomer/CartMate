@@ -8,7 +8,8 @@
   },
   "scripts": {
     "build": "tsc",
-    "test": "firebase emulators:exec --only firestore --project demo-cartmate \"vitest run\""
+    "test": "firebase emulators:exec --only firestore --project demo-cartmate \"vitest run\"",
+    "eval": "npm run build && node eval/run.mjs"
   },
   "dependencies": {
     "firebase-admin": "^13.10.0",
@@ -16,6 +17,7 @@
     "openai": "^6.49.0"
   },
   "devDependencies": {
+    "@anthropic-ai/sdk": "^1.6.0",
     "@types/node": "^22.20.5",
     "firebase-tools": "^15.35.0",
     "typescript": "^5.9.3",
