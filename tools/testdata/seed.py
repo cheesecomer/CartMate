@@ -68,7 +68,7 @@ SHOWCASE_LISTS = [
     ("homecenter", "ホームセンター", 3.0, "shared", None),
     ("birthday", "誕生日の準備", 4.0, "private", "日曜のパーティー"),
 ]
-# 商品名, リスト, 数量, 単位, 備考, 公開範囲, 作った人（花子なら True）, チェックした時刻（何時間前か。未購入は None）
+# 商品名, リスト, 数量, 単位, 備考, 公開範囲, 作った人（花子なら True）, チェックした時刻（SHOWCASE_CLOCK の何時間前か。未購入は None）
 # スーパーは、ストアの掲載画像で上から「未チェック → 自分がチェック → 他人がチェック」を並べて見せ、
 # 4行目からは未チェックを続ける
 SHOWCASE_ITEMS = [
@@ -82,6 +82,9 @@ SHOWCASE_ITEMS = [
     ("ろうそく", "誕生日の準備", 1, "箱", None, "private", False, None),
     ("クラッカー", "誕生日の準備", 6, "個", None, "private", False, None),
 ]
+# スクリーンショットのステータスバーの時刻（take.sh のデモモードの 10:00）。チェックした時刻をこれに合わせて固定し、
+# 撮るたびに画像が変わらないようにする
+SHOWCASE_CLOCK = datetime.time(10, 0)
 # サジェストのシートで、時期が近い商品の下に出す「よく買う商品」。間隔が 3・20・9 日でばらつく（周期が不安定）ので、
 # 時期が近い商品には出ない。商品名, リスト, 数量, 単位, 備考, 購入日（今日から何日前か）
 SHOWCASE_PURCHASES = [
@@ -241,10 +244,14 @@ def main():
             "role": "member", "displayName": MEMBER_NAME, "photoUrl": None,
             "joinedAt": now - datetime.timedelta(days=100), "joinedVia": None,
         })
+        clock = datetime.datetime.combine(now.date(), SHOWCASE_CLOCK, now.tzinfo)
         for index, (name, list_name, quantity, unit, memo, visibility, by_member, hours) in enumerate(SHOWCASE_ITEMS):
             pid = product(name, now - datetime.timedelta(days=1))
             by = MEMBER_UID if by_member else uid
-            checked_at = now - datetime.timedelta(hours=hours) if hours else None
+            checked_at = clock - datetime.timedelta(hours=hours) if hours else None
+            # 撮る時刻より後なら、未来にならないよう前日の同じ時刻にする（24時間以内なので、チェック済みとして表示される）
+            if checked_at and checked_at > now:
+                checked_at -= datetime.timedelta(days=1)
             created_at = now - datetime.timedelta(hours=20 - index)
             item(f"showcase-{index}", pid, name, list_name, quantity, unit, memo, visibility, by, 1000 + index, created_at, checked_at)
             count += 1 if checked_at else 0
