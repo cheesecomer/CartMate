@@ -204,9 +204,10 @@ internal fun AddItemSheetContent(
                 )
             }
             is SheetSuggestions.Items -> if (suggestions.rows.isNotEmpty()) {
-                // 長押しで商品の画面を開けることに気づけるよう、一覧の上に案内を常に出す（フィードバック #014）。
-                // 商品のない候補（まだ買ったことのない名前）は長押しできないので、長押しできる候補があるときだけ出す
-                if (suggestions.rows.any { it.suggestion.productId != null }) {
+                // 長押しで商品の画面を開けることに気づけるよう、一覧の上に案内を出す（フィードバック #014）。
+                // 商品のない候補（まだ買ったことのない名前）は長押しできないので、長押しできる候補があるときだけ出す。
+                // 入力中は補完の候補を多く見せるため、未入力のときだけ出す（フィードバック #022）
+                if (value.text.isBlank() && suggestions.rows.any { it.suggestion.productId != null }) {
                     Text(
                         stringResource(R.string.add_item_long_press_hint),
                         style = MaterialTheme.typography.bodySmall,

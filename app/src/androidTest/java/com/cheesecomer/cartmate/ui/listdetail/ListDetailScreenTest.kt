@@ -21,6 +21,8 @@ import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.onNodeWithText
@@ -54,6 +56,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.time.Clock
+import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -244,6 +247,40 @@ class ListDetailScreenTest {
         composeRule.onNodeWithText("数量を設定して追加").assertIsDisplayed()
     }
 
+    /** 長押しの案内は未入力のときだけ出し、入力中は隠す。入力を消すとまた出す（フィードバック #022） */
+    @Test
+    fun 長押しの案内は未入力のときだけ出し_入力中は隠して_消すとまた出す() {
+        // 7日ごとに買っている牛乳を、未入力のときに時期が近い商品として出す
+        listOf(21L, 14L, 7L).forEach { daysAgo ->
+            val id = addItem("牛乳").id
+            runBlocking { store.completeItem(id, clock.instant().minus(Duration.ofDays(daysAgo))) }
+        }
+        setContent()
+        val hint = "長押しで、まとめる・非表示・購入履歴を開けます"
+
+        openSheet()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            runCatching { composeRule.onNodeWithText("日ごと", substring = true).assertIsDisplayed() }.isSuccess
+        }
+        composeRule.onNodeWithText(hint).assertIsDisplayed()
+
+        composeRule.onNodeWithTag(AddItemTags.SHEET_INPUT).performTextInput("牛")
+        // 補完の候補に切り替わるまで待つ
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag(AddItemTags.SUGGESTION).fetchSemanticsNodes().isNotEmpty() &&
+                composeRule.onAllNodesWithText("日ごと", substring = true).fetchSemanticsNodes().isEmpty()
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText(hint).assertDoesNotExist()
+
+        composeRule.onNodeWithContentDescription("入力を消す").performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            runCatching { composeRule.onNodeWithText("日ごと", substring = true).assertIsDisplayed() }.isSuccess
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText(hint).assertIsDisplayed()
+    }
+
     /**
      * 候補の長押しで商品の画面を開く。補完の「追加済み」には、どのリストに入っているかを添える。
      * 今日買ったばかりなので、周期が分からなくても前回の購入日を添える
@@ -262,9 +299,6 @@ class ListDetailScreenTest {
         composeRule.waitUntil(timeoutMillis = 5_000) {
             runCatching { composeRule.onNodeWithText(note).assertIsDisplayed() }.isSuccess
         }
-        // 長押しできることを、候補の一覧の上で伝える（フィードバック #014）
-        composeRule.onNodeWithText("長押しで、まとめる・非表示・購入履歴を開けます").assertIsDisplayed()
-
         composeRule.onNodeWithText(note).performTouchInput { longClick() }
         composeRule.waitForIdle()
 
