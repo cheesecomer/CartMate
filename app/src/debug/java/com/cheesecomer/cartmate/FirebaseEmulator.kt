@@ -4,6 +4,9 @@ import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
+import java.time.Clock
+import java.time.Instant
+import java.time.ZoneId
 
 /**
  * デバッグ版を Firebase のエミュレータ（Auth と Firestore）につなぐ。`-PfirebaseEmulator` を付けてビルドしたときだけ。
@@ -21,6 +24,23 @@ object FirebaseEmulator {
 
     /** ログイン画面に、テスト用ユーザーでログインするボタンを出すか。スクリーンショットでは隠す（ScreenshotTour） */
     var testUserSignInVisible = true
+
+    /**
+     * アプリの「今」を固定する。null なら端末の時計。スクリーンショットで、テストデータ（seed.py --now）と同じ日時にして、
+     * 撮る日で画像が変わらないようにする（ScreenshotTour）
+     */
+    @Volatile
+    var fixedNow: Instant? = null
+
+    /**
+     * アプリが使う時計（DataModule）。アプリの起動時に作られた部品にも効くよう、時刻を聞かれるたびに [fixedNow] を見る
+     */
+    val clock: Clock = object : Clock() {
+        private val system = systemDefaultZone()
+        override fun getZone(): ZoneId = system.zone
+        override fun withZone(zone: ZoneId): Clock = fixedNow?.let { fixed(it, zone) } ?: system.withZone(zone)
+        override fun instant(): Instant = fixedNow ?: system.instant()
+    }
 
     /** Firebase へのアクセスより先に呼ぶ */
     fun install() {

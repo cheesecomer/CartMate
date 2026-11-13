@@ -19,6 +19,10 @@ OUT="${1:-$ROOT/docs/screenshots}"
 WORK="$ROOT/build/screenshots"
 PROJECT="cartmate-cheesecomer"
 PACKAGE="com.cheesecomer.cartmate"
+# 撮るときの「今」。テストデータの日付とアプリの時計をこれに固定し、撮る日で画像（購入日・招待コードの残り時間など）が
+# 変わらないようにする。画面には月日と時刻だけが出る。招待コードは実際の時刻で期限を判定する（Firestore のルール）ので、
+# 期限が切れないよう未来の日付にする。時刻はステータスバー（デモモードの 10:00）に合わせる
+SHOWCASE_NOW="2099-11-14T10:00"
 DEVICE_DIR="/sdcard/Android/data/$PACKAGE/files/screenshots"
 
 if ! command -v adb >/dev/null; then
@@ -77,7 +81,7 @@ if ! nc -z 127.0.0.1 8085 2>/dev/null || ! nc -z 127.0.0.1 9099 2>/dev/null; the
 fi
 
 # 2. テストデータ
-python3 "$ROOT/tools/testdata/seed.py" --showcase --project "$PROJECT"
+python3 "$ROOT/tools/testdata/seed.py" --showcase --project "$PROJECT" --now "$SHOWCASE_NOW"
 
 # 3. アプリとテスト。前の起動のログインとキャッシュを残さない
 (cd "$ROOT" && ./gradlew -q :app:installDebug :app:installDebugAndroidTest -PfirebaseEmulator)
@@ -108,10 +112,14 @@ demo clock -e hhmm 1000
 demo battery -e level 100 -e plugged false
 demo network -e wifi show -e level 4 -e fully true -e mobile hide
 demo notifications -e visible false
+# デモモードでも、通知のアイコン（「画面ロックが未設定」の盾など）がステータスバーに残ることがあるので、出ている通知を
+# 1時間止める（snooze。通知は消えず、時間がたつと戻る）
+adb shell dumpsys notification --noredact | sed -n 's/^ *NotificationRecord(.* key=\([^ ]*\): Notification(.*/\1/p' | sort -u |
+  while read -r key; do adb shell "cmd notification snooze --for 3600000 '$key'" >/dev/null </dev/null || true; done
 
 # 4. 撮って取り出す。am instrument はテストが失敗しても 0 で終わるので、結果の行で判定する。
 # 失敗したときも、そこまでに撮った画面と、失敗したときの画面（failed.png）を取り出す
-result="$(adb shell am instrument -w -e screenshots true -e class "$PACKAGE.screenshots.ScreenshotTour" \
+result="$(adb shell am instrument -w -e screenshots true -e now "$SHOWCASE_NOW" -e class "$PACKAGE.screenshots.ScreenshotTour" \
   "$PACKAGE.test/androidx.test.runner.AndroidJUnitRunner")"
 rm -rf "$WORK"/*.png
 adb pull "$DEVICE_DIR/." "$WORK" >/dev/null 2>&1 || true

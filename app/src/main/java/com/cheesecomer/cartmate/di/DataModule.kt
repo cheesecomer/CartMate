@@ -19,6 +19,7 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import java.time.Clock
+import com.cheesecomer.cartmate.FirebaseEmulator
 import com.cheesecomer.cartmate.data.dictionary.AssetDictionaryProvider
 import com.cheesecomer.cartmate.domain.repository.DictionaryProvider
 import com.cheesecomer.cartmate.ui.hints.HintStore
@@ -56,8 +57,9 @@ abstract class DataModule {
     abstract fun bindAiCandidateSource(source: JudgedAiCandidateSource): AiCandidateSource
 
     companion object {
+        // 端末の時計。デバッグ版のスクリーンショットでは固定する（FirebaseEmulator.fixedNow）
         @Provides
-        fun provideClock(): Clock = Clock.systemDefaultZone()
+        fun provideClock(): Clock = FirebaseEmulator.clock
 
         @Provides
         fun provideCurrentUserProvider(auth: FirebaseAuth): CurrentUserProvider =

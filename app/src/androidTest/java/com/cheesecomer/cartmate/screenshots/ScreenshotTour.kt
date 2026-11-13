@@ -9,6 +9,8 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasScrollToNodeAction
+import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isOn
@@ -37,6 +39,8 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
+import java.time.LocalDateTime
+import java.time.ZoneId
 import kotlin.math.ceil
 
 /**
@@ -66,6 +70,10 @@ class ScreenshotTour {
         FirebaseAuth.getInstance().signOut()
         // ストアや README に載せるので、ログイン画面にエミュレータ用のボタンを出さない。ログインは直接する
         FirebaseEmulator.testUserSignInVisible = false
+        // テストデータ（seed.py --now）と同じ「今」にする。撮る日で購入日や招待コードの残り時間が変わらないように
+        InstrumentationRegistry.getArguments().getString("now")?.let {
+            FirebaseEmulator.fixedNow = LocalDateTime.parse(it).atZone(ZoneId.systemDefault()).toInstant()
+        }
         // 一度だけ出す案内（アバターの吹き出し）は、見たことにして写さない。take.sh がアプリのデータを消すので、毎回入れる
         runBlocking { SharedPreferencesHintStore(instrumentation.targetContext).markShown(Hint.FAMILY_ENTRY) }
     }
@@ -73,6 +81,7 @@ class ScreenshotTour {
     @After
     fun restoreTestUserSignIn() {
         FirebaseEmulator.testUserSignInVisible = true
+        FirebaseEmulator.fixedNow = null
     }
 
     @Test
@@ -296,14 +305,47 @@ class ScreenshotTour {
 
     /** 画面が落ち着くのを待ってから、画面全体を撮る */
     private fun capture(name: String) {
+        // 戻るキーを送ると、端末がタッチ操作の状態から外れ、最初のボタンにフォーカスの丸が出る。端末の状態で出たり
+        // 出なかったりするので、タッチ操作の状態に戻してから撮る
+        instrumentation.setInTouchMode(true)
         settle()
         if (name != FAILED) {
             check(composeRule.onAllNodes(hasText("オフライン表示中", substring = true), useUnmergedTree = true).fetchSemanticsNodes().isEmpty()) {
                 "オフラインの表示で撮ろうとした: $name（tools/screenshots/take.sh で端末をオンラインにする）"
             }
         }
-        val bitmap = checkNotNull(instrumentation.uiAutomation.takeScreenshot()) { "スクリーンショットを撮れない: $name" }
+        val bitmap = if (hasFocusedTextField()) withoutCursor(name) else screenshot(name)
         File(outputDir, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+    }
+
+    private fun screenshot(name: String): Bitmap =
+        checkNotNull(instrumentation.uiAutomation.takeScreenshot()) { "スクリーンショットを撮れない: $name" }
+
+    /** 入力欄にフォーカスがあり、カーソルが点滅している */
+    private fun hasFocusedTextField(): Boolean =
+        composeRule.onAllNodes(isFocused() and hasSetTextAction(), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+
+    /**
+     * カーソルが消えている瞬間の1枚。点滅のどちらで撮れるかで、撮るたびに画像が変わらないようにする。
+     * 点滅の1周期（表示と非表示が 500ms ずつ）をまたいで何枚か撮り、いちばん明るいもの（カーソルは背景より暗い）を選ぶ
+     */
+    private fun withoutCursor(name: String): Bitmap {
+        val frames = List(CURSOR_SAMPLES) { index ->
+            if (index > 0) {
+                // 点滅はテストの時計で動くので、実時間で待つだけでは進まない。時計を進めてから、描かれるのを待つ
+                composeRule.mainClock.advanceTimeBy(CURSOR_SAMPLE_MILLIS)
+                composeRule.waitForIdle()
+                SystemClock.sleep(FRAME_MILLIS)
+            }
+            screenshot(name)
+        }
+        return frames.maxBy(::brightness).also { chosen -> frames.filter { it !== chosen }.forEach(Bitmap::recycle) }
+    }
+
+    private fun brightness(bitmap: Bitmap): Long {
+        val pixels = IntArray(bitmap.width * bitmap.height)
+        bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
+        return pixels.sumOf { ((it shr 16 and 0xFF) + (it shr 8 and 0xFF) + (it and 0xFF)).toLong() }
     }
 
     private companion object {
@@ -317,5 +359,11 @@ class ScreenshotTour {
         const val SCREEN_WIDTH = 1080
         const val SCREEN_HEIGHT = 1920
         const val MAX_RESIZES = 3
+
+        /** カーソルの点滅の1周期（1秒）を、間をあけて撮った枚数でまたぐ */
+        const val CURSOR_SAMPLES = 6
+        const val CURSOR_SAMPLE_MILLIS = 250L
+        /** 進めた時計の画面が、実際に描かれるまで待つ時間 */
+        const val FRAME_MILLIS = 100L
     }
 }
