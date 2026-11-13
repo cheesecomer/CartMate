@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+
+<html lang="ja"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+<title>CartMate - Item Suggestion Bottom Sheet</title>
+<!-- Tailwind CSS CDN v3 with forms and container-queries -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script data-purpose="tailwind-config">
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            m3: {
+              surface: '#FEF7FF',
+              surfaceVariant: '#E7E0EC',
+              primary: '#6750A4',
+              primaryContainer: '#EADDFF',
+              onPrimary: '#FFFFFF',
+              onPrimaryContainer: '#21005D',
+              secondaryContainer: '#E8DEF8',
+              onSecondaryContainer: '#1D192B',
+              outline: '#79747E',
+              outlineVariant: '#CAC4D0',
+              onSurface: '#1D1B20',
+              onSurfaceVariant: '#49454F',
+              actionPurple: '#6B4E8C',
+              chipBgLilac: '#F2E7FE',
+              chipTextDeep: '#4A2E70',
+              searchBg: '#F5EBF9',
+            }
+          },
+          fontFamily: {
+            sans: ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Display"', '"SF Pro Text"', '"Roboto"', '"Noto Sans JP"', 'sans-serif'],
+          }
+        }
+      }
+    };
+  </script>
+<style data-purpose="base-typography">
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Roboto", "Noto Sans JP", sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+  </style>
+<style data-purpose="scrollbar-hidden">
+    /* Hide scrollbars for clean bottom sheet appearance while remaining scrollable */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+<body class="bg-black flex items-center justify-center min-h-screen p-0 sm:p-4 text-m3-onSurface">
+<!-- BEGIN: PhoneFrame -->
+<div class="relative w-full max-w-[420px] h-[890px] max-h-[100vh] bg-[#9C94A0] overflow-hidden flex flex-col justify-between sm:rounded-[44px] shadow-2xl border-0 sm:border-[8px] sm:border-neutral-900 select-none">
+<!-- BEGIN: BackgroundLayer (Dimmed behind bottom sheet) -->
+<div class="absolute inset-0 bg-[#EADBEE] pointer-events-none z-0 flex flex-col" data-purpose="dimmed-background">
+<!-- Top Status Bar Mock behind sheet -->
+<div class="w-full h-11 pt-3 px-6 flex justify-between items-center text-neutral-800 text-sm font-semibold">
+<span>10:00</span>
+<div class="flex items-center space-x-2">
+<!-- Wi-Fi Icon -->
+<svg class="w-4 h-4 fill-current" viewbox="0 0 24 24">
+<path d="M12 4C7.31 4 3.07 5.9 0 8.98L12 21 24 8.98A16.88 16.88 0 0012 4z"></path>
+</svg>
+<!-- Battery Icon -->
+<svg class="w-5 h-5 fill-current" viewbox="0 0 24 24">
+<path d="M17 5v1a1 1 0 001 1h1a1 1 0 011 1v10a1 1 0 01-1 1h-1a1 1 0 00-1 1v1h-8v-1a1 1 0 00-1-1H6a1 1 0 01-1-1V8a1 1 0 011-1h1a1 1 0 001-1V5h8z"></path>
+</svg>
+</div>
+</div>
+<!-- Supermarket App Header (Behind sheet) -->
+<header class="px-4 py-2 flex items-center justify-between text-neutral-900 mt-1">
+<div class="flex items-center space-x-5">
+<svg class="w-6 h-6 stroke-[2.5] stroke-current" fill="none" viewbox="0 0 24 24">
+<path d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<h1 class="text-2xl font-bold tracking-tight">スーパー</h1>
+</div>
+<button class="p-1 text-neutral-700">
+<svg class="w-6 h-6 fill-current" viewbox="0 0 24 24">
+<path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"></path>
+</svg>
+</button>
+</header>
+<!-- Cart Summary Badge -->
+<div class="px-5 mt-3">
+<div class="inline-flex items-center space-x-1.5 bg-[#D5C6E0] text-[#332244] text-xs font-semibold px-3 py-1.5 rounded-full">
+<svg class="w-4 h-4 fill-current" viewbox="0 0 20 20">
+<path clip-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" fill-rule="evenodd"></path>
+</svg>
+<span>のこり 4件 / 2完了</span>
+</div>
+</div>
+<!-- Action Prompt Subtitle -->
+<div class="text-center text-sm font-medium text-neutral-600 mt-4">
+        カードをタップして購入完了
+      </div>
+<!-- Background Item Card Mock (にんじん) -->
+<div class="mx-4 mt-6 bg-[#C6BACB] rounded-2xl p-4 flex items-center justify-between border border-[#B3A4BA]">
+<div class="flex items-center space-x-3">
+<span class="text-lg font-bold text-neutral-800">にんじん</span>
+<span class="bg-[#B7A6BE] text-neutral-800 text-xs px-2.5 py-0.5 rounded-full font-medium">3本</span>
+</div>
+<svg class="w-6 h-6 text-neutral-600 fill-current" viewbox="0 0 24 24">
+<path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"></path>
+</svg>
+</div>
+<!-- Dark Dim Overlay -->
+<div class="absolute inset-0 bg-neutral-900/35"></div>
+</div>
+<!-- END: BackgroundLayer -->
+<!-- BEGIN: SuggestionBottomSheet -->
+<main class="relative z-10 w-full bg-white rounded-t-[28px] shadow-[0_-8px_30px_rgba(0,0,0,0.18)] mt-[250px] flex-1 flex flex-col overflow-hidden" data-purpose="bottom-sheet">
+<!-- Top Drag Handle -->
+<div class="w-full flex justify-center pt-3 pb-2 cursor-grab" data-purpose="drag-handle-container">
+<div class="w-10 h-1 bg-[#79747E]/40 rounded-full" data-purpose="drag-handle"></div>
+</div>
+<!-- Fixed Header Content inside Bottom Sheet -->
+<div class="px-5 pt-1 pb-3 flex-shrink-0">
+<!-- Search Input Field -->
+<div class="relative w-full mb-3" data-purpose="search-bar">
+<div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-m3-actionPurple">
+<!-- Material Search Icon -->
+<svg class="w-5 h-5 stroke-[2.2] stroke-current fill-none" viewbox="0 0 24 24">
+<circle cx="11" cy="11" r="7"></circle>
+<path d="m20 20-3.5-3.5" stroke-linecap="round"></path>
+</svg>
+</div>
+<input aria-label="商品名を検索" class="w-full h-13 py-3 pl-12 pr-4 bg-m3-searchBg hover:bg-[#F0E4F5] focus:bg-white text-base text-neutral-900 placeholder-[#49454F] border-0 rounded-full focus:ring-2 focus:ring-m3-primary transition-all duration-150 outline-none" placeholder="商品名" type="search"/>
+</div>
+<!-- Scope Selector (公開範囲) -->
+<div class="flex items-center space-x-3 mb-3 text-sm font-medium" data-purpose="scope-selector">
+<span class="text-neutral-700 text-sm pl-1 font-normal">公開範囲</span>
+<div class="flex items-center space-x-2">
+<!-- Selected Scope: 全員に共有 -->
+<button aria-pressed="true" class="h-9 px-4 rounded-lg bg-m3-secondaryContainer text-m3-onPrimaryContainer font-medium flex items-center justify-center shadow-sm active:scale-95 transition-transform" type="button">
+              全員に共有
+            </button>
+<!-- Outlined Scope: 自分のみ -->
+<button aria-pressed="false" class="h-9 px-3.5 rounded-lg bg-white border border-m3-outline/40 text-neutral-700 font-medium flex items-center space-x-1.5 active:bg-neutral-50 active:scale-95 transition-transform" type="button">
+<!-- Lock Icon -->
+<svg class="w-3.5 h-3.5 fill-current text-neutral-600" viewbox="0 0 20 20">
+<path clip-rule="evenodd" d="M10 1a4.5 4.5 0 00-4.5 4.5V9H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-.5V5.5A4.5 4.5 0 0010 1zm3 8V5.5a3 3 0 10-6 0V9h6z" fill-rule="evenodd"></path>
+</svg>
+<span>自分のみ</span>
+</button>
+</div>
+</div>
+<!-- Guide Notice Text -->
+<p class="text-[13px] text-m3-onSurfaceVariant/90 leading-tight pl-1 font-normal tracking-wide">
+          長押しで、まとめる・非表示・購入履歴を開けます
+        </p>
+</div>
+<!-- Candidate Suggestion List (PROPOSAL A: State Chip Style) -->
+<section aria-label="提案候補リスト" class="flex-1 overflow-y-auto px-5 divide-y divide-transparent no-scrollbar" data-purpose="suggestion-list">
+<!-- Row 1: 麦茶（2L） -->
+<article class="flex items-center justify-between py-2.5 min-h-[58px] active:bg-neutral-50 rounded-xl px-1 transition-colors">
+<div class="flex-1 pr-3"><div class="flex items-center space-x-2 flex-wrap"><span class="text-base font-bold text-neutral-900 tracking-tight">麦茶（2L）</span><span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-m3-chipBgLilac text-m3-actionPurple">1日過ぎ</span></div><p class="text-xs text-neutral-500 mt-0.5 tracking-tight font-normal">約9日ごと · 最後は10日前</p></div>
+<!-- Action Plus Button -->
+<button aria-label="麦茶（2L）を追加" class="flex-shrink-0 w-10 h-10 min-w-[40px] min-h-[40px] p-2 flex items-center justify-center bg-m3-actionPurple hover:bg-[#5C3F7C] active:scale-90 text-white rounded-full transition shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-m3-actionPurple" type="button">
+<svg class="w-5 h-5 stroke-[2.8] stroke-white fill-none" viewbox="0 0 24 24">
+<path d="M12 4.5v15m7.5-7.5h-15" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+</article>
+<!-- Row 2: 食パン -->
+<article class="flex items-center justify-between py-2.5 min-h-[58px] active:bg-neutral-50 rounded-xl px-1 transition-colors">
+<div class="flex-1 pr-3"><div class="flex items-center space-x-2 flex-wrap"><span class="text-base font-bold text-neutral-900 tracking-tight">食パン</span><span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-m3-chipBgLilac text-m3-actionPurple">今日が目安</span></div><p class="text-xs text-neutral-500 mt-0.5 tracking-tight font-normal">約4日ごと · 最後は4日前</p></div>
+<!-- Action Plus Button -->
+<button aria-label="食パンを追加" class="flex-shrink-0 w-10 h-10 min-w-[40px] min-h-[40px] p-2 flex items-center justify-center bg-m3-actionPurple hover:bg-[#5C3F7C] active:scale-90 text-white rounded-full transition shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-m3-actionPurple" type="button">
+<svg class="w-5 h-5 stroke-[2.8] stroke-white fill-none" viewbox="0 0 24 24">
+<path d="M12 4.5v15m7.5-7.5h-15" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+</article>
+<!-- Row 3: 牛乳 -->
+<article class="flex items-center justify-between py-2.5 min-h-[58px] active:bg-neutral-50 rounded-xl px-1 transition-colors">
+<div class="flex-1 pr-3"><div class="flex items-center space-x-2 flex-wrap"><span class="text-base font-bold text-neutral-900 tracking-tight">牛乳</span><span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-m3-chipBgLilac text-m3-actionPurple">あと1日</span></div><p class="text-xs text-neutral-500 mt-0.5 tracking-tight font-normal">約7日ごと · 最後は6日前</p></div>
+<!-- Action Plus Button -->
+<button aria-label="牛乳を追加" class="flex-shrink-0 w-10 h-10 min-w-[40px] min-h-[40px] p-2 flex items-center justify-center bg-m3-actionPurple hover:bg-[#5C3F7C] active:scale-90 text-white rounded-full transition shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-m3-actionPurple" type="button">
+<svg class="w-5 h-5 stroke-[2.8] stroke-white fill-none" viewbox="0 0 24 24">
+<path d="M12 4.5v15m7.5-7.5h-15" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+</article>
+<!-- Row 4: 卵 -->
+<article class="flex items-center justify-between py-2.5 min-h-[58px] active:bg-neutral-50 rounded-xl px-1 transition-colors">
+<div class="flex-1 pr-3"><div class="flex items-center space-x-2 flex-wrap"><span class="text-base font-bold text-neutral-900 tracking-tight">卵</span><span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-m3-chipBgLilac text-m3-actionPurple">3日過ぎ</span></div><p class="text-xs text-neutral-500 mt-0.5 tracking-tight font-normal">約2日ごと · 最後は5日前</p></div>
+<!-- Action Plus Button -->
+<button aria-label="卵を追加" class="flex-shrink-0 w-10 h-10 min-w-[40px] min-h-[40px] p-2 flex items-center justify-center bg-m3-actionPurple hover:bg-[#5C3F7C] active:scale-90 text-white rounded-full transition shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-m3-actionPurple" type="button">
+<svg class="w-5 h-5 stroke-[2.8] stroke-white fill-none" viewbox="0 0 24 24">
+<path d="M12 4.5v15m7.5-7.5h-15" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+</article>
+<!-- Row 5: ヨーグルト (よく買う商品 - No State Chip) -->
+<article class="flex items-center justify-between py-2.5 min-h-[58px] active:bg-neutral-50 rounded-xl px-1 transition-colors">
+<div class="flex-1 pr-3"><div class="flex items-center space-x-2 flex-wrap"><span class="text-base font-bold text-neutral-900 tracking-tight">ヨーグルト</span><span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-[#F3EDF7] text-m3-onSurfaceVariant">よく買う</span></div><p class="text-xs text-neutral-500 mt-0.5 tracking-tight font-normal">4回購入 · 最後は8日前</p></div>
+<!-- Action Plus Button -->
+<button aria-label="ヨーグルトを追加" class="flex-shrink-0 w-10 h-10 min-w-[40px] min-h-[40px] p-2 flex items-center justify-center bg-m3-actionPurple hover:bg-[#5C3F7C] active:scale-90 text-white rounded-full transition shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-m3-actionPurple" type="button">
+<svg class="w-5 h-5 stroke-[2.8] stroke-white fill-none" viewbox="0 0 24 24">
+<path d="M12 4.5v15m7.5-7.5h-15" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+</article>
+<!-- Row 6: 豆腐 (よく買う商品 - No State Chip) -->
+<article class="flex items-center justify-between py-2.5 min-h-[58px] active:bg-neutral-50 rounded-xl px-1 transition-colors mb-4">
+<div class="flex-1 pr-3"><div class="flex items-center space-x-2 flex-wrap"><span class="text-base font-bold text-neutral-900 tracking-tight">豆腐</span><span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-[#F3EDF7] text-m3-onSurfaceVariant">よく買う</span></div><p class="text-xs text-neutral-500 mt-0.5 tracking-tight font-normal">2回購入 · 最後は19日前</p></div>
+<!-- Action Plus Button -->
+<button aria-label="豆腐を追加" class="flex-shrink-0 w-10 h-10 min-w-[40px] min-h-[40px] p-2 flex items-center justify-center bg-m3-actionPurple hover:bg-[#5C3F7C] active:scale-90 text-white rounded-full transition shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-m3-actionPurple" type="button">
+<svg class="w-5 h-5 stroke-[2.8] stroke-white fill-none" viewbox="0 0 24 24">
+<path d="M12 4.5v15m7.5-7.5h-15" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+</article>
+</section>
+<!-- END: SuggestionList -->
+<!-- BEGIN: AndroidHomeIndicator -->
+<footer class="w-full h-7 bg-white flex justify-center items-center flex-shrink-0 pb-1" data-purpose="home-indicator-bar">
+<div class="w-36 h-1 bg-neutral-900/80 rounded-full" data-purpose="gesture-handle"></div>
+</footer>
+<!-- END: AndroidHomeIndicator -->
+</main>
+<!-- END: SuggestionBottomSheet -->
+</div>
+<!-- END: PhoneFrame -->
+<!-- Optional click handler micro-interaction -->
+<script data-purpose="interaction-handlers">
+    document.addEventListener('DOMContentLoaded', () => {
+      const addButtons = document.querySelectorAll('button[aria-label$="を追加"]');
+      addButtons.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          // Visual feedback ripple effect
+          btn.classList.add('bg-[#4A2E70]');
+          setTimeout(() => {
+            btn.classList.remove('bg-[#4A2E70]');
+          }, 180);
+        });
+      });
+    });
+  </script>
+</body></html>

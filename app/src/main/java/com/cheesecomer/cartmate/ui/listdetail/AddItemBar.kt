@@ -56,6 +56,8 @@ import com.cheesecomer.cartmate.R
 import com.cheesecomer.cartmate.domain.input.AddItemEvent
 import com.cheesecomer.cartmate.domain.input.AddItemState
 import com.cheesecomer.cartmate.domain.model.Item
+import com.cheesecomer.cartmate.domain.suggest.DueStatus
+import androidx.compose.ui.text.font.FontWeight
 import com.cheesecomer.cartmate.ui.components.KeyboardSheet
 import com.cheesecomer.cartmate.ui.theme.CartMateSpacing
 import androidx.compose.material3.FilterChip
@@ -264,7 +266,24 @@ private fun SuggestionRowView(row: SuggestionRow, onOpen: () -> Unit, onAdd: () 
                 )
                 .padding(horizontal = CartMateSpacing.small, vertical = CartMateSpacing.small),
         ) {
-            Text(row.label, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            val status = statusChip(row.note)
+            if (status == null) {
+                Text(row.label, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            } else {
+                // 未入力の候補は、名前の横に買い時の状態（「あと1日」「3日過ぎ」）か「よく買う」のチップを出す
+                // （デザインは docs/design/screens/product-often-suggestions-sheet）
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        row.label,
+                        style = MaterialTheme.typography.titleMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    Spacer(Modifier.width(CartMateSpacing.small))
+                    StatusChip(status)
+                }
+            }
             noteText(row.note)?.let {
                 Text(it, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
             }
@@ -280,6 +299,42 @@ private fun SuggestionRowView(row: SuggestionRow, onOpen: () -> Unit, onAdd: () 
             }
         }
     }
+}
+
+/** 候補の名前の横に出すチップ。[emphasized] は時期が近い商品（primary の系統）、そうでなければよく買う商品（控えめな灰色の系統） */
+private data class ChipLabel(val text: String, val emphasized: Boolean)
+
+/** 時期が近い商品は買い時の状態、よく買う商品は「よく買う」。補完の候補には出さない */
+@Composable
+private fun statusChip(note: SuggestionNote): ChipLabel? = when (note) {
+    is SuggestionNote.Due -> ChipLabel(
+        when (val status = DueStatus.of(note.intervalDays, note.daysSinceLast)) {
+            is DueStatus.Remaining -> stringResource(R.string.add_item_status_remaining, status.days.toInt())
+            DueStatus.Today -> stringResource(R.string.add_item_status_today)
+            is DueStatus.Overdue -> stringResource(R.string.add_item_status_overdue, status.days.toInt())
+        },
+        emphasized = true,
+    )
+    is SuggestionNote.Frequent -> ChipLabel(stringResource(R.string.add_item_status_frequent), emphasized = false)
+    is SuggestionNote.Completion -> null
+}
+
+/**
+ * 状態のチップ。押せないので、Material の Chip ではなく文字に背景を付けただけにする。
+ * 遅れを煽らないよう、過ぎていても色は変えない（大きく過ぎた商品は、わざと順位を下げているため）
+ */
+@Composable
+private fun StatusChip(label: ChipLabel) {
+    val colors = MaterialTheme.colorScheme
+    Text(
+        label.text,
+        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+        color = if (label.emphasized) colors.primary else colors.onSurfaceVariant,
+        maxLines = 1,
+        modifier = Modifier
+            .background(if (label.emphasized) colors.primaryContainer else colors.surfaceContainer, CircleShape)
+            .padding(horizontal = CartMateSpacing.small, vertical = 2.dp),
+    )
 }
 
 /** 候補の補足。時期が近い商品は周期と前回からの日数、よく買う商品は買った日の数と前回からの日数、補完は「追加済み」と早すぎる再購入 */
