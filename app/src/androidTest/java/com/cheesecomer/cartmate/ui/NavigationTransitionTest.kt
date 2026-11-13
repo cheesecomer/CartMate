@@ -3,7 +3,14 @@ package com.cheesecomer.cartmate.ui
 import com.cheesecomer.cartmate.ui.hints.InMemoryHintStore
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -25,11 +32,13 @@ import com.cheesecomer.cartmate.domain.model.UserId
 import com.cheesecomer.cartmate.domain.model.Visibility
 import com.cheesecomer.cartmate.domain.product.NormalizationDictionary
 import com.cheesecomer.cartmate.ui.itementry.LastVisibilityStore
+import com.cheesecomer.cartmate.ui.listdetail.AddItemTags
 import com.cheesecomer.cartmate.ui.listdetail.ListDetailRoute
 import com.cheesecomer.cartmate.ui.listdetail.ListDetailScreen
 import com.cheesecomer.cartmate.ui.listdetail.ListDetailViewModel
 import com.cheesecomer.cartmate.ui.lists.ListsScreen
 import com.cheesecomer.cartmate.ui.lists.ListsViewModel
+import com.cheesecomer.cartmate.ui.products.ProductDetailRoute
 import com.cheesecomer.cartmate.ui.suggestions.SuggestionSource
 import com.cheesecomer.cartmate.ui.theme.CartMateTheme
 import com.google.common.truth.Truth.assertWithMessage
@@ -75,6 +84,9 @@ class NavigationTransitionTest {
             listItemsArrived.filter { it }.take(1).flatMapLatest { store.observeListItems(listId, completedSince) }
     }
 
+    /** サジェストの候補の長押しで、商品の画面を開いた */
+    private var productOpened = false
+
     /** リスト一覧の「スーパー」のカードの位置 */
     private var listCard = Offset.Zero
 
@@ -116,8 +128,15 @@ class NavigationTransitionTest {
                             onOpenEntry = { _, _, _ -> },
                             onEditItem = {},
                             entryResults = flowOf(),
+                            onOpenProduct = {
+                                productOpened = true
+                                navController.navigate(ProductDetailRoute(it.value))
+                            },
                             viewModel = viewModel,
                         )
+                    }
+                    screen<ProductDetailRoute> {
+                        TextButton(onClick = { navController.popBackStack() }) { Text("商品の画面を閉じる") }
                     }
                 }
             }
@@ -211,7 +230,58 @@ class NavigationTransitionTest {
         composeRule.onNodeWithText("パン").assertIsDisplayed()
     }
 
+    /**
+     * サジェストの候補を長押しして商品の画面を開くと、遷移の間にシートが先に消えて、背後のリスト詳細が一瞬見える（フィードバック #023）。
+     * 遷移の間はシートを表示したままにし、商品の画面から戻ったときはシートを出さずに、入力した商品名を商品追加欄に残す
+     */
+    @Test
+    fun 候補の長押しで商品の画面を開く間_シートは表示したままで_戻るとシートは閉じて入力は残る() {
+        setUp()
+        composeRule.onNodeWithTag(AddItemTags.FIELD).performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodes(hasTestTag(AddItemTags.SHEET_INPUT)).fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag(AddItemTags.SHEET_INPUT).performTextInput("牛")
+        val suggestion = composeRule.onNode(hasText("牛乳") and hasAnyAncestor(hasTestTag(AddItemTags.SUGGESTION)))
+        // シートは、キーボードが出るのを待ってからせり上がる
+        composeRule.waitUntil(timeoutMillis = 10_000) { runCatching { suggestion.assertIsDisplayed() }.isSuccess }
+
+        // 長押しして、商品の画面への遷移が始まったら指を離し、遷移の途中まで進める
+        composeRule.mainClock.autoAdvance = false
+        suggestion.performTouchInput { down(center) }
+        var waited = 0L
+        while (!productOpened && waited < 2_000L) {
+            composeRule.mainClock.advanceTimeBy(FRAME_MILLIS)
+            waited += FRAME_MILLIS
+        }
+        suggestion.performTouchInput { up() }
+        assertWithMessage("長押しで商品の画面が開かなかった").that(productOpened).isTrue()
+        composeRule.mainClock.advanceTimeBy(TRANSITION_MIDWAY_MILLIS)
+        val sheetShownDuringTransition =
+            composeRule.onAllNodes(hasTestTag(AddItemTags.SHEET_INPUT)).fetchSemanticsNodes().isNotEmpty()
+        composeRule.mainClock.autoAdvance = true
+        composeRule.waitForIdle()
+        assertWithMessage("遷移の途中でシートが消え、背後のリスト詳細が見えた").that(sheetShownDuringTransition).isTrue()
+
+        // 遷移が終わったあと: 商品の画面だけが表示され、シートは残っていない
+        composeRule.onNodeWithText("商品の画面を閉じる").assertIsDisplayed()
+        composeRule.onNodeWithTag(AddItemTags.SHEET_INPUT).assertDoesNotExist()
+
+        // 戻ると、戻る途中もそのあとも、シートは出ない。入力した商品名は商品追加欄に残る
+        composeRule.mainClock.autoAdvance = false
+        composeRule.onNodeWithText("商品の画面を閉じる").performClick()
+        composeRule.mainClock.advanceTimeBy(TRANSITION_MIDWAY_MILLIS)
+        val sheetShownWhileReturning =
+            composeRule.onAllNodes(hasTestTag(AddItemTags.SHEET_INPUT)).fetchSemanticsNodes().isNotEmpty()
+        composeRule.mainClock.autoAdvance = true
+        composeRule.waitForIdle()
+        assertWithMessage("戻る途中でシートが表示された").that(sheetShownWhileReturning).isFalse()
+        composeRule.onNodeWithTag(AddItemTags.SHEET_INPUT).assertDoesNotExist()
+        composeRule.onNode(hasTestTag(AddItemTags.FIELD) and hasText("牛")).assertIsDisplayed()
+    }
+
     private companion object {
+        const val FRAME_MILLIS = 16L
         /** 遷移のアニメーション（0.3秒）の途中 */
         const val TRANSITION_MIDWAY_MILLIS = 200L
         /** 遷移のアニメーション（0.3秒）が終わった少しあと */

@@ -3,6 +3,7 @@ package com.cheesecomer.cartmate.domain.input
 import com.cheesecomer.cartmate.domain.input.AddItemState.Entering
 import com.cheesecomer.cartmate.domain.input.AddItemState.Idle
 import com.cheesecomer.cartmate.domain.input.AddItemState.Open
+import com.cheesecomer.cartmate.domain.input.AddItemState.OpeningProduct
 
 object AddItemReducer {
     /** Enter と「数量を設定して追加」で使う数量・単位 */
@@ -13,6 +14,7 @@ object AddItemReducer {
         is Idle -> reduceIdle(state, event)
         is Open -> reduceOpen(state, event)
         is Entering -> reduceEntering(state, event)
+        is OpeningProduct -> reduceOpeningProduct(state, event)
     }
 
     private fun reduceIdle(state: Idle, event: AddItemEvent): AddItemTransition = when (event) {
@@ -41,10 +43,9 @@ object AddItemReducer {
                 val (quantity, unit) = lastOrDefault(event.suggestion)
                 AddItemTransition(Entering(state.text), AddItemEffect.OpenEntry(event.suggestion.name, quantity, unit))
             }
-            // 商品の画面から戻ってもシートは開き直さない（まとめる・非表示などの操作のあとで、元の入力に戻るのは不自然なため）。
-            // 入力した商品名は商品追加欄に残す
+            // 移り終わるまではシートを表示したままにする（先に閉じると、遷移の間に背後のリスト詳細が見える。フィードバック #023）
             is AddItemEvent.SuggestionLongPressed -> event.suggestion.productId
-                ?.let { AddItemTransition(Idle(state.text), AddItemEffect.OpenProduct(it)) }
+                ?.let { AddItemTransition(OpeningProduct(state.text), AddItemEffect.OpenProduct(it)) }
                 ?: AddItemTransition(state)
             AddItemEvent.DetailRequested ->
                 if (name.isEmpty()) {
@@ -60,6 +61,15 @@ object AddItemReducer {
     private fun reduceEntering(state: Entering, event: AddItemEvent): AddItemTransition = when (event) {
         // 追加したらリスト詳細に戻り、商品追加欄は空にする。やめたらシートに戻り、入力した商品名を残す
         is AddItemEvent.EntryClosed -> AddItemTransition(if (event.added) Idle("") else Open(state.text))
+        else -> AddItemTransition(state)
+    }
+
+    private fun reduceOpeningProduct(state: OpeningProduct, event: AddItemEvent): AddItemTransition = when (event) {
+        // 商品の画面から戻ってもシートは開き直さない（まとめる・非表示などの操作のあとで、元の入力に戻るのは不自然なため）。
+        // 入力した商品名は商品追加欄に残す
+        AddItemEvent.ScreenLeft -> AddItemTransition(Idle(state.text))
+        // 移る途中で取りやめになり、シートが残ったときは、ふつうに閉じられるようにする
+        AddItemEvent.Dismissed -> AddItemTransition(Idle(state.text))
         else -> AddItemTransition(state)
     }
 

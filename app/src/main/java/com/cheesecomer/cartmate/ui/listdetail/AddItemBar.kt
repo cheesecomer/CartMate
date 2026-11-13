@@ -115,11 +115,11 @@ fun AddItemField(text: String, onClick: () -> Unit, modifier: Modifier = Modifie
 
 /**
  * サジェストのシート。キーボードと一緒にせり上がる（docs/design/ui.md「商品追加欄とサジェストのシート」）。
- * 未入力なら時期が近い商品、入力中なら補完を出す
+ * 未入力なら時期が近い商品、入力中なら補完を出す。[state] は Open か、商品の画面へ移っている間の OpeningProduct
  */
 @Composable
 fun AddItemSheet(
-    state: AddItemState.Open,
+    state: AddItemState,
     onEvent: (AddItemEvent) -> Unit,
     /** 追加するときの公開範囲。null なら表示しない（プライベートのリスト） */
     visibility: Visibility? = null,
@@ -131,7 +131,12 @@ fun AddItemSheet(
     var value by remember { mutableStateOf(TextFieldValue(state.text, TextRange(state.text.length))) }
     if (value.text != state.text) value = TextFieldValue(state.text, TextRange(state.text.length))
 
-    KeyboardSheet(onDismiss = { onEvent(AddItemEvent.Dismissed) }, focusRequester = focusRequester) {
+    KeyboardSheet(
+        onDismiss = { onEvent(AddItemEvent.Dismissed) },
+        focusRequester = focusRequester,
+        // 商品の画面へ移っている間の戻るキーは、商品の画面に渡す
+        backEnabled = state is AddItemState.Open,
+    ) {
         AddItemSheetContent(
             value = value,
             onValueChange = {

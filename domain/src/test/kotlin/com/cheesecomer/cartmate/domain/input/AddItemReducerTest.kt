@@ -128,9 +128,34 @@ class AddItemReducerTest {
         private val egg = Suggestion("卵", 2.0, "パック", productId = com.cheesecomer.cartmate.domain.model.ProductId("n_egg"))
 
         @Test
-        fun `長押しすると、シートを閉じて商品の画面を開き、入力した商品名は商品追加欄に残す`() {
+        fun `長押しすると、商品の画面を開き、移り終わるまではシートを表示したままにする`() {
             assertThat(reduce(Open("た"), AddItemEvent.SuggestionLongPressed(egg)))
-                .isEqualTo(AddItemTransition(Idle("た"), AddItemEffect.OpenProduct(egg.productId!!)))
+                .isEqualTo(AddItemTransition(AddItemState.OpeningProduct("た"), AddItemEffect.OpenProduct(egg.productId!!)))
+        }
+
+        @Test
+        fun `移り終わったらシートを閉じ、入力した商品名は商品追加欄に残す`() {
+            assertThat(reduce(AddItemState.OpeningProduct("た"), AddItemEvent.ScreenLeft)).isEqualTo(AddItemTransition(Idle("た")))
+        }
+
+        @Test
+        fun `移る途中で取りやめになって残ったシートは、ふつうに閉じられる`() {
+            assertThat(reduce(AddItemState.OpeningProduct("た"), AddItemEvent.Dismissed)).isEqualTo(AddItemTransition(Idle("た")))
+        }
+
+        @Test
+        fun `移っている間の長押しやタップは受けない`() {
+            val state = AddItemState.OpeningProduct("た")
+            assertThat(reduce(state, AddItemEvent.SuggestionLongPressed(egg))).isEqualTo(AddItemTransition(state))
+            assertThat(reduce(state, AddItemEvent.SuggestionOpened(egg))).isEqualTo(AddItemTransition(state))
+            assertThat(reduce(state, AddItemEvent.TextChanged("たま"))).isEqualTo(AddItemTransition(state))
+        }
+
+        @Test
+        fun `ほかの状態では、画面が表示されなくなっても変わらない`() {
+            listOf(Idle("た"), Open("た"), AddItemState.Entering("た")).forEach {
+                assertThat(reduce(it, AddItemEvent.ScreenLeft)).isEqualTo(AddItemTransition(it))
+            }
         }
 
         @Test

@@ -775,7 +775,7 @@ class ListDetailViewModelTest {
     }
 
     @Test
-    fun `候補を長押しすると、シートを閉じて候補の商品の画面を開く`() = runTest {
+    fun `候補を長押しすると、候補の商品の画面を開き、移り終わったらシートを閉じる`() = runTest {
         bought("牛乳", times = 3, intervalDays = 10)
         clock.advance(java.time.Duration.ofDays(9))
         turbineScope {
@@ -789,6 +789,9 @@ class ListDetailViewModelTest {
 
             viewModel.onAddItemEvent(AddItemEvent.SuggestionLongPressed(row.suggestion))
             assertThat(navigation.awaitItem()).isEqualTo(DetailNavigation.OpenProduct(milk))
+            // 移り終わるまではシートを表示したままにする（フィードバック #023）
+            states.awaitUntil { it.addItem == AddItemState.OpeningProduct("") }
+            viewModel.onAddItemEvent(AddItemEvent.ScreenLeft)
             states.awaitUntil { it.addItem == AddItemState.Idle("") }
             navigation.cancelAndIgnoreRemainingEvents()
             states.cancelAndIgnoreRemainingEvents()

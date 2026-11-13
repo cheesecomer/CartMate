@@ -52,12 +52,14 @@ import kotlinx.coroutines.delay
  * 呼び出し側の画面の上に重ねて表示する（画面全体を覆う Box の中に置く）。
  *
  * @param onDismiss 幕のタップ、戻るキー、下へのドラッグで閉じたとき。フォーカスは外してから呼ぶ
+ * @param backEnabled false なら戻るキーを受けない（ほかの画面へ移っている間は、戻るキーをその画面に渡す）
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun KeyboardSheet(
     onDismiss: () -> Unit,
     focusRequester: FocusRequester,
+    backEnabled: Boolean = true,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val colors = MaterialTheme.colorScheme
@@ -105,7 +107,7 @@ fun KeyboardSheet(
         focusManager.clearFocus()
         onDismiss()
     }
-    BackHandler(onBack = dismiss)
+    BackHandler(enabled = backEnabled, onBack = dismiss)
 
     Box(Modifier.fillMaxSize()) {
         // 背面の画面を覆う幕。タップで閉じる

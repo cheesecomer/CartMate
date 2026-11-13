@@ -18,6 +18,12 @@ sealed interface AddItemState {
     /** 商品詳細入力画面を開いている。閉じて戻ってきたらシートを開き直す */
     data class Entering(override val text: String) : AddItemState
 
+    /**
+     * 候補の長押しで、商品の画面へ移っている。移り終わるまではシートを表示したままにし、背後のリスト詳細を見せない
+     * （フィードバック #023）。移り終わったらシートを閉じる（戻ってもシートは出さない）
+     */
+    data class OpeningProduct(override val text: String) : AddItemState
+
     companion object {
         val Initial: AddItemState = Idle("")
     }
@@ -46,7 +52,7 @@ sealed interface AddItemEvent {
     data class SuggestionAdded(val suggestion: Suggestion) : AddItemEvent
     /** 候補の名前の部分をタップした */
     data class SuggestionOpened(val suggestion: Suggestion) : AddItemEvent
-    /** 候補を長押しした。シートを閉じて商品の画面を開く */
+    /** 候補を長押しした。商品の画面を開き、移り終わったらシートを閉じる */
     data class SuggestionLongPressed(val suggestion: Suggestion) : AddItemEvent
     /** 「数量を設定して追加」 */
     data object DetailRequested : AddItemEvent
@@ -54,6 +60,8 @@ sealed interface AddItemEvent {
     data object Dismissed : AddItemEvent
     /** 商品詳細入力画面から戻った。[added] は追加したかどうか */
     data class EntryClosed(val added: Boolean) : AddItemEvent
+    /** ほかの画面へ移り終わり、リスト詳細の画面が表示されなくなった */
+    data object ScreenLeft : AddItemEvent
 }
 
 sealed interface AddItemEffect {

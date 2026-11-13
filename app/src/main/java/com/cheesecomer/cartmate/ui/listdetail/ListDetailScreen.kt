@@ -41,6 +41,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -148,6 +149,10 @@ fun ListDetailScreen(
         }
     }
     LaunchedEffect(viewModel, entryResults) { entryResults.collect(viewModel::onEntryResult) }
+    // 商品の画面へ移り終わって、この画面が表示されなくなったら、残しておいたシートを閉じる（フィードバック #023）
+    DisposableEffect(viewModel) {
+        onDispose { viewModel.onAddItemEvent(AddItemEvent.ScreenLeft) }
+    }
 
     ListDetailContent(
         state = state,
@@ -251,7 +256,8 @@ fun ListDetailContent(
             )
         }
 
-        (state.addItem as? AddItemState.Open)?.let {
+        // 商品の画面へ移っている間（OpeningProduct）も表示したままにする。先に閉じると、遷移の間に背後の一覧が見える（フィードバック #023）
+        state.addItem.takeIf { it is AddItemState.Open || it is AddItemState.OpeningProduct }?.let {
             AddItemSheet(
                 state = it,
                 onEvent = onAddItemEvent,
