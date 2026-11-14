@@ -47,6 +47,28 @@ class AiCandidatesTest {
     }
 
     @Test
+    fun `AI の品目がカタカナとひらがなの違いだけなら、同じ品目として候補にする`() {
+        // AI は入力の表記のまま品目を答えることがある（本番の「にら」と「ニラ」）
+        val hiragana = product("にら", createdAt = 10)
+        val katakana = product("ニラ", createdAt = 20)
+        val candidates = find(listOf(hiragana, katakana), listOf(judgement(hiragana, "にら"), judgement(katakana, "ニラ")))
+        assertThat(candidates.map { it.source to it.target }).containsExactly(katakana to hiragana)
+    }
+
+    @Test
+    fun `AI の属性がカタカナとひらがなの違いだけなら、一致とみなす`() {
+        val candidates = find(
+            listOf(goma, sesame),
+            listOf(judgement(goma, "豚肉", form = "こま切れ"), judgement(sesame, "豚肉", form = "コマ切れ")),
+        )
+        assertThat(candidates).hasSize(1)
+        // 記号はそろえない（容量の 1.5L と 15L は別）
+        assertThat(
+            find(listOf(goma, sesame), listOf(judgement(goma, "コーラ", volume = "1.5L"), judgement(sesame, "コーラ", volume = "15L"))),
+        ).isEmpty()
+    }
+
+    @Test
     fun `品目が違えば候補にしない`() {
         assertThat(find(listOf(goma, sesame), listOf(judgement(goma, "ごまドレッシング"), judgement(sesame, "和風ドレッシング")))).isEmpty()
     }

@@ -95,6 +95,16 @@ object AiCandidates {
     fun forProduct(id: ProductId, candidates: List<Candidate>): Candidate? =
         candidates.filter { it.source.id == id || it.target.id == id }.singleOrNull()
 
+    /**
+     * 比べるための AI の品目・属性の値。AI は入力の表記のまま答えることがあるので（「にら」と「ニラ」）、
+     * 正規化したうえでカタカナをひらがなにそろえる。記号は残す（容量の「1.5L」と「15L」を同じにしない）
+     */
+    private fun comparable(value: String): String =
+        NameNormalizer.normalizedName(value).map { if (it in KATAKANA) it - KATAKANA_TO_HIRAGANA else it }.joinToString("")
+
+    private val KATAKANA = 'ァ'..'ヶ'
+    private const val KATAKANA_TO_HIRAGANA = 'ァ' - 'ぁ'
+
     private fun identity(
         product: Product,
         products: Collection<Product>,
@@ -110,7 +120,9 @@ object AiCandidates {
                 product,
                 item = "c:${reason.canonicalId.value}",
                 canonical = reason.canonicalId,
-                attributes = KINDS.associateWith { kind -> attributes.filter { it.kind == kind }.map { it.value }.sorted().joinToString(",").ifEmpty { null } },
+                attributes = KINDS.associateWith { kind ->
+                    attributes.filter { it.kind == kind }.map { comparable(it.value) }.sorted().joinToString(",").ifEmpty { null }
+                },
                 fromDictionary = true,
                 reason = null,
             )
@@ -123,14 +135,14 @@ object AiCandidates {
         val canonical = dictionary.lookup(item)?.takeIf { it.match != NormalizationDictionary.Match.DEFAULT }?.canonicalId
         return Identity(
             product,
-            item = canonical?.let { "c:${it.value}" } ?: "n:$item",
+            item = canonical?.let { "c:${it.value}" } ?: "n:${comparable(item)}",
             canonical = canonical,
             attributes = mapOf(
                 "form" to judgement.form,
                 "use" to judgement.use,
                 "variant" to judgement.variant,
                 "volume" to judgement.volume,
-            ).mapValues { (_, value) -> value?.let(NameNormalizer::normalizedName)?.ifEmpty { null } },
+            ).mapValues { (_, value) -> value?.let(::comparable)?.ifEmpty { null } },
             fromDictionary = false,
             reason = judgement.reason?.let { Reason(product.displayName, it) },
         )

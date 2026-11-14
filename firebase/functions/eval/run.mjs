@@ -77,13 +77,16 @@ function loadDictionary() {
   return map;
 }
 
+// アプリの AiCandidates.comparable と同じ（正規化したうえで、カタカナをひらがなにそろえる）
+const comparable = (s) => normalize(s).replace(/[\u30a1-\u30f6]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0x60));
+
 function identity(answer, dictionary) {
   if (!answer?.item || answer.confidence < MIN_CONFIDENCE) return null;
   const item = normalize(answer.item);
   const canonical = dictionary.get(item);
-  const attr = (v) => (v == null ? null : normalize(v) || null);
+  const attr = (v) => (v == null ? null : comparable(v) || null);
   return {
-    item: canonical ? `c:${canonical}` : `n:${item}`,
+    item: canonical ? `c:${canonical}` : `n:${comparable(item)}`,
     attributes: [answer.form, answer.use, answer.variant, answer.volume].map(attr).join("|"),
   };
 }
