@@ -384,6 +384,7 @@ private fun ItemList(
                         onCheck = { onCheck(item) },
                         onDelete = { onDelete(item) },
                         drag = drag,
+                        early = state.earlyNotices[item.id],
                     )
                     ItemStatus.COMPLETED ->
                         CompletedItemCard(

@@ -1,6 +1,7 @@
 package com.cheesecomer.cartmate.domain.suggest
 
 import com.cheesecomer.cartmate.domain.model.Item
+import com.cheesecomer.cartmate.domain.model.ItemId
 import com.cheesecomer.cartmate.domain.model.ListId
 import com.cheesecomer.cartmate.domain.model.Product
 import com.cheesecomer.cartmate.domain.model.ProductId
@@ -32,7 +33,7 @@ import java.time.temporal.ChronoUnit
 class SuggestionEngine(
     products: Collection<Product>,
     purchases: Collection<Purchase>,
-    openItems: Collection<Item>,
+    private val openItems: Collection<Item>,
     private val dictionary: NormalizationDictionary,
     private val today: LocalDate,
     private val zone: ZoneId,
@@ -384,6 +385,21 @@ class SuggestionEngine(
             .map { it.first }
             .take(params.maxCompletions)
     }
+
+    // リスト詳細の項目のカード
+
+    /**
+     * 未購入の項目のうち、早すぎる再購入に当たるもの（docs/requirements.md §4.5）。Enter で追加して候補の注意を見逃した場合や、
+     * 追加した人とは別の家族が買い物するときにも気づけるよう、リストのカードに出す。判定は今日の時点で、
+     * 項目の商品名と備考で決まる記録（購入したときと同じまとめ方）で行う。非表示の商品には出さない
+     */
+    fun earlyNotices(): Map<ItemId, EarlyPurchaseNotice> = openItems.mapNotNull { item ->
+        val id = item.productId ?: return@mapNotNull null
+        val root = rootOf(id)
+        if (root in hidden || alwaysHidden(root)) return@mapNotNull null
+        val record = item.record() ?: return@mapNotNull null
+        early(record.group)?.let { item.id to it }
+    }.toMap()
 
     // 商品詳細入力画面
 

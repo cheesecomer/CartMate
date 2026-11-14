@@ -391,6 +391,45 @@ class SuggestionEngineTest {
         assertThat(engine(products, purchases, today = 10).complete("牛乳", "スーパー")).hasSize(8)
     }
 
+    // リスト詳細の項目のカード
+
+    @Test
+    fun `未購入の項目のうち、早すぎる再購入に当たるものだけ知らせる`() {
+        val milk = product("牛乳")
+        val eggs = product("卵")
+        val milkItem = openItem(milk)
+        val eggsItem = openItem(eggs)
+        // 牛乳は10日ごとで最後は2日前（経過率0.2）、卵は10日ごとで最後は8日前（経過率0.8）
+        val purchases = bought(milk, 0, 10, 20) + bought(eggs, 0, 10, 16)
+        val notices = engine(listOf(milk, eggs), purchases, today = 22, openItems = listOf(milkItem, eggsItem)).earlyNotices()
+        assertThat(notices).containsExactly(milkItem.id, EarlyPurchaseNotice(day0.plusDays(20), typicalIntervalDays = 10))
+    }
+
+    @Test
+    fun `項目の早すぎる再購入は、まとめた商品の記録を合わせて判定する`() {
+        val milk = product("牛乳")
+        val alias = product("ミルク", mergedInto = milk)
+        val item = openItem(alias)
+        val notices = engine(listOf(milk, alias), bought(milk, 0, 10) + bought(alias, 20), today = 22, openItems = listOf(item)).earlyNotices()
+        assertThat(notices).containsExactly(item.id, EarlyPurchaseNotice(day0.plusDays(20), typicalIntervalDays = 10))
+    }
+
+    @Test
+    fun `周期が分からない項目は、買ってから3日以内なら周期なしで知らせる`() {
+        val onion = product("玉ねぎ")
+        val item = openItem(onion)
+        assertThat(engine(listOf(onion), bought(onion, 0, 10), today = 12, openItems = listOf(item)).earlyNotices())
+            .containsExactly(item.id, EarlyPurchaseNotice(day0.plusDays(10), typicalIntervalDays = null))
+        assertThat(engine(listOf(onion), bought(onion, 0, 10), today = 14, openItems = listOf(item)).earlyNotices()).isEmpty()
+    }
+
+    @Test
+    fun `常に非表示の商品の項目には知らせない`() {
+        val test = product("テスト", suggestionExcluded = true)
+        val item = openItem(test)
+        assertThat(engine(listOf(test), bought(test, 0, 10, 20), today = 22, openItems = listOf(item)).earlyNotices()).isEmpty()
+    }
+
     // 商品詳細入力画面
 
     @Test

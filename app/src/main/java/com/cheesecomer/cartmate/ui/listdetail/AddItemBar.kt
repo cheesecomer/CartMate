@@ -57,6 +57,7 @@ import com.cheesecomer.cartmate.domain.input.AddItemEvent
 import com.cheesecomer.cartmate.domain.input.AddItemState
 import com.cheesecomer.cartmate.domain.model.Item
 import com.cheesecomer.cartmate.domain.suggest.DueStatus
+import com.cheesecomer.cartmate.domain.suggest.EarlyPurchaseNotice
 import androidx.compose.ui.text.font.FontWeight
 import com.cheesecomer.cartmate.ui.components.KeyboardSheet
 import com.cheesecomer.cartmate.ui.theme.CartMateSpacing
@@ -354,13 +355,17 @@ private fun noteText(note: SuggestionNote): String? = when (note) {
             note.addedLists.isEmpty() -> stringResource(R.string.add_item_note_added)
             else -> stringResource(R.string.add_item_note_added_in, note.addedLists.joinToString("・"))
         },
-        note.early?.let { early ->
-            val date = NOTE_DATE.format(early.lastPurchase)
-            early.typicalIntervalDays
-                ?.let { stringResource(R.string.add_item_note_early, date, it) }
-                ?: stringResource(R.string.add_item_note_recent, date)
-        },
+        note.early?.let { earlyNoteText(it) },
     ).joinToString("・").ifEmpty { null }
+}
+
+/** 早すぎる再購入の「前回 10/18 に購入・いつもは約14日ごと」（周期が分からなければ「前回 10/28 に購入」）。補完候補と項目のカードで使う */
+@Composable
+internal fun earlyNoteText(early: EarlyPurchaseNotice): String {
+    val date = NOTE_DATE.format(early.lastPurchase)
+    return early.typicalIntervalDays
+        ?.let { stringResource(R.string.add_item_note_early, date, it) }
+        ?: stringResource(R.string.add_item_note_recent, date)
 }
 
 /**

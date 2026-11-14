@@ -812,4 +812,25 @@ class ListDetailViewModelTest {
             cancelAndIgnoreRemainingEvents()
         }
     }
+
+    /** Enter で追加すると候補の注意は出ないので、追加したあとのリストのカードで知らせる（docs/requirements.md §4.5） */
+    @Test
+    fun `早すぎる再購入の項目は、Enter で追加してもカードに前回の購入と周期を出す`() = runTest {
+        // 卵は10日ごとで最後は22日前（早すぎない）、牛乳は10日ごとで最後は2日前（早すぎる）
+        bought("卵", times = 3, intervalDays = 10)
+        bought("牛乳", times = 3, intervalDays = 10)
+        val lastMilk = LocalDate.now(clock)
+        clock.advance(java.time.Duration.ofDays(2))
+        viewModel.uiState.test {
+            viewModel.onAddItemEvent(AddItemEvent.FieldFocused)
+            for (name in listOf("牛乳", "卵")) {
+                viewModel.onAddItemEvent(AddItemEvent.TextChanged(name))
+                viewModel.onAddItemEvent(AddItemEvent.Submitted)
+            }
+            val state = awaitUntil { s -> s.earlyNotices.isNotEmpty() && s.items.count { it.status == ItemStatus.OPEN } == 2 }
+            val open = state.items.filter { it.status == ItemStatus.OPEN }.associateBy { it.inputName }
+            assertThat(state.earlyNotices).containsExactly(open.getValue("牛乳").id, EarlyPurchaseNotice(lastMilk, typicalIntervalDays = 10))
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
 }

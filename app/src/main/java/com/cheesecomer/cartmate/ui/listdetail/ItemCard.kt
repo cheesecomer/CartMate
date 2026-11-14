@@ -46,6 +46,7 @@ import com.cheesecomer.cartmate.R
 import com.cheesecomer.cartmate.domain.input.formatQuantity
 import com.cheesecomer.cartmate.domain.model.Item
 import com.cheesecomer.cartmate.domain.model.Visibility
+import com.cheesecomer.cartmate.domain.suggest.EarlyPurchaseNotice
 import com.cheesecomer.cartmate.ui.components.DraggingElevation
 import com.cheesecomer.cartmate.ui.components.cardFrame
 import com.cheesecomer.cartmate.ui.components.cardSlot
@@ -74,7 +75,8 @@ data class RowDrag(
 /**
  * 未購入の項目のカード。タップか → でチェック、⋮ メニューの「編集」で編集、「削除」で削除。
  * ← のスワイプでは削除しない。チェックの代わりに削除してしまい、購入の記録が残らないため（フィードバック #018）。
- * [showLock] は共有のリストにあるプライベートな項目に鍵アイコンを付けるか
+ * [showLock] は共有のリストにあるプライベートな項目に鍵アイコンを付けるか。
+ * [early] は早すぎる再購入。備考の下に「前回 10/18 に購入・いつもは約14日ごと」と控えめに出す（docs/requirements.md §4.5）
  */
 @Composable
 fun OpenItemCard(
@@ -85,7 +87,9 @@ fun OpenItemCard(
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
     drag: RowDrag = RowDrag(),
+    early: EarlyPurchaseNotice? = null,
 ) {
+    val memo = item.memo
     SwipeableCard(
         enableStartToEnd = true,
         enableEndToStart = false,
@@ -104,15 +108,18 @@ fun OpenItemCard(
                 item.quantityText()?.let { QuantityBadge(it, completed = false) }
                 if (showLock) LockIcon()
             },
-            supporting = item.memo?.let {
+            supporting = if (memo == null && early == null) null else {
                 {
-                    Text(
-                        it,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                    if (memo != null) {
+                        Text(
+                            memo,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    early?.let { EarlyNote(it) }
                 }
             },
             trailing = { ItemMenu(item.inputName, onEdit = onEdit, onDelete = onDelete) },
@@ -252,6 +259,30 @@ private fun QuantityBadge(text: String, completed: Boolean) {
             .background(if (completed) colors.surfaceVariant else colors.primaryContainer, CircleShape)
             .padding(horizontal = CartMateSpacing.small + 2.dp, vertical = 2.dp),
     )
+}
+
+/**
+ * 早すぎる再購入の注意。追加を妨げず、色でも煽らないよう、履歴のアイコンと小さな文字を `onSurfaceVariant` で出す。
+ * 追加した人が Enter で候補の注意を見逃した場合や、別の家族が買い物するときにも気づけるようにする
+ */
+@Composable
+private fun EarlyNote(early: EarlyPurchaseNotice) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(
+            painterResource(R.drawable.ic_history),
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(14.dp),
+        )
+        Text(
+            earlyNoteText(early),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(start = CartMateSpacing.xSmall),
+        )
+    }
 }
 
 @Composable

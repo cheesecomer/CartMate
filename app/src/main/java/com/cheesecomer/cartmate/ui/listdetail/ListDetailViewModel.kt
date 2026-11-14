@@ -17,6 +17,7 @@ import com.cheesecomer.cartmate.domain.input.AddItemState
 import com.cheesecomer.cartmate.domain.model.Item
 import com.cheesecomer.cartmate.domain.model.ItemId
 import com.cheesecomer.cartmate.domain.model.ItemStatus
+import com.cheesecomer.cartmate.domain.suggest.EarlyPurchaseNotice
 import com.cheesecomer.cartmate.domain.model.ListId
 import com.cheesecomer.cartmate.domain.model.ListStatus
 import com.cheesecomer.cartmate.domain.model.NewItem
@@ -79,6 +80,8 @@ data class ListDetailUiState(
     val me: UserId? = null,
     /** 買い終わったリストに追加したので、買い忘れか次の買い物かを聞く（docs/requirements.md §3.2「前回の買い物の片付け」） */
     val asksRound: Boolean = false,
+    /** 未購入の項目のうち、早すぎる再購入に当たるもの。カードに「前回 10/18 に購入・いつもは約14日ごと」と出す（§4.5） */
+    val earlyNotices: Map<ItemId, EarlyPurchaseNotice> = emptyMap(),
 ) {
     /** [item] をチェックした人の名前。家族にいない人（退会したメンバー）は null */
     fun checkerName(item: Item): String? = item.completedBy?.let(memberNames::of)
@@ -179,6 +182,7 @@ class ListDetailViewModel @Inject constructor(
             state.copy(addVisibility = VisibilityDefaults.initial(state.listVisibility, remembered))
         }
         .combine(asksRound) { state, asks -> state.copy(asksRound = asks) }
+        .combine(earlyNotices(suggestionSource)) { state, notices -> state.copy(earlyNotices = notices) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), ListDetailUiState(listName = routeListName))
 
     /**
@@ -247,6 +251,14 @@ class ListDetailViewModel @Inject constructor(
     ) { engine, text, listNames -> SheetSuggestions.of(engine, text, listNames[listId].orEmpty(), listId, listNames) }
         .flowOn(source.dispatcher)
         .onStart { emit(SheetSuggestions.Loading) }
+
+    /** 項目のカードに出す早すぎる再購入。計算が終わるまでは出さず、項目の一覧の表示を待たせない */
+    private fun earlyNotices(source: SuggestionSource): Flow<Map<ItemId, EarlyPurchaseNotice>> =
+        source.observe()
+            .map { it.earlyNotices() }
+            .distinctUntilChanged()
+            .flowOn(source.dispatcher)
+            .onStart { emit(emptyMap()) }
 
     /** サジェストのシートで公開範囲を切り替える。そのリストの次の追加の初期値になる（docs/requirements.md §3.4） */
     fun setAddVisibility(visibility: Visibility) {
