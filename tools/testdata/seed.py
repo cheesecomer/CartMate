@@ -7,7 +7,7 @@
   - テスト用ユーザー taro@example.com（パスワード cartmate-test、表示名 山田 太郎）と、その家族
   - リスト「スーパー」「薬局」と、そこで過去に買った商品の購入の記録（今日を基準にした日付）
   - --showcase のときは、画面のスクリーンショット用に、家族のメンバー（山田 花子）、未購入とチェック済みの項目、
-    プライベートのリスト、まとめた商品、招待コードも入れる（tools/screenshots/take.sh）
+    プライベートのリスト、まとめた商品、AI の名寄せの判定、招待コードも入れる（tools/screenshots/take.sh）
 
 標準ライブラリだけを使う（Python 3.9 以上）。
 
@@ -19,6 +19,7 @@ import argparse
 import datetime
 import hashlib
 import json
+import pathlib
 import re
 import sys
 import time
@@ -97,6 +98,17 @@ SHOWCASE_PURCHASES = [
 ]
 # 「牛乳」にまとめた別の表記。購入日（27日前）は牛乳の周期（7日ごと）に沿わせる
 SHOWCASE_MERGED = ("ミルク", "牛乳", "スーパー", 1, "本", 27)
+# 商品名の管理の「AI の候補」に出す組。商品名, 購入日（今日から何日前か）, AI の品目, AI の理由。
+# どれも辞書になく、1回ずつしか買っていない（よく買う商品にも時期が近い商品にも出ず、サジェストのシートは変わらない）。
+# 判定は、関数（judgeName）が書いたものと同じ形で入れる（エミュレータでは関数を動かさない）
+SHOWCASE_AI = [
+    ("片栗粉", 40, "片栗粉", "「片栗粉」はじゃがいものでんぷんの粉"),
+    ("かたくり粉", 12, "片栗粉", "「かたくり粉」は片栗粉のひらがな表記"),
+    ("胡麻ドレ", 50, "ごまドレッシング", "「胡麻ドレ」はごまドレッシングの略称"),
+    ("セサミドレ", 18, "ごまドレッシング", "「セサミドレ」はごまドレッシングの略称"),
+]
+# AI の信頼度（候補にする下限 0.7 以上）
+SHOWCASE_AI_CONFIDENCE = 0.9
 INVITE_CODE = "K7QM2XWP4R"
 
 
@@ -121,10 +133,28 @@ def product_id(name):
     return "n_" + hashlib.sha256(normalized_name(name).encode("utf-8")).digest()[:16].hex()
 
 
+def judgement_key(normalized, qualifiers=None):
+    """アプリの JudgementKey.of と同じ（属性がなければ、名前だけで決まる）"""
+    lines = sorted(f"{kind}={v}" for kind, values in (qualifiers or {}).items() for v in values)
+    canonical = "\n".join(["v1", normalized] + lines)
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:32]
+
+
+def judge_version():
+    """アプリの NameJudgement.CURRENT_VERSION。違うと、アプリは判定を使わない（候補が出ない）ので、ソースから読む"""
+    path = pathlib.Path(__file__).resolve().parents[2] / "domain/src/main/kotlin/com/cheesecomer/cartmate/domain/product/NameJudgement.kt"
+    match = re.search(r'const val CURRENT_VERSION = "([^"]+)"', path.read_text(encoding="utf-8"))
+    if not match:
+        sys.exit(f"判定のバージョンが見つからない: {path}")
+    return match.group(1)
+
+
 def value(v):
     """Firestore の REST API の値"""
     if v is None:
         return {"nullValue": None}
+    if isinstance(v, dict):
+        return {"mapValue": {"fields": {k: value(x) for k, x in v.items()}}}
     if isinstance(v, bool):
         return {"booleanValue": v}
     if isinstance(v, (int, float)):
@@ -270,6 +300,18 @@ def main():
         at = noon - datetime.timedelta(days=day)
         item(f"seed-{pid[2:10]}-{day}", pid, name, list_name, quantity, unit, None, "shared", MEMBER_UID, day, at, at)
         count += 1
+        version = judge_version()
+        for name, day, ai_item, reason in SHOWCASE_AI:
+            at = noon - datetime.timedelta(days=day)
+            pid = product(name, at)
+            item(f"seed-{pid[2:10]}-{day}", pid, name, "スーパー", 1, "袋", None, "shared", uid, day, at, at)
+            count += 1
+            put(f"{household}/nameJudgements/{judgement_key(normalized_name(name))}", {
+                "normalizedName": normalized_name(name), "qualifiers": {}, "status": "done",
+                "item": ai_item, "form": None, "volume": None, "use": None, "variant": None,
+                "confidence": SHOWCASE_AI_CONFIDENCE, "reason": reason, "judgeVersion": version,
+                "dictionaryVersion": "showcase", "requestedAt": at, "judgedAt": at,
+            })
         put(f"invites/{INVITE_CODE}", {
             "householdId": HOUSEHOLD_ID, "createdBy": uid, "inviterName": DISPLAY_NAME,
             "createdAt": now - datetime.timedelta(hours=2), "expiresAt": now + datetime.timedelta(hours=22),
