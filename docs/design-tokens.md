@@ -41,7 +41,7 @@ val TextDisabled = Color(0x661D1B20)          // 完了商品の打消し線・�
 // Status & Semantic Tokens
 val WarningBannerBackground = Color(0xFFFCEEE8) // オフライン警告バナー背景
 val WarningBannerText = Color(0xFF6E3917)       // オフライン警告テキスト・アイコン
-val HintBackground = Color(0xFF2E1F42)          // 初回の案内の吹き出し背景（docs/design/screens/family-hint）
+val HintBackground = Color(0xFF2E1F42)          // 初回の案内の吹き出し背景（docs/design/screens/02-lists-family-hint）
 ```
 
 ---

@@ -91,7 +91,7 @@ data class PurchaseHistoryRoute(val productId: String)
 @Serializable
 data class MergeProductsRoute(val targetId: String)
 
-/** 商品名の管理（docs/design/screens/item_list）。検索欄、商品の一覧のカード、非表示の商品のカード */
+/** 商品名の管理（docs/design/screens/12-product-names）。検索欄、商品の一覧のカード、非表示の商品のカード */
 @Composable
 fun ProductNamesScreen(onBack: () -> Unit, onOpen: (ProductId) -> Unit, viewModel: ProductNamesViewModel = hiltViewModel()) {
     val lists by viewModel.lists.collectAsStateWithLifecycle()
@@ -427,7 +427,7 @@ private fun RenameDialog(
     )
 }
 
-/** 統合先の商品の画面（docs/design/screens/item_detail-no_zip。まとめている商品の欄は item_detail-zip） */
+/** 統合先の商品の画面（docs/design/screens/13-product-detail。まとめている商品の欄は 13-product-detail-merged） */
 @Composable
 private fun TargetDetail(
     entry: ProductMerge.Entry,
@@ -669,7 +669,7 @@ private fun MergedDetail(target: Product, onUnmerge: () -> Unit, onOpenTarget: (
 }
 
 /**
- * 商品をまとめる（docs/design/screens/item_zip）。残す商品、検索欄、候補（今まとめている商品はチェックした状態）、
+ * 商品をまとめる（docs/design/screens/15-merge-products）。残す商品、検索欄、候補（今まとめている商品はチェックした状態）、
  * 「すべて解除」、下部の件数と「まとめる」
  */
 @Composable

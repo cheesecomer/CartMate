@@ -234,7 +234,7 @@ fun ItemEntryContent(
 }
 
 /**
- * 「『牛乳』と同じ商品として扱う」の選択肢（docs/design/screens/item-entry-merge-full、item-entry-merge-selected-full）。
+ * 「『牛乳』と同じ商品として扱う」の選択肢（docs/design/screens/07-item-entry-merge-full、07-item-entry-merge-selected-full）。
  * カードのどこを押してもチェックが切り替わる。中のチェックボックスは表示だけにして、押せる場所を1つにする
  */
 @Composable
@@ -334,7 +334,7 @@ private fun Section(
 }
 
 /**
- * 数量のカード。「−」・数字と単位・「＋」を1つの丸い入れ物にまとめ（docs/design/screens/product-detail-entry）、
+ * 数量のカード。「−」・数字と単位・「＋」を1つの丸い入れ物にまとめ（docs/design/screens/07-item-entry）、
  * その下に 1〜6 のチップを等幅で並べる
  */
 @Composable

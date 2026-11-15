@@ -34,7 +34,7 @@ import androidx.compose.ui.unit.dp
 import com.cheesecomer.cartmate.R
 import com.cheesecomer.cartmate.ui.theme.CartMateSpacing
 
-// 商品名の管理・商品・購入履歴・商品をまとめるの画面で共通の部品（docs/design/screens/item_*）
+// 商品名の管理・商品・購入履歴・商品をまとめるの画面で共通の部品（docs/design/screens/12-product-names・13-product-detail*・14-purchase-history・15-merge-products）
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

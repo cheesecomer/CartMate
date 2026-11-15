@@ -49,7 +49,7 @@ import java.time.format.DateTimeFormatter
 /** 「10/18」 */
 internal val HISTORY_DATE: DateTimeFormatter = DateTimeFormatter.ofPattern("M/d")
 
-/** 商品ごとの購入履歴（docs/design/ui.md「購入履歴」、docs/design/screens/item_history） */
+/** 商品ごとの購入履歴（docs/design/ui.md「購入履歴」、docs/design/screens/14-purchase-history） */
 @Composable
 fun PurchaseHistoryScreen(
     onBack: () -> Unit,

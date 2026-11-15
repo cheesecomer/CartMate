@@ -97,7 +97,7 @@ private fun FamilyHint(show: Boolean, onDismiss: () -> Unit, anchor: @Composable
     }
     TooltipBox(
         positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Below),
-        // 見た目は docs/design/screens/family-hint。吹き出しの外をタップしても、吹き出し自体や × をタップしても閉じる
+        // 見た目は docs/design/screens/02-lists-family-hint。吹き出しの外をタップしても、吹き出し自体や × をタップしても閉じる
         tooltip = {
             PlainTooltip(
                 // 画面の端に付けず、アバターの右端にそろえる

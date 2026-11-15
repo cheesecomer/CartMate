@@ -277,7 +277,7 @@ private fun SuggestionRowView(row: SuggestionRow, onOpen: () -> Unit, onAdd: () 
                 Text(row.label, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
             } else {
                 // 未入力の候補は、名前の横に買い時の状態（「あと1日」「3日過ぎ」）か「よく買う」のチップを出す
-                // （デザインは docs/design/screens/product-often-suggestions-sheet）
+                // （デザインは docs/design/screens/05-suggestions）
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         row.label,

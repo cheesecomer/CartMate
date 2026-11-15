@@ -66,22 +66,22 @@ Material Design 3 の Dynamic Color / Lilac Purple パレットを基準とし�
 
 ## 2. 最終採用画面一覧（全6画面構成）
 
-> ログイン・家族・招待・合流の画面（フェーズ2）は [family-screens-spec.md](family-screens-spec.md) にあります。`list-overview` のモックは、上部バーの右端に自分のアバターを加えたものに差し替えました。
+> ログイン・家族・招待・合流の画面（フェーズ2）は [family-screens-spec.md](family-screens-spec.md) にあります。`02-lists` のモックは、上部バーの右端に自分のアバターを加えたものに差し替えました。
 
 | # | 画面識別名（Screen ID） | 対応ファイル名 | プレビュー / プレースホルダー | 役割・表示状態 |
 | :--- | :--- | :--- | :--- | :--- |
-| 1 | **`list-overview`** | `list-overview.html` | `SCREEN_79` | 買い物リスト一覧（通常・登録あり・2カラムグリッド） |
-| 2 | **`list-overview-empty`** | `list-overview-empty.html` | `SCREEN_103` | 買い物リスト一覧（0件・空状態案内） |
-| 3 | **`list-overview-offline`** | `list-overview-offline.html` | `SCREEN_124` | 買い物リスト一覧（オフライン警告バナー表示） |
-| 4 | **`list-detail`** | `list-detail.html` | `SCREEN_210` | 買い物リスト詳細（スーパー / チェック＆Undo対応） |
-| 5 | **`product-suggestions-sheet`** | `product-suggestions-sheet.html` | `SCREEN_231` | 商品サジェスト（ボトムシート型 / 連続入力対応） |
-| 6 | **`product-detail-entry`** | `product-detail-entry.html` | `SCREEN_236` | 商品詳細入力（数量・単位・公開範囲・備考） |
+| 1 | **`02-lists`** | `02-lists.html` | `SCREEN_79` | 買い物リスト一覧（通常・登録あり・2カラムグリッド） |
+| 2 | **`02-lists-empty`** | `02-lists-empty.html` | `SCREEN_103` | 買い物リスト一覧（0件・空状態案内） |
+| 3 | **`02-lists-offline`** | `02-lists-offline.html` | `SCREEN_124` | 買い物リスト一覧（オフライン警告バナー表示） |
+| 4 | **`04-list-detail`** | `04-list-detail.html` | `SCREEN_210` | 買い物リスト詳細（スーパー / チェック＆Undo対応） |
+| 5 | **`06-suggestions-typing`** | `06-suggestions-typing.html` | `SCREEN_231` | 商品サジェスト（ボトムシート型 / 連続入力対応） |
+| 6 | **`07-item-entry`** | `07-item-entry.html` | `SCREEN_236` | 商品詳細入力（数量・単位・公開範囲・備考） |
 
 ---
 
 ## 3. 各画面の詳細仕様と Jetpack Compose 実装手引き
 
-### 3.1 買い物リスト一覧（`list-overview.html` / `SCREEN_79`）
+### 3.1 買い物リスト一覧（`02-lists.html` / `SCREEN_79`）
 - **Top App Bar**: 左にアプリ名「CartMate」、右端に自分の Google アカウントのアバター（32dp の円。48dp のタップ領域）。アバターのタップで家族画面を開く。ほかの設定アイコンや戻るボタンは置かない。
 - **並び替え**: 上部案内テキスト「長押しで並び替えができます」（アイコンなし、テキストのみ）。カード面の長押しドラッグ（`detectDragGesturesAfterLongPress`）で並び替え。カード側にドラッグハンドルアイコンは置かない。
 - **カード構成（2カラムグリッド）**:
@@ -92,17 +92,17 @@ Material Design 3 の Dynamic Color / Lilac Purple パレットを基準とし�
 - **FAB**: 右下固定「＋ リスト作成」（Primary `#6B4E8C`, Text `#FFFFFF`, Pill型角丸9999px）。
 - **リスト追加位置**: 新規作成されたリストは一覧の末尾に追加される。
 
-### 3.2 買い物リスト一覧 空状態（`list-overview-empty.html` / `SCREEN_103`）
+### 3.2 買い物リスト一覧 空状態（`02-lists-empty.html` / `SCREEN_103`）
 - **レイアウト**: 画面中央配置。
 - **メッセージ**: 「リストがありません」（20sp Bold）＋「最初の買い物リストを作成しましょう」（14sp Regular）。
 - **装飾**: 派手なイラストや店舗候補選択UIは置かず、クリーンなメッセージと「＋ リストを作成する」CTAボタン（Primary `#6B4E8C`）で構成。
 
-### 3.3 買い物リスト一覧 オフライン（`list-overview-offline.html` / `SCREEN_124`）
+### 3.3 買い物リスト一覧 オフライン（`02-lists-offline.html` / `SCREEN_124`）
 - **バナー**: Top App Bar 直下に固定警告バナー「オフライン表示中（変更は再接続時に同期されます）」。
 - **カラー**: 背景 `#FCEEE8` / テキスト・アイコン `#6E3917`。
 - **操作性**: キャッシュ済みリストカードの閲覧・タップ・編集は通常通り可能。オフライン切替用のデバッグボタン・トグルは置かない。
 
-### 3.4 買い物リスト詳細（`list-detail.html` / `SCREEN_210`）
+### 3.4 買い物リスト詳細（`04-list-detail.html` / `SCREEN_210`）
 - **Top App Bar**: ナビゲーション戻る矢印アイコン（48dpタップ領域）、リスト名「スーパー」（20sp Semi-Bold）、プライベート時は鍵アイコン。メンバーのアバターは表示しない。※コンテンツ領域内にはリスト名を重複表示しない。
 - **進行状況**: 「のこり 4件 / 2完了」のバッジだけ（`#F2E7FE` 背景に `#6B4E8C` テキスト）。見出し「買い物進捗」、カードの枠、進捗バーは置かない（2026-10-26 に変更）。
 - **商品行カード（購入完了・Undo仕様）**:
@@ -112,7 +112,7 @@ Material Design 3 の Dynamic Color / Lilac Purple パレットを基準とし�
 - **商品追加位置**: 新規追加された商品は **リスト末尾（最下部）** に順次追加される。
 - **ボトム入力バー**: 画面最下部に固定「商品名を入力して追加...」（フォーカスでサジェストボトムシート起動）。
 
-### 3.5 商品サジェスト ボトムシート（`product-suggestions-sheet.html` / `SCREEN_231`）
+### 3.5 商品サジェスト ボトムシート（`06-suggestions-typing.html` / `SCREEN_231`）
 - **形態**: **ボトムシート方式**（背面にリスト詳細画面が透けて見える半透明スクリム `rgba(0,0,0,0.5)` 付きモーダルシート）。上部角丸は 28dp。全画面型は不採用。
 - **キーボード連動**: IME展開時に入力欄が最上部に押し上げられ、`Modifier.imePadding()` でスムーズに追従。
 - **最上部固定アクション**: 固定文言**「数量を設定して追加」**（品名は含めない）。タップで入力文字列を保持して商品詳細入力画面へ遷移。
@@ -124,7 +124,7 @@ Material Design 3 の Dynamic Color / Lilac Purple パレットを基準とし�
   - 入力中文字列を「数量: 1」「単位: 個」「備考: 空」「公開範囲: **当該リストで直前に選択した公開範囲を引き継ぐ**」で**即座にリスト末尾へ追加**。
   - **ボトムシートは閉じず**に入力欄が自動クリアされ、ソフトウェアキーボードを開いたまま連続して次の品目をテンポよく入力可能。
 
-### 3.6 商品詳細入力（`product-detail-entry.html` / `SCREEN_236`）
+### 3.6 商品詳細入力（`07-item-entry.html` / `SCREEN_236`）
 - **構成**:
   - ヘッダー: 「×」閉じる/戻るアイコン（48dpタップ領域）、タイトル「商品の詳細入力」（20sp Semi-Bold）。
   - 追加先リスト表示: 「追加先: スーパー（共有リスト 3人）」。

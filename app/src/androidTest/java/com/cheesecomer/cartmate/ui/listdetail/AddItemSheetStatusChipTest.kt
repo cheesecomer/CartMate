@@ -12,7 +12,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/** 未入力のサジェストの候補に、買い時の状態と「よく買う」のチップを出す（docs/design/screens/product-often-suggestions-sheet） */
+/** 未入力のサジェストの候補に、買い時の状態と「よく買う」のチップを出す（docs/design/screens/05-suggestions） */
 @RunWith(AndroidJUnit4::class)
 class AddItemSheetStatusChipTest {
 
