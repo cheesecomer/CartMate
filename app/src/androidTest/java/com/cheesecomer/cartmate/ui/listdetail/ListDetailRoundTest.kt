@@ -41,7 +41,10 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.time.Clock
+import java.time.Duration
 import java.time.Instant
+import java.time.ZoneId
+import java.time.ZoneOffset
 
 /** 買い物を終えてすぐ、買い忘れを足す（フィードバック #013。docs/requirements.md §3.2「前回の買い物の片付け」） */
 @RunWith(AndroidJUnit4::class)
@@ -50,7 +53,14 @@ class ListDetailRoundTest {
     @get:Rule
     val composeRule = createAndroidComposeRule<ComponentActivity>()
 
-    private val clock = Clock.systemUTC()
+    /** 端末の時刻からのずれ。買い物を過去の時刻で済ませるために使う */
+    @Volatile
+    private var clockOffset: Duration = Duration.ZERO
+    private val clock = object : Clock() {
+        override fun instant(): Instant = Instant.now().plus(clockOffset)
+        override fun getZone(): ZoneId = ZoneOffset.UTC
+        override fun withZone(zone: ZoneId): Clock = this
+    }
     private val store = InMemoryStore(clock) { UserId("taro") }
     private val listId = runBlocking { store.createList(NewList("スーパー", null, Visibility.SHARED)) }
 
@@ -68,6 +78,12 @@ class ListDetailRoundTest {
             val milk = store.addItem(NewItem(listId, "牛乳", 1.0, "本", null, Visibility.SHARED)).id
             store.completeItem(milk, clock.instant())
         }
+        openAndAdd("卵", keepKeyboard)
+        composeRule.waitUntil(timeoutMillis = 5_000) { displayed(DIALOG_TITLE) }
+    }
+
+    /** リスト詳細を開き、シートで [name] を Enter で追加する */
+    private fun openAndAdd(name: String, keepKeyboard: Boolean = false) {
         val viewModel = ListDetailViewModel(
             savedStateHandle = SavedStateHandle(mapOf("listId" to listId.value)),
             listRepository = store,
@@ -93,13 +109,12 @@ class ListDetailRoundTest {
 
         composeRule.onNodeWithTag(AddItemTags.FIELD).performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) { (!keepKeyboard || imeBottom > 0) && displayedTag(AddItemTags.SHEET_INPUT) }
-        composeRule.onNodeWithTag(AddItemTags.SHEET_INPUT).performTextInput("卵")
+        composeRule.onNodeWithTag(AddItemTags.SHEET_INPUT).performTextInput(name)
         if (!keepKeyboard) {
             Espresso.closeSoftKeyboard()
             composeRule.waitUntil(timeoutMillis = 5_000) { imeBottom == 0 }
         }
         composeRule.onNodeWithTag(AddItemTags.SHEET_INPUT).performImeAction()
-        composeRule.waitUntil(timeoutMillis = 5_000) { displayed(DIALOG_TITLE) }
     }
 
     private fun displayed(text: String) = runCatching { composeRule.onNodeWithText(text).assertIsDisplayed() }.isSuccess
@@ -176,6 +191,35 @@ class ListDetailRoundTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithTag(AddItemTags.SHEET_INPUT).assertIsFocused()
         assertWithMessage("落ち着いたあともキーボードが出ている").that(imeBottom).isGreaterThan(0)
+    }
+
+    /**
+     * 店で見つからなかった商品を未購入のまま残し、ほかの商品をチェックして帰った。別の日に次の買い物の商品を足すと、
+     * 前回のチェック済みは片付き、見つからなかった商品と今回の商品だけが並ぶ（聞かない）
+     */
+    @Test
+    fun 見つからず残した商品があっても_最後のチェックから2時間を過ぎた追加では_チェック済みを片付ける() {
+        clockOffset = Duration.ofHours(-3)
+        runBlocking {
+            val milk = store.addItem(NewItem(listId, "牛乳", 1.0, "本", null, Visibility.SHARED)).id
+            store.addItem(NewItem(listId, "しょうゆ", 1.0, "本", null, Visibility.SHARED))
+            store.completeItem(milk, clock.instant())
+        }
+        clockOffset = Duration.ZERO
+
+        openAndAdd("卵")
+
+        // 落ち着いたあと: 聞かずに片付け、見つからなかったしょうゆと今回の卵だけが並ぶ
+        composeRule.waitUntil(timeoutMillis = 5_000) { shownNames().contains("卵") }
+        composeRule.waitForIdle()
+        assertWithMessage("聞かない").that(displayed(DIALOG_TITLE)).isFalse()
+        assertWithMessage("前回のチェック済みは片付け、未購入は残す").that(shownNames()).containsExactly("しょうゆ", "卵").inOrder()
+        Espresso.pressBack()
+        composeRule.waitUntil(timeoutMillis = 5_000) { !displayedTag(AddItemTags.SHEET_INPUT) }
+        composeRule.waitForIdle()
+        assertWithMessage("片付けた牛乳を一覧に出さない").that(displayed("牛乳")).isFalse()
+        composeRule.onNodeWithText("しょうゆ").assertIsDisplayed()
+        composeRule.onNodeWithText("卵").assertIsDisplayed()
     }
 
     private companion object {

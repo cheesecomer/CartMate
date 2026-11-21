@@ -189,7 +189,7 @@ class InMemoryStore @Inject constructor(
                 completedBy = null,
                 productId = ProductId(NameNormalizer.productId(newItem.inputName)),
             )
-            // 買い終わったリストに追加したら、前回の買い物のチェック済みを片付ける。最後のチェックから間もなければ、聞いてから片付ける
+            // 買い物を終えたリストに追加したら、前回の買い物のチェック済みを片付ける。最後のチェックから間もなければ、聞いてから片付ける
             val list = d.lists[newItem.listId]
             val shown = ShoppingRound.visible(
                 d.items.values.filter { it.listId == newItem.listId && it.visible },

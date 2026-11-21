@@ -226,7 +226,7 @@ class FirestoreShoppingStore @Inject constructor(
             clearedAt = list?.clearedAt,
         )
         val onAdd = if (list != null) ShoppingRound.onAdd(shown, now) else ShoppingRound.OnAdd.KEEP
-        // 買い終わったリストに追加したら、前回の買い物のチェック済みを片付ける（docs/requirements.md §3.2）。
+        // 買い物を終えたリストに追加したら、前回の買い物のチェック済みを片付ける（docs/requirements.md §3.2）。
         // 最後のチェックから間もなければ片付けず、呼び出し側が買い忘れか聞く（asksRound）。
         // 項目の追加とは別に書く。同じ書き込みにすると、ほかの端末がそのリストを先に削除していた場合などに片付けが拒否され、
         // 追加した項目まで消えてしまう（docs/design/sync.md「リスト削除の競合」）
